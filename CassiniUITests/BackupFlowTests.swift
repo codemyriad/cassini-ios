@@ -86,6 +86,37 @@ final class BackupFlowTests: XCTestCase {
         }
     }
 
+    @MainActor func testReadersLinkOpensTheReadershipSection() {
+        let app = launch()
+        openBackup(app)
+        let readers = app.buttons["backupReadersRow"]
+        reveal(readers, in: app); readers.tap()
+        let heading = app.staticTexts["iCloud Backup"]
+        XCTAssertTrue(heading.waitForExistence(within: 15))
+        XCTAssertTrue(heading.isHittable, "The topic link opens its section without another scroll")
+    }
+
+    @MainActor func testVoiceChoiceDoesNotExcludeMeetings() {
+        let app = launch()
+        openBackup(app)
+        let control = app.switches["includeSavedVoicesToggle"]
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        XCTAssertTrue(control.waitForValue("0"))
+        XCTAssertEqual(app.switches["cloudBackupToggle"].value as? String, "1")
+        let info = app.buttons["backupInfoRow"]
+        reveal(info, in: app); info.tap()
+        XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
+        for id in ["backupStatusMeetings", "backupStatusVoices"] {
+            let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
+            reveal(row, in: app)
+            XCTAssertTrue(row.label.contains(id == "backupStatusMeetings" ? "Included when iCloud Backup is on" : "Marked to be left out"), row.label)
+        }
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "--reset-test-data" }
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=false;dismissed=false"))
+    }
+
     @MainActor func testExcludingMeetingsPreservesVoiceChoiceAndExcludesBothStoredKinds() {
         let app = launch()
         openBackup(app)

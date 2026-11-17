@@ -85,27 +85,40 @@ struct BackupInfoView: View {
     var body: some View {
         let presentation = BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
         ScrollViewReader { proxy in
-            List {
-                Section {
-                    inclusion(SettingsPhase2Copy.backupRowMeetings, detail: SettingsPhase2Copy.backupRowMeetingsDetail,
-                              included: presentation.meetingsIncluded, id: "backupStatusMeetings")
-                    inclusion(SettingsPhase2Copy.backupRowSettings, detail: SettingsPhase2Copy.backupRowSettingsDetail,
-                              included: true, id: "backupStatusSettings")
-                    inclusion(SettingsPhase2Copy.savedVoices, detail: SettingsPhase2Copy.backupRowVoicesDetail,
-                              included: presentation.voicesIncluded, id: "backupStatusVoices")
-                    inclusion(SettingsPhase2Copy.backupRowModels, detail: SettingsPhase2Copy.backupRowModelsDetail,
-                              included: false, id: "backupStatusModels")
-                } header: { Text(Wave6Copy.backupInfoWhatHeading) }
-                .id(Topic.contents)
-                Section {
-                    explanation(Wave6Copy.backupInfoIcloudHeading, detail: SettingsPhase2Copy.backupWhoIcloud)
-                    explanation(SettingsPhase2Copy.backupWhoComputer, detail: SettingsPhase2Copy.backupWhoComputerDetail)
-                    explanation(SettingsPhase2Copy.backupWhoZip, detail: SettingsPhase2Copy.backupWhoZipDetail)
-                        .accessibilityIdentifier("backupZipReader")
-                } header: { Text(SettingsPhase2Copy.backupWho) } footer: { Text(SettingsPhase2Copy.backupCassiniNever) }
-                .id(Topic.readers)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        detailHeading(Wave6Copy.backupInfoWhatHeading)
+                        VStack(spacing: 0) {
+                            inclusion(SettingsPhase2Copy.backupRowMeetings, detail: SettingsPhase2Copy.backupRowMeetingsDetail,
+                                      included: presentation.meetingsIncluded, id: "backupStatusMeetings")
+                            detailDivider
+                            inclusion(SettingsPhase2Copy.backupRowSettings, detail: SettingsPhase2Copy.backupRowSettingsDetail,
+                                      included: true, id: "backupStatusSettings")
+                            detailDivider
+                            inclusion(SettingsPhase2Copy.savedVoices, detail: SettingsPhase2Copy.backupRowVoicesDetail,
+                                      included: presentation.voicesIncluded, id: "backupStatusVoices")
+                            detailDivider
+                            inclusion(SettingsPhase2Copy.backupRowModels, detail: SettingsPhase2Copy.backupRowModelsDetail,
+                                      included: false, id: "backupStatusModels")
+                        }.background(Color.card, in: RoundedRectangle(cornerRadius: 22))
+                    }.id(Topic.contents)
+                    VStack(alignment: .leading, spacing: 8) {
+                        detailHeading(SettingsPhase2Copy.backupWho)
+                        VStack(alignment: .leading, spacing: 0) {
+                            explanation(Wave6Copy.backupInfoIcloudHeading, detail: SettingsPhase2Copy.backupWhoIcloud)
+                            detailDivider
+                            explanation(SettingsPhase2Copy.backupWhoComputer, detail: SettingsPhase2Copy.backupWhoComputerDetail)
+                            detailDivider
+                            explanation(SettingsPhase2Copy.backupWhoZip, detail: SettingsPhase2Copy.backupWhoZipDetail)
+                                .accessibilityIdentifier("backupZipReader")
+                        }.background(Color.card, in: RoundedRectangle(cornerRadius: 22))
+                        Text(SettingsPhase2Copy.backupCassiniNever).font(.footnote).foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 16)
+                    }.id(Topic.readers)
+                }.padding(.horizontal, 16).padding(.vertical, 20).readableWidth()
             }
-            .paperListBackground().readableListWidth()
+            .background(Color.paper)
             .accessibilityIdentifier("backupInfo")
             .onAppear { if topic == .readers { proxy.scrollTo(Topic.readers, anchor: .top) } }
         }
@@ -114,6 +127,7 @@ struct BackupInfoView: View {
 
     private func inclusion(_ title: String, detail: String, included: Bool, id: String) -> some View {
         BackupInclusionRow(title: title, detail: detail, included: included)
+            .padding(.horizontal, 16).padding(.vertical, 11)
             .accessibilityIdentifier(id)
     }
 
@@ -121,8 +135,16 @@ struct BackupInfoView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).foregroundStyle(Color.ink)
             Text(detail).font(.subheadline).foregroundStyle(Color.muted)
-        }.fixedSize(horizontal: false, vertical: true).padding(.vertical, 4)
+        }.fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 15)
     }
+
+    private func detailHeading(_ title: String) -> some View {
+        Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.muted)
+            .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 16)
+            .accessibilityAddTraits(.isHeader)
+    }
+    private var detailDivider: some View { Divider().overlay(Color.line).padding(.horizontal, 16) }
 }
 
 private struct BackupInclusionRow: View {
@@ -145,6 +167,7 @@ private struct BackupInclusionRow: View {
         Group {
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) { label; status }
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(alignment: .top, spacing: 16) {
                     label.frame(maxWidth: .infinity, alignment: .leading)
@@ -161,6 +184,7 @@ private struct BackupInclusionRow: View {
 struct BackupNoticeCard: View {
     let maximumHeight: CGFloat
     @State private var contentHeight: CGFloat = 0
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(SettingsStore.self) private var settings
     @Environment(BackupModel.self) private var backup
     @Environment(ErrorPresenter.self) private var errors
@@ -172,8 +196,8 @@ struct BackupNoticeCard: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .frame(height: min(contentHeight > 0 ? contentHeight : maximumHeight, maximumHeight))
-        .background(Color.paper, in: RoundedRectangle(cornerRadius: 24))
-        .overlay { RoundedRectangle(cornerRadius: 24).stroke(Color.muted.opacity(0.2), lineWidth: 1).allowsHitTesting(false) }
+        .background(Color.raised, in: RoundedRectangle(cornerRadius: 24))
+        .overlay { RoundedRectangle(cornerRadius: 24).stroke(Color.line, lineWidth: 0.5).allowsHitTesting(false) }
         .shadow(color: Color.shadow, radius: 16, y: 4)
         .disabled(backup.updating)
         .accessibilityElement(children: .contain)
@@ -193,10 +217,11 @@ struct BackupNoticeCard: View {
                     .accessibilityIdentifier("backupNoticeDismiss")
             }
             Text(Wave6Copy.backupPhoneOnlyCardBody).font(.subheadline).foregroundStyle(Color.muted)
+                .padding(.leading, typeSize.isAccessibilitySize ? 0 : 36)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) { keepButton; leaveOutButton }.fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 8) { keepButton; leaveOutButton }
-            }
+            }.padding(.leading, typeSize.isAccessibilitySize ? 0 : 36)
         }.padding(16)
     }
 
@@ -204,7 +229,7 @@ struct BackupNoticeCard: View {
         Button { settings.dismissBackupNotice() } label: {
             Text(Wave6Copy.backupPhoneOnlyCardDismiss).font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 16).frame(minHeight: 44)
-                .background(Color.accentInk, in: Capsule()).foregroundStyle(Color.paper)
+                .background(Color.accentStrong, in: Capsule()).foregroundStyle(Color.onAccent)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeKeep")
     }
 
@@ -217,7 +242,7 @@ struct BackupNoticeCard: View {
         } label: {
             Text(Wave6Copy.backupPhoneOnlyCardActionIos).font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 16).frame(minHeight: 44)
-                .background(Color.accentTint, in: Capsule()).foregroundStyle(Color.accentInk)
+                .background(Color.neutralTint, in: Capsule()).foregroundStyle(Color.ink)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeExclude")
     }
 }
