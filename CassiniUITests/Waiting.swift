@@ -237,13 +237,13 @@ extension XCUIApplication {
 }
 
 extension XCUIApplication {
-    /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
+    /// The row titled `title`, clear of navigation, capture and the floating notice before a tap or long-press.
     @MainActor func scrolledLibraryRow(_ title: String) -> XCUIElement {
         let element = buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
         return scrolledLibraryElement(element, description: "row \(title)")
     }
 
-    /// A Library control or row, fully clear of both bars before interacting with it.
+    /// A Library control or row, fully clear of both bars and any floating backup notice.
     @MainActor func scrolledLibraryElement(_ element: XCUIElement, description: String) -> XCUIElement {
         let bar = buttons["recordButton"]
         let viewport = scrollViews["libraryScroll"], navigation = navigationBars.firstMatch

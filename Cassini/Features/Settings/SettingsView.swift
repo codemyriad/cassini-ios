@@ -115,6 +115,7 @@ private struct SettingsForm: View {
         }
         .readableListWidth()
         .shareSheet(item: $backupExport.shareItem)
+        .onDisappear { backupExport.cancel() }
     }
 
     private var map: some View {
