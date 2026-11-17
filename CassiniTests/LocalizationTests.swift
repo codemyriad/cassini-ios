@@ -123,7 +123,7 @@ import Testing
     @Test func savedVoicesPhase2CopyResolvesCatalogEntriesAndFeminineMeetingCountsInAllSixLanguages() {
         let staleExpected: [(String, String)] = [
             ("en", "Name them again in a meeting to keep recognising them."),
-            ("it", "Dai di nuovo il nome in una riunione per continuare a riconoscerla."),
+            ("it", "Dai di nuovo un nome a questa voce in una riunione, così Cassini continuerà a riconoscerla."),
             ("fr", "Nommez à nouveau cette personne dans une réunion pour que Cassini continue à la reconnaître."),
             ("es", "Vuelve a poner nombre a esta persona en una reunión para que Cassini la siga reconociendo."),
             ("pt-BR", "Nomeie essa pessoa de novo em uma reunião para que ela continue sendo reconhecida."),
