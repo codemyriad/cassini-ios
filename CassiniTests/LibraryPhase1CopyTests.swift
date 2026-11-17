@@ -9,7 +9,7 @@ import Testing
         let expected: [(String, [String])] = [
             ("en", ["Search", "Close", "Record", "Import audio", "No speech", "Search every meeting", "Search every meeting", "Search results"]),
             ("it", ["Cerca", "Chiudi", "Registra", "Importa audio", "Nessun parlato", "Cerca in tutte le riunioni", "Cerca in tutte le riunioni", "Risultati della ricerca"]),
-            ("fr", ["Recherche", "Fermer", "Enregistrer", "Importer un audio", "Aucune parole", "Rechercher dans toutes les réunions", "Rechercher dans toutes les réunions", "Résultats de la recherche"]),
+            ("fr", ["Rechercher", "Fermer", "Enregistrer", "Importer un audio", "Aucune parole", "Rechercher dans toutes les réunions", "Rechercher dans toutes les réunions", "Résultats de la recherche"]),
             ("es", ["Buscar", "Cerrar", "Grabar", "Importar audio", "Sin voz", "Buscar en todas las reuniones", "Buscar en todas las reuniones", "Resultados de la búsqueda"]),
             ("pt-BR", ["Buscar", "Fechar", "Gravar", "Importar áudio", "Sem fala", "Buscar em todas as reuniões", "Buscar em todas as reuniões", "Resultados da busca"]),
             ("pt-PT", ["Pesquisar", "Fechar", "Gravar", "Importar áudio", "Sem fala", "Pesquisar em todas as reuniões", "Pesquisar em todas as reuniões", "Resultados da pesquisa"]),

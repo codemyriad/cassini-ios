@@ -145,7 +145,7 @@
       }
     },
     "%lld meetings could not be deleted. They stay in Recently Deleted.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.trash.deleteManyFailed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.trash.deleteManyFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -172,19 +172,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld riunioni. Restano in Eliminati di recente."
+                  "value": "Impossibile eliminare %lld riunioni. Restano in Eliminati di recente."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld riunione. Resta in Eliminati di recente."
+                  "value": "Impossibile eliminare %lld riunione. Resta in Eliminati di recente."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Non è stato possibile eliminare %lld riunioni. Restano in Eliminati di recente."
+                  "value": "Impossibile eliminare %lld riunioni. Restano in Eliminati di recente."
                 }
               }
             }
@@ -268,19 +268,19 @@
               "many": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados."
+                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados recentemente."
                 }
               },
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld reunião. Fica em Apagados."
+                  "value": "Não foi possível eliminar %lld reunião. Fica em Apagados recentemente."
                 }
               },
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados."
+                  "value": "Não foi possível eliminar %lld reuniões. Ficam em Apagados recentemente."
                 }
               }
             }
@@ -371,7 +371,7 @@
       }
     },
     "Delete %lld meetings for good?": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.trash.deleteAll.title.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.trash.deleteAll.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -761,7 +761,7 @@
       }
     },
     "Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.trash.delete.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.trash.delete.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -844,7 +844,7 @@
       }
     },
     "Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.trash.retentionNote.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.trash.retentionNote.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -886,7 +886,7 @@
       }
     },
     "Meetings you delete stay here for 30 days.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.trash.empty.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.trash.empty.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1256,7 +1256,7 @@
       }
     },
     "“%@” could not be deleted. It stays in Recently Deleted.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.trash.deleteFailed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.trash.deleteFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1268,7 +1268,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile eliminare “%@”. Resta in Eliminati di recente."
+            "value": "Impossibile eliminare “%@”. Resta in Eliminati di recente."
           }
         },
         "fr": {
@@ -1292,7 +1292,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Não foi possível eliminar «%@». Fica em Apagados."
+            "value": "Não foi possível eliminar «%@». Fica em Apagados recentemente."
           }
         }
       }

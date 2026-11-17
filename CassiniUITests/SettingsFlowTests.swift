@@ -271,6 +271,7 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["aboutHelp"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["aboutSourceCode"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "{year}")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Codemyriad OÜ")).firstMatch.exists)
         app.buttons["aboutPrivacy"].tap()
         XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Cassini for iOS keeps"))
