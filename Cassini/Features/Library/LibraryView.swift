@@ -9,6 +9,7 @@ struct LibraryView: View {
     @Environment(ImportStore.self) private var imports
     @Environment(SettingsStore.self) private var settings
     @Environment(BackupModel.self) private var backup
+    @Environment(TrashUndo.self) private var trashUndo
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
@@ -37,6 +38,8 @@ struct LibraryView: View {
         let content = model.listContent
         let exportable = Set(ArchiveSelection.ids(library.notes))
         let showsBackupNotice = !model.isSearching && !searchPresented
+            // Undo is time-limited and must remain reachable above the capture bar.
+            && trashUndo.pending == nil && trashUndo.snackbar == nil
             && BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
                 .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
                              dismissed: settings.backupNoticeDismissed)

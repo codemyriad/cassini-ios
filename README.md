@@ -609,5 +609,5 @@ separate explanations of iCloud, computer backups and ZIP copies. Both switches 
 eligible independently of the Library directory, saved voices follow both switches, and downloaded models are always
 excluded. “Included” is conditional on iCloud Backup being enabled; Cassini cannot inspect its state or completion.
 The once-only notice floats above Record after a saved recording or import, never over an empty first launch or a
-first live/interrupted recording. Close and Keep backup on preserve choices; exclusion dismisses only after its
+first live/interrupted recording. The notice temporarily yields to the Undo snackbar. Close and Keep backup on preserve choices; exclusion dismisses only after its
 storage transaction succeeds. Backup’s ZIP action uses the Library exporter and excludes live and interrupted captures.

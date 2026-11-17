@@ -34,6 +34,22 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["backupNoticeDismiss"].isHittable)
     }
 
+    @MainActor func testUndoTemporarilyTakesPriorityWithoutDismissingBackupNotice() {
+        let app = launch()
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
+        let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "Thoughts from the morning walk")).firstMatch
+        row.press(forDuration: 1)
+        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        let undo = app.buttons["Undo"]
+        XCTAssertTrue(undo.waitForExistence(within: 15))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+        XCTAssertTrue(undo.isHittable)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=true;dismissed=false"))
+    }
+
     @MainActor func testLastMeetingCanScrollAboveTheFloatingNotice() {
         let app = launch(["--seed", "statuses"])
         XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
