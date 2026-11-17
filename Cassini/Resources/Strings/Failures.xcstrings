@@ -31,13 +31,13 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O modelo de fala da Apple neste dispositivo não é compatível com este idioma. Escolha outro idioma em Ajustes."
+            "value": "O modelo de voz da Apple neste dispositivo não é compatível com este idioma. Escolha outro idioma em Ajustes."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O modelo de voz da Apple no dispositivo não suporta este idioma. Escolha outro idioma nas Definições."
+            "value": "O modelo de voz da Apple no dispositivo não suporta este idioma. Escolha outro idioma nas definições."
           }
         }
       }
@@ -506,7 +506,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abrir Definições"
+            "value": "Abrir definições"
           }
         }
       }
@@ -723,19 +723,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El análisis de hablantes no pudo terminar. Tu transcripción está guardada. Puedes volver a intentarlo desde Hablantes."
+            "value": "No se pudo completar el análisis de hablantes. Tu transcripción está guardada. Puedes volver a intentarlo desde Hablantes."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’analyse des intervenants n’a pas pu aboutir. Votre transcription est sauvegardée. Vous pouvez réessayer depuis Intervenants."
+            "value": "Impossible de terminer l’analyse des intervenants. Votre transcription est sauvegardée. Vous pouvez réessayer depuis Intervenants."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’analisi delle voci non è terminata. La trascrizione è salvata. Puoi riprovare da Voci."
+            "value": "Impossibile completare l’analisi delle voci. La trascrizione è salvata. Puoi riprovare da Voci."
           }
         },
         "pt-BR": {
@@ -770,13 +770,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio de ce document n’a pas pu être vérifié, donc aucune nouvelle version ne peut être ajoutée."
+            "value": "Impossible de vérifier l’audio de ce document, aucune nouvelle version ne peut donc être ajoutée."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione."
+            "value": "Impossibile verificare l’audio di questo documento, quindi non si può aggiungere una nuova versione."
           }
         },
         "pt-BR": {
@@ -811,13 +811,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le système ne peut pas réserver une autre langue parlée. Essayez une langue déjà installée sur cet appareil."
+            "value": "Le système ne peut pas réserver une autre langue de reconnaissance vocale. Essayez une langue déjà installée sur cet appareil."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il sistema non può riservare un’altra lingua vocale. Prova una lingua già installata su questo dispositivo."
+            "value": "Il sistema non può predisporre il riconoscimento vocale per un’altra lingua. Prova una lingua già installata su questo dispositivo."
           }
         },
         "pt-BR": {
@@ -829,7 +829,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O sistema não consegue reservar outro idioma de fala. Experimente um idioma já instalado neste dispositivo."
+            "value": "O sistema não consegue reservar outro idioma para reconhecimento de voz. Experimente um idioma já instalado neste dispositivo."
           }
         }
       }

@@ -1488,31 +1488,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno %@ automaticamente. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà %@ automaticamente. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront %@ automatiquement. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
+            "value": "Cassini nommera %@ automatiquement dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de la Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a %@ automáticamente. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
+            "value": "En las próximas reuniones, Cassini reconocerá a %@ automáticamente. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
+            "value": "Nas próximas reuniões, o Cassini vai nomear %@ automaticamente. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
+            "value": "Nas próximas reuniões, o Cassini reconhece %@ automaticamente. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
           }
         }
       }
@@ -1529,31 +1529,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno %@ automaticamente. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà %@ automaticamente. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront %@ automatiquement. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
+            "value": "Cassini nommera %@ automatiquement dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a %@ automáticamente. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
+            "value": "En las próximas reuniones, Cassini reconocerá a %@ automáticamente. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini vai nomear %@ automaticamente. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini reconhece %@ automaticamente. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
           }
         }
       }
@@ -1570,31 +1570,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno questa persona automaticamente. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà automaticamente questa persona. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront cette personne automatiquement. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
+            "value": "Cassini nommera cette personne automatiquement dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de la Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a esta persona automáticamente. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
+            "value": "En las próximas reuniones, Cassini reconocerá a esta persona automáticamente. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
+            "value": "Nas próximas reuniões, o Cassini vai nomear esta pessoa automaticamente. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
+            "value": "Nas próximas reuniões, o Cassini reconhece esta pessoa automaticamente. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
           }
         }
       }
@@ -1611,31 +1611,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno questa persona automaticamente. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà automaticamente questa persona. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront cette personne automatiquement. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
+            "value": "Cassini nommera cette personne automatiquement dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a esta persona automáticamente. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
+            "value": "En las próximas reuniones, Cassini reconocerá a esta persona automáticamente. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini vai nomear esta pessoa automaticamente. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini reconhece esta pessoa automaticamente. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
           }
         }
       }
@@ -1652,31 +1652,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno %@. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
+            "value": "Nelle prossime riunioni, Cassini suggerirà %@. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront %@. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
+            "value": "Cassini suggérera %@ dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de la Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a %@. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
+            "value": "En las próximas reuniones, Cassini sugerirá a %@. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir %@. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
+            "value": "Nas próximas reuniões, o Cassini sugere %@. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
           }
         }
       }
@@ -1693,31 +1693,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno %@. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
+            "value": "Nelle prossime riunioni, Cassini suggerirà %@. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront %@. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
+            "value": "Cassini suggérera %@ dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a %@. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
+            "value": "En las próximas reuniones, Cassini sugerirá a %@. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir %@. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini sugere %@. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
           }
         }
       }
@@ -1734,31 +1734,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno questa persona. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
+            "value": "Nelle prossime riunioni, Cassini suggerirà questa persona. Cassini non carica mai l’impronta vocale e la contrassegna per escluderla dal Backup iCloud; un trasferimento diretto potrebbe comunque copiarla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront cette personne. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
+            "value": "Cassini suggérera cette personne dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne et la marque pour l’exclure de la Sauvegarde iCloud ; un transfert direct peut tout de même la copier."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a esta persona. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
+            "value": "En las próximas reuniones, Cassini sugerirá a esta persona. Cassini nunca sube la huella de voz y la marca para quedar fuera de Copia en iCloud; una transferencia directa podría copiarla igualmente."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir esta pessoa. O Cassini nunca envia a impressão de voz e a marca para ficar fora do Backup do iCloud; uma transferência direta ainda pode copiá-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
+            "value": "Nas próximas reuniões, o Cassini sugere esta pessoa. O Cassini nunca envia a impressão vocal e marca-a para ficar fora da Cópia em iCloud; uma transferência direta pode ainda assim copiá-la."
           }
         }
       }
@@ -1775,31 +1775,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno questa persona. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
+            "value": "Nelle prossime riunioni, Cassini suggerirà questa persona. Cassini non carica mai l’impronta vocale; i backup di sistema potrebbero includerla."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront cette personne. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
+            "value": "Cassini suggérera cette personne dans les prochaines réunions. Cassini ne met jamais l’empreinte vocale en ligne ; les sauvegardes système peuvent l’inclure."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a esta persona. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
+            "value": "En las próximas reuniones, Cassini sugerirá a esta persona. Cassini nunca sube la huella de voz; las copias de seguridad del sistema pueden incluirla."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir esta pessoa. O Cassini nunca envia a impressão de voz; os backups do sistema podem incluí-la."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
+            "value": "Nas próximas reuniões, o Cassini sugere esta pessoa. O Cassini nunca envia a impressão vocal; as cópias de segurança do sistema podem incluí-la."
           }
         }
       }
@@ -1828,7 +1828,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riconosci le voci"
+            "value": "Distingui le voci"
           }
         },
         "pt-BR": {
@@ -2908,7 +2908,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oradores juntados"
+            "value": "Junção de oradores"
           }
         }
       }
@@ -2944,7 +2944,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oradores juntados · da versão %lld · %@"
+            "value": "Junção de oradores · da versão %lld · %@"
           }
         }
       }
@@ -3050,7 +3050,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Impossible d’écrire la voix mémorisée : %@. Réessayez."
+            "value": "Impossible de sauvegarder la voix mémorisée : %@. Réessayez."
           }
         },
         "it": {
@@ -3414,13 +3414,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les empreintes vocales restent sur cet appareil. Elles ne sont jamais envoyées ni écrites dans les fichiers partagés — seuls les noms que vous choisissez le sont."
+            "value": "Les empreintes vocales restent sur cet appareil. Elles ne sont jamais mises en ligne ni écrites dans les fichiers partagés — seuls les noms que vous choisissez le sont."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le impronte vocali restano su questo dispositivo. Non vengono mai caricate né scritte nei file condivisi — solo i nomi che scegli."
+            "value": "Le impronte vocali restano su questo dispositivo. Non vengono mai caricate né scritte nei file condivisi, che contengono solo i nomi che scegli."
           }
         },
         "pt-BR": {

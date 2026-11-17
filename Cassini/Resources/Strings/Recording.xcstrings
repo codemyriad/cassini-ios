@@ -929,19 +929,19 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Spazio per circa %@ ancora."
+            "value": "Ancora spazio per circa %@."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Espaço para cerca de mais %@."
+            "value": "Espaço para cerca de %@ a mais."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Espaço para cerca de mais %@."
+            "value": "Espaço para mais cerca de %@."
           }
         }
       },

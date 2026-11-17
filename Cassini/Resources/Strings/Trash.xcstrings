@@ -939,13 +939,13 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mover a Eliminado recientemente"
+            "value": "Mover a Eliminados"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Déplacer vers Suppressions récentes"
+            "value": "Placer dans Supprimés récemment"
           }
         },
         "it": {
@@ -963,7 +963,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mover para Apagados"
+            "value": "Mover para Apagados recentemente"
           }
         }
       }
@@ -986,7 +986,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Suppressions récentes"
+            "value": "Supprimés récemment"
           }
         },
         "it": {
@@ -1004,7 +1004,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apagados"
+            "value": "Apagados recentemente"
           }
         }
       }
@@ -1021,7 +1021,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eliminado recientemente está vacío"
+            "value": "Eliminados está vacío"
           }
         },
         "fr": {
@@ -1045,7 +1045,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apagados está vazio"
+            "value": "Apagados recentemente está vazio"
           }
         }
       }
@@ -1086,7 +1086,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Recuperar"
+            "value": "Restaurar"
           }
         }
       }
@@ -1115,7 +1115,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Non è stato possibile leggere le voci salvate, quindi non è stato eliminato nulla. I loro file sono conservati."
+            "value": "Impossibile leggere le voci salvate, quindi non è stato eliminato nulla. I loro file sono conservati."
           }
         },
         "pt-BR": {
@@ -1144,13 +1144,13 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Detener la transcripción y mover a Eliminado recientemente?"
+            "value": "¿Detener la transcripción y mover a Eliminados?"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arrêter la transcription et déplacer vers Suppressions récentes ?"
+            "value": "Arrêter la transcription et placer dans Supprimés récemment ?"
           }
         },
         "it": {
@@ -1168,7 +1168,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Parar a transcrição e mover para Apagados?"
+            "value": "Parar a transcrição e mover para Apagados recentemente?"
           }
         }
       }
@@ -1309,13 +1309,13 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "“%@” movida a Eliminado recientemente"
+            "value": "“%@” movida a Eliminados"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "« %@ » déplacée vers Suppressions récentes"
+            "value": "« %@ » placée dans Supprimés récemment"
           }
         },
         "it": {
@@ -1333,7 +1333,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "«%@» movida para Apagados"
+            "value": "«%@» movida para Apagados recentemente"
           }
         }
       }

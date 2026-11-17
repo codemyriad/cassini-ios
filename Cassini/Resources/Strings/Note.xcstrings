@@ -834,7 +834,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todas las palabras como una sola voz"
+            "value": "Todas las palabras se muestran como una sola voz"
           }
         },
         "fr": {
@@ -846,7 +846,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tutte le parole come una sola voce"
+            "value": "Tutte le parole attribuite a una sola voce"
           }
         },
         "pt-BR": {
@@ -928,7 +928,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Torna alla libreria"
+            "value": "Torna alla Libreria"
           }
         },
         "pt-BR": {
@@ -940,7 +940,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Voltar à biblioteca"
+            "value": "Voltar à Biblioteca"
           }
         }
       }
@@ -1890,7 +1890,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nessun modello vocale sul dispositivo è disponibile per questo dispositivo e questa lingua."
+            "value": "Non è disponibile un modello vocale da eseguire su questo dispositivo per questa lingua."
           }
         },
         "fr": {
@@ -1908,7 +1908,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nenhum modelo de fala local está disponível para este dispositivo e idioma."
+            "value": "Nenhum modelo de voz local está disponível para este dispositivo e idioma."
           }
         },
         "pt-PT": {
@@ -2107,7 +2107,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Riproduci dall’inizio del turno"
+            "value": "Riproduci dall’inizio dell’intervento"
           }
         },
         "pt-BR": {
@@ -2417,19 +2417,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quitar de favoritas"
+            "value": "Quitar destacado"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Retirer des favoris"
+            "value": "Retirer l’étoile"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Togli la stella"
+            "value": "Rimuovi stella"
           }
         },
         "pt-BR": {
@@ -2593,7 +2593,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Torna alla libreria per scegliere una registrazione."
+            "value": "Torna alla Libreria per scegliere una registrazione."
           }
         },
         "pt-BR": {
@@ -2605,7 +2605,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Volte à biblioteca para escolher uma gravação."
+            "value": "Volte à Biblioteca para escolher uma gravação."
           }
         }
       }
@@ -2828,7 +2828,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Partager et plus"
+            "value": "Partager et autres actions"
           }
         },
         "it": {
@@ -2846,7 +2846,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Partilhar e mais"
+            "value": "Partilhar e mais opções"
           }
         }
       }
@@ -3027,19 +3027,19 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Añadir a favoritas"
+            "value": "Destacar"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajouter aux favoris"
+            "value": "Ajouter une étoile"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aggiungi una stella"
+            "value": "Aggiungi stella"
           }
         },
         "pt-BR": {
@@ -3298,7 +3298,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O rascunho até agora é descartado. A gravação é mantida."
+            "value": "O rascunho criado até agora é descartado. A gravação é mantida."
           }
         }
       }
