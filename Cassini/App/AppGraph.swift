@@ -76,6 +76,9 @@ import CassiniNotebook
                               audioReady: { [recording] in await recording.controller.settle() }) { [startup] in
             _ = await startup.ready()
         }
+        #if DEBUG
+        if environment.holdArchiveExport { exports.archiveFixture = ArchiveExportFixture(folder: environment.exports) }
+        #endif
         libraryScreen = Self.libraryScreen(environment: environment, library: library, processing: processing,
                                            recording: recording, trash: trash)
         libraryScreen.connect(router: router, errors: errors)

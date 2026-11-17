@@ -92,6 +92,29 @@ final class ScreenshotTests: XCTestCase {
         try captureSettingsPage("aboutRow", name: "24-about-settings")
     }
 
+    @MainActor func test25BackupSettings() throws {
+        try captureSettingsPage("backupRow", name: "25-backup-settings")
+    }
+
+    @MainActor func test26BackupDetails() throws {
+        let app = try launchPhone(["--seed", "voices"])
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        app.buttons["backupRow"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("backup"))
+        let detail = app.buttons["backupInfoRow"]
+        app.scroll { detail.exists && detail.isHittable }
+        detail.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["backupInfo"].waitForExistence(within: 15))
+        capture("26-backup-details")
+    }
+
+    @MainActor func test27BackupNotice() throws {
+        let app = try launchPhone(["--seed", "library"])
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
+        capture("27-backup-notice")
+    }
+
     @MainActor private func captureSettingsPage(_ id: String, name: String, arguments: [String] = []) throws {
         let app = try launchPhone(["--seed", "voices"] + arguments)
         app.buttons["settingsButton"].tap()
@@ -269,10 +292,7 @@ final class ScreenshotTests: XCTestCase {
         let search = app.textFields["librarySearch"]
         XCTAssertTrue(search.waitForExistence(within: 15))
         let searchFrame = search.frame
-        let quiet = row(app, "Quiet room")
-        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
-            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
-        })
+        _ = app.scrolledLibraryRow("Quiet room")
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "the pinned field stays fully visible")
         XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
         capture("20-library-scrolled")
