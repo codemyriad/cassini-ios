@@ -184,6 +184,24 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(pending.label.contains("Downloads with next transcription"), pending.label)
     }
 
+    @MainActor func testInstalledModelChoiceKeepsItsSizeAndSurvivesRelaunch() {
+        let app = openSettings(["--d78", "--d78-capable", "--d78-verified"])
+        openPage(app, "transcriptionRow", title: "Transcription")
+        let whistle = app.buttons["chooseWhistle"], parakeet = app.buttons["chooseParakeet"]
+        XCTAssertTrue(parakeet.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        XCTAssertTrue(app.staticTexts["installedParakeetSize"].label.contains("444 MB"))
+        XCTAssertFalse(app.buttons["downloadParakeet"].exists)
+        whistle.tap()
+        XCTAssertTrue(whistle.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        app.launchArguments.removeAll { $0 == "--reset-test-data" }
+        app.launchAndWait(fresh: true)
+        app.buttons["settingsButton"].tap()
+        openPage(app, "transcriptionRow", title: "Transcription")
+        XCTAssertTrue(whistle.wait(until: NSPredicate(format: "selected == true"), within: 15))
+        parakeet.tap()
+        XCTAssertTrue(parakeet.wait(until: NSPredicate(format: "selected == true"), within: 15))
+    }
+
     @MainActor func testSpeakerChoicesPersistAndAboutOpensPrivacyDirectly() {
         let app = openSettings()
         openPage(app, "speakersRow", title: "Speakers")

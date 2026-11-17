@@ -335,7 +335,15 @@ private struct SpeechChoicesView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title).foregroundStyle(Color.ink)
                         Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
-                        if recognizer == .whistle { Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted) }
+                        if recognizer == .whistle {
+                            Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted)
+                        } else if installed {
+                            if let detail = rows.first(where: { $0.part == .speech })?.size.label(locale: locale) {
+                                Text(detail).font(.caption).foregroundStyle(Color.muted)
+                                    .accessibilityIdentifier("installedParakeetSize")
+                            }
+                            Text(ModelRowStatus.ready.label).font(.caption).foregroundStyle(Color.muted)
+                        }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.buttonStyle(.plain).disabled(installed && recognizer == .parakeet && !store.canChooseParakeet)
