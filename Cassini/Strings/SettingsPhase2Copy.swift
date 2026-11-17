@@ -1,4 +1,4 @@
-// Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702; do not edit.
+// Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit.
 import Foundation
 import CassiniNotebook
 

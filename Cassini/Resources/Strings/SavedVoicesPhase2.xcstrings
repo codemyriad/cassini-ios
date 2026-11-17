@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "savedVoices.howToAdd": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.howToAdd.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.howToAdd.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "savedVoices.row.meetingCount": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.meetingCount.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.meetingCount.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -188,7 +188,7 @@
       }
     },
     "savedVoices.row.meta": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.meta.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.meta.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -230,7 +230,7 @@
       }
     },
     "savedVoices.row.stale": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.stale.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.stale.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -242,7 +242,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dai di nuovo il nome in una riunione per continuare a riconoscerla."
+            "value": "Dai di nuovo un nome a questa voce in una riunione, così Cassini continuerà a riconoscerla."
           }
         },
         "fr": {

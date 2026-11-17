@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "firstRun.hero.phoneBackupQualifier": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.hero.phoneBackupQualifier.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.phoneBackupQualifier.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "firstRun.hero.subtitle": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.hero.subtitle.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "firstRun.hero.subtitlePhoneNote": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.hero.subtitlePhoneNote.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.subtitlePhoneNote.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "firstRun.hero.title": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.hero.title.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "privacy.onDevice.ipad.backupExcluded": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, privacy.onDevice.ipad.backupExcluded.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.ipad.backupExcluded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -188,7 +188,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transcrit sur cet iPad. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de Sauvegarde iCloud."
+            "value": "Transcrit sur cet iPad. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud."
           }
         },
         "es": {
@@ -212,7 +212,7 @@
       }
     },
     "privacy.onDevice.ipad.withBackup": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, privacy.onDevice.ipad.withBackup.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.ipad.withBackup.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "privacy.onDevice.iphone.backupExcluded": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, privacy.onDevice.iphone.backupExcluded.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.iphone.backupExcluded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -272,7 +272,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Transcrit sur cet iPhone. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de Sauvegarde iCloud."
+            "value": "Transcrit sur cet iPhone. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud."
           }
         },
         "es": {
@@ -296,7 +296,7 @@
       }
     },
     "privacy.onDevice.iphone.withBackup": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, privacy.onDevice.iphone.withBackup.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.iphone.withBackup.",
       "extractionState": "manual",
       "localizations": {
         "en": {

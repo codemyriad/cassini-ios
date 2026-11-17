@@ -167,4 +167,12 @@ import Testing
             #expect(SavedVoicesPhase2Copy.meta(meetings: count, confirmedSpeech: "22 min", language: language) == expected)
         }
     }
+
+    @Test(arguments: languages)
+    func aboutLicenceLineNamesCodemyriadOUInEveryLanguage(language: String) throws {
+        let bundle = try Self.bundle(language)
+        let line = bundle.localizedString(forKey: "about.licenceLine.phone", value: nil, table: "SettingsPhase2")
+        #expect(line.contains("Codemyriad OÜ"), "\(language): \(line)")
+        #expect(line.contains("{year}"), "\(language): \(line)")
+    }
 }
