@@ -231,7 +231,6 @@ final class BackupFlowTests: XCTestCase {
         link.tapWhenSettled()
         XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
         app.buttons["releaseArchiveExport"].tap()
-        XCTAssertTrue(state.waitForValue("completed"))
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
         // The presenter's normal dismissal marker belongs to the covered Backup form.
         // Wait for the export store's completed cleanup event, visible above either detail page.
