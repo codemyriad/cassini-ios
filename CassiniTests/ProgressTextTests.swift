@@ -49,7 +49,7 @@ final class ProgressTextTests: XCTestCase {
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "it"), "circa 4–6 min rimanenti")
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "fr"), "environ 1 min restante")
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "fr"), "environ 4–6 min restantes")
-        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "es"), "queda 1 min")
+        XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "es"), "queda aprox. 1 min")
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "es"), "quedan unos 4–6 min")
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 1 * minute, highMs: 1 * minute), language: "pt-BR"), "cerca de 1 min restante")
         XCTAssertEqual(ProgressText.compactEta(.range(lowMs: 4 * minute, highMs: 6 * minute), language: "pt-PT"), "cerca de 4–6 min restantes")
@@ -62,8 +62,8 @@ final class ProgressTextTests: XCTestCase {
                        "29:52 de 48:13")
 
         XCTAssertEqual(ProgressText.stepDescription(.saving, language: "pt-BR"), "Etapa 5 de 5: Salvamento")
-        XCTAssertEqual(ProgressText.stepDescription(.saving, language: "pt-PT"), "Passo 5 de 5: Gravação")
-        XCTAssertEqual(ProgressText.stepDescription(.speakers, language: "fr"), "Étape 4 sur 5\u{00A0}: Intervenants et correspondance")
+        XCTAssertEqual(ProgressText.stepDescription(.saving, language: "pt-PT"), "Passo 5 de 5: A guardar")
+        XCTAssertEqual(ProgressText.stepDescription(.speakers, language: "fr"), "Étape 4 sur 5\u{00A0}: Intervenants et reconnaissance")
     }
 
     // ports: FormatTest#clock (the progress sheet's range and Audio done stat)

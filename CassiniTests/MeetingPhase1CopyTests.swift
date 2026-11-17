@@ -105,7 +105,7 @@ import Testing
         #expect(MeetingPhase1Copy.template("transcribing.step.speakers", language: "pt-BR") == "Locutores e reconhecimento")
         #expect(MeetingPhase1Copy.template("transcribing.step.speakers", language: "pt-PT") == "Oradores e reconhecimento")
         #expect(MeetingPhase1Copy.template("transcribing.step.saving", language: "pt-BR") == "Salvamento")
-        #expect(MeetingPhase1Copy.template("transcribing.step.saving", language: "pt-PT") == "Gravação")
+        #expect(MeetingPhase1Copy.template("transcribing.step.saving", language: "pt-PT") == "A guardar")
         #expect(MeetingPhase1Copy.template("transcribing.stat.batteryAtFinish", language: "pt-BR") == "Bateria ao terminar")
         #expect(MeetingPhase1Copy.template("transcribing.stat.batteryAtFinish", language: "pt-PT") == "Bateria no final")
     }

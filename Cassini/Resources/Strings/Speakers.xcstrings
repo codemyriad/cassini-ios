@@ -697,7 +697,7 @@
       }
     },
     "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forgetEveryone.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.savedVoices.forgetEveryone.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -841,7 +841,7 @@
       }
     },
     "Cassini stops recognising this voice. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forget.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.savedVoices.forget.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -924,7 +924,7 @@
       }
     },
     "Deletes the voiceprints of every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.savedVoices.forgetAllData.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.savedVoices.forgetAllData.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1477,7 +1477,7 @@
       }
     },
     "Future meetings will name %@ automatically. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.rememberVoice.description.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.rememberVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1489,37 +1489,37 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà %@ automaticamente. L’impronta vocale non lascia mai il dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront %@ automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Cassini nommera %@ automatiquement dans les prochaines réunions. L’empreinte vocale ne quitte jamais cet appareil."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
+            "value": "En las próximas reuniones, Cassini reconocerá a %@ automáticamente. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini vai nomear %@ automaticamente. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini reconhece %@ automaticamente. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
     "Future meetings will name this person automatically. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.rememberVoice.description.unnamed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.rememberVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1531,37 +1531,37 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni riconosceranno questa persona automaticamente. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Nelle prossime riunioni, Cassini riconoscerà automaticamente questa persona. L’impronta vocale non lascia mai il dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions nommeront cette personne automatiquement. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Cassini nommera cette personne automatiquement dans les prochaines réunions. L’empreinte vocale ne quitte jamais cet appareil."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones nombrarán a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
+            "value": "En las próximas reuniones, Cassini reconocerá a esta persona automáticamente. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini vai nomear esta pessoa automaticamente. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão nomear esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini reconhece esta pessoa automaticamente. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
     "Future meetings will suggest %@. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.suggestVoice.description.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.suggestVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1573,37 +1573,37 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno %@. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Nelle prossime riunioni, Cassini suggerirà %@. L’impronta vocale non lascia mai il dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront %@. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Cassini suggérera %@ dans les prochaines réunions. L’empreinte vocale ne quitte jamais cet appareil."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a %@. La huella de voz nunca sale de este dispositivo."
+            "value": "En las próximas reuniones, Cassini sugerirá a %@. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. A impressão de voz nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir %@. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir %@. A impressão vocal nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini sugere %@. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
     },
     "Future meetings will suggest this person. The voiceprint never leaves this device.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.suggestVoice.description.unnamed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.suggestVoice.description.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1615,31 +1615,31 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le prossime riunioni suggeriranno questa persona. L’impronta vocale non lascia mai il dispositivo."
+            "value": "Nelle prossime riunioni, Cassini suggerirà questa persona. L’impronta vocale non lascia mai il dispositivo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les prochaines réunions suggéreront cette personne. L’empreinte vocale ne quitte jamais cet appareil."
+            "value": "Cassini suggérera cette personne dans les prochaines réunions. L’empreinte vocale ne quitte jamais cet appareil."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las próximas reuniones sugerirán a esta persona. La huella de voz nunca sale de este dispositivo."
+            "value": "En las próximas reuniones, Cassini sugerirá a esta persona. La huella de voz nunca sale de este dispositivo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini vai sugerir esta pessoa. A impressão de voz nunca sai deste dispositivo."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "As próximas reuniões vão sugerir esta pessoa. A impressão vocal nunca sai deste dispositivo."
+            "value": "Nas próximas reuniões, o Cassini sugere esta pessoa. A impressão vocal nunca sai deste dispositivo."
           }
         }
       }
@@ -2243,7 +2243,7 @@
       }
     },
     "People in this meeting": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.peopleInMeeting.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.peopleInMeeting.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2831,7 +2831,7 @@
       }
     },
     "The meeting could not be saved. Nothing was changed.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.meetingSaveFailed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.meetingSaveFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
