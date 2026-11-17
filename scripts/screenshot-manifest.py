@@ -36,6 +36,10 @@ SHOTS = {
     "23-speaker-settings": ("Speaker settings", "P2Speakers-Phones", "test23SpeakerSettings", "voices"),
     "24-about-settings": ("About", "P2About-Phones", "test24AboutSettings", "voices"),
 
+    "25-backup-settings": ("Backup", "P2Backup-Phones", "test25BackupSettings", "voices"),
+    "26-backup-details": ("Backup details", "P2BackupDetails-Phones", "test26BackupDetails", "voices"),
+    "27-backup-notice": ("Backup notice", "P2BackupNote-Phones", "test27BackupNotice", "library"),
+
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }

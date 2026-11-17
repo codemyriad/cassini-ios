@@ -1,0 +1,128 @@
+import XCTest
+
+final class BackupFlowTests: XCTestCase {
+    override func setUp() { continueAfterFailure = false }
+    @MainActor private func launch(_ arguments: [String] = ["--seed", "library"]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + arguments
+        app.launchAndWait()
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForExistence(within: 15))
+        return app
+    }
+
+    @MainActor private func openBackup(_ app: XCUIApplication) {
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        app.buttons["backupRow"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("backup"))
+        XCTAssertTrue(app.switches["cloudBackupToggle"].waitForEnabled(within: 15))
+    }
+
+    @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(app.scroll(attempts: 12) { element.exists && element.isHittable && app.frame.contains(element.frame) })
+    }
+
+    @MainActor func testEmptyLibraryDoesNotShowTheBackupNotice() {
+        let app = launch([])
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+    }
+
+    @MainActor func testFirstLiveCaptureDoesNotShowNoticeUntilSaved() {
+        let app = launch(["--seed", "recording"] + DeviceUnderTest.workingSpeech)
+        for title in ["A quieter kind of productivity", "Thoughts from the morning walk"] {
+            let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
+            XCTAssertTrue(row.waitForExistence(within: 15))
+            row.press(forDuration: 1)
+            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        }
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: 15))
+        app.buttons["recordingAllMeetings"].tap()
+        XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+        app.buttons["activeRecordingCard"].tap()
+        XCTAssertTrue(app.buttons["stopRecording"].waitForEnabled(within: 15))
+        app.buttons["stopRecording"].tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        if UIDevice.current.userInterfaceIdiom != .pad { app.navigationBars.buttons["Back to all meetings"].tap() }
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
+    }
+
+    @MainActor func testBothChoicesDefaultOnAndDetailRowsDescribeInclusion() {
+        let app = launch()
+        openBackup(app)
+        XCTAssertEqual(app.switches["cloudBackupToggle"].value as? String, "1")
+        XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
+        let info = app.buttons["backupInfoRow"]
+        reveal(info, in: app); info.tap()
+        XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
+        for id in ["backupStatusMeetings", "backupStatusSettings", "backupStatusVoices", "backupStatusModels"] {
+            let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
+            reveal(row, in: app)
+            XCTAssertTrue(row.label.contains(id == "backupStatusModels" ? "Marked to be left out" : "Included when iCloud Backup is on"), row.label)
+        }
+    }
+
+    @MainActor func testExcludingMeetingsPreservesVoiceChoiceAndExcludesBothStoredKinds() {
+        let app = launch()
+        openBackup(app)
+        app.switches["cloudBackupToggle"].tapWhenSettled()
+        XCTAssertTrue(app.switches["cloudBackupToggle"].waitForValue("0"))
+        XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
+        XCTAssertEqual(app.staticTexts["backupAnswer"].label, "Marked to be left out")
+        let info = app.buttons["backupInfoRow"]
+        reveal(info, in: app); info.tap()
+        XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
+        for id in ["backupStatusMeetings", "backupStatusVoices"] {
+            let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
+            reveal(row, in: app)
+            XCTAssertTrue(row.label.contains("Marked to be left out"), row.label)
+        }
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "--reset-test-data" }
+        app.launchAndWait(fresh: true)
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=false;voices=true;dismissed=false"))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+    }
+
+    @MainActor func testNoticeCloseAndPrimaryKeepBothChoicesAndPersistDismissal() {
+        for action in ["backupNoticeDismiss", "backupNoticeKeep"] {
+            let app = launch()
+            let button = app.buttons[action]
+            XCTAssertTrue(button.waitForExistence(within: 15)); button.tap()
+            XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=true;dismissed=true"))
+            XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+            app.terminate()
+            app.launchArguments.removeAll { $0 == "--reset-test-data" }
+            app.launchAndWait(fresh: true)
+            XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=true;dismissed=true"))
+            XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+        }
+    }
+
+    @MainActor func testNoticeExclusionCommitsBeforeDismissing() {
+        let app = launch()
+        XCTAssertTrue(app.buttons["backupNoticeExclude"].waitForExistence(within: 15))
+        app.buttons["backupNoticeExclude"].tap()
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=false;voices=true;dismissed=true"))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
+        openBackup(app)
+        XCTAssertEqual(app.switches["cloudBackupToggle"].value as? String, "0")
+        XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
+    }
+
+    @MainActor func testOwnCopyExportsEverySavedMeeting() {
+        let app = launch()
+        openBackup(app)
+        let export = app.buttons["backupExportZIP"]
+        reveal(export, in: app); export.tapWhenSettled()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
+        closeShareSheet(app)
+        let complete = app.staticTexts["zipExportCompleted"]
+        reveal(complete, in: app)
+        XCTAssertEqual(complete.label, "Exported 2 to a ZIP archive")
+    }
+}

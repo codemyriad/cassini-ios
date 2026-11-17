@@ -46,6 +46,78 @@ enum SettingsPhase2Copy {
     static var version: String {
         String(localized: "about.version", table: "SettingsPhase2")
     }
+    static var backupCassiniNever: String {
+        String(localized: "backup.info.cassiniNever", table: "SettingsPhase2")
+    }
+    static var backupRowMeetings: String {
+        String(localized: "backup.info.row.meetings", table: "SettingsPhase2")
+    }
+    static var backupRowMeetingsDetail: String {
+        String(localized: "backup.info.row.meetings.detail", table: "SettingsPhase2")
+    }
+    static var backupRowModels: String {
+        String(localized: "backup.info.row.models", table: "SettingsPhase2")
+    }
+    static var backupRowModelsDetail: String {
+        String(localized: "backup.info.row.models.detail.iphone", table: "SettingsPhase2")
+    }
+    static var backupRowVoicesDetail: String {
+        String(localized: "backup.info.row.savedVoices.choice", table: "SettingsPhase2")
+    }
+    static var backupRowSettings: String {
+        String(localized: "backup.info.row.settings", table: "SettingsPhase2")
+    }
+    static var backupRowSettingsDetail: String {
+        String(localized: "backup.info.row.settings.detail", table: "SettingsPhase2")
+    }
+    static var backupIncluded: String {
+        String(localized: "backup.info.status.backedUp", table: "SettingsPhase2")
+    }
+    static var backupExcluded: String {
+        String(localized: "backup.info.status.notBackedUp", table: "SettingsPhase2")
+    }
+    static var backupWhoComputer: String {
+        String(localized: "backup.info.who.computer", table: "SettingsPhase2")
+    }
+    static var backupWhoComputerDetail: String {
+        String(localized: "backup.info.who.computer.detail", table: "SettingsPhase2")
+    }
+    static var backupWho: String {
+        String(localized: "backup.info.who.heading", table: "SettingsPhase2")
+    }
+    static var backupWhoIcloud: String {
+        String(localized: "backup.info.who.icloud.detail", table: "SettingsPhase2")
+    }
+    static var backupWhoZip: String {
+        String(localized: "backup.info.who.zip", table: "SettingsPhase2")
+    }
+    static var backupWhoZipDetail: String {
+        String(localized: "backup.info.who.zip.detail", table: "SettingsPhase2")
+    }
+    static var backupMeetings: String {
+        String(localized: "backup.meetings.switch", table: "SettingsPhase2")
+    }
+    static var backupMeetingsSubtitle: String {
+        String(localized: "backup.meetings.switch.subtitle", table: "SettingsPhase2")
+    }
+    static var ownCopy: String {
+        String(localized: "backup.ownCopy.heading", table: "SettingsPhase2")
+    }
+    static var zipSubtitle: String {
+        String(localized: "backup.ownCopy.zip.subtitle", table: "SettingsPhase2")
+    }
+    static var backupAnswer: String {
+        String(localized: "backup.page.answer.icloud", table: "SettingsPhase2")
+    }
+    static var backupAnswerBody: String {
+        String(localized: "backup.page.answer.icloud.body", table: "SettingsPhase2")
+    }
+    static var backupVoices: String {
+        String(localized: "backup.savedVoices.switch", table: "SettingsPhase2")
+    }
+    static var backupVoicesWhy: String {
+        String(localized: "backup.savedVoices.switch.why", table: "SettingsPhase2")
+    }
     static var savedVoices: String {
         String(localized: "common.savedVoices", table: "SettingsPhase2")
     }
@@ -105,6 +177,9 @@ enum SettingsPhase2Copy {
     }
     static var autoNameSubtitle: String {
         String(localized: "settings.ios.speakers.autoName.subtitle", table: "SettingsPhase2")
+    }
+    static var moreDetail: String {
+        String(localized: "settings.moreDetail", table: "SettingsPhase2")
     }
     static var aboutSubtitle: String {
         String(localized: "settings.phone.aboutRow.subtitle", table: "SettingsPhase2")

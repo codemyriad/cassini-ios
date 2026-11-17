@@ -89,6 +89,7 @@ struct SettingsView: View {
 }
 
 private struct SettingsForm: View {
+    @State private var backupExport = ArchiveExportModel()
     let model: SettingsModel
     let page: SettingsPage?
     @Environment(SettingsStore.self) private var settings
@@ -109,10 +110,11 @@ private struct SettingsForm: View {
             case .transcription: transcription
             case .speakers: speakers
             case .about: about
-            case .backup: BackupSection()
+            case .backup: BackupSection(archiveExport: backupExport)
             }
         }
         .readableListWidth()
+        .shareSheet(item: $backupExport.shareItem)
     }
 
     private var map: some View {

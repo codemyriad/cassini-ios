@@ -577,12 +577,12 @@ join paragraphs with spaces so blank lines cannot hide the matching word. Both s
 the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
 
 Wave 6 voices and phone backups (`D-979`, `D98`): iOS includes meetings and saved voices in OS backups by default.
-Settings → Moving and backup controls Library directory exclusion and the independent PrivateVoices exclusion;
+Settings → Backup controls Library directory exclusion and the independent PrivateVoices exclusion;
 Saved voices includes a one-question opt-in for automatic naming, transcript enrollment (unchanged), guided
 four-second test-phrase enrollment, sample playback, rename and forget. Guided audio stays under
 `PrivateVoices/Enrollment`, never in the Library or ZIP export, and is removed when its voice is forgotten.
 Unlike Android's “phone only” mode, iOS only marks directories to be left out of iCloud Backup: Quick Start may still
-copy them. The once-only Library card and layered explainer say so. Turning exclusion on does not delete existing
+copy them. The floating Library notice appears only after a saved meeting exists; the Backup page explains this guidance. Turning exclusion on does not delete existing
 cloud backups. Directory resource flags cover all descendants, including new directories, atomic replacements,
 recordings and imports; startup reapplies both committed preferences, including the old always-excluded voice store.
 Manual ZIP export contains portable meetings (or their original audio) and never private voiceprints or guided samples,
@@ -603,3 +603,11 @@ from Android's older subtitle rules (six-second cues and cross-speaker overlap).
 Imported provenance (L-10): Library and Search show the shared outline Imported badge before speaker counts on finished imported meetings; progress and problem states take its place. Headers identify imported meetings and files that arrived with a transcript from another device. This matches the Phase 2 phone contract; recovered local captures remain own recordings. Existing stored import records are read without migration, and import-flow copy is unchanged.
 
 D103 phone Settings uses the shared topic map. iOS keeps its speech-language picker on Apple Speech devices, its “Transcribe right away” and “Name strong matches automatically” switches, and opens app language in iOS Settings. The Backup page retains iOS backup guidance; it cannot report whether iCloud Backup has run. Turning off “Recognise saved voices” clears unconfirmed matches from active and paused drafts, while keeping confirmed names and Remember choices. Re-analysis still carries over names given within the same meeting.
+
+D103 Backup uses the answer-first phone page, independent meeting and saved-voice switches, inclusion rows and
+separate explanations of iCloud, computer backups and ZIP copies. Both switches still default on. Settings remain
+eligible independently of the Library directory, saved voices follow both switches, and downloaded models are always
+excluded. “Included” is conditional on iCloud Backup being enabled; Cassini cannot inspect its state or completion.
+The once-only notice floats above Record after a saved recording or import, never over an empty first launch or a
+first live/interrupted recording. Close and Keep backup on preserve choices; exclusion dismisses only after its
+storage transaction succeeds. Backup’s ZIP action uses the Library exporter and excludes live and interrupted captures.

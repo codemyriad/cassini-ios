@@ -7,6 +7,8 @@ import CassiniNotebook
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(ImportStore.self) private var imports
+    @Environment(SettingsStore.self) private var settings
+    @Environment(BackupModel.self) private var backup
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
@@ -44,9 +46,30 @@ struct LibraryView: View {
         .meetingScrollEdge()
         .scrollDismissesKeyboard(.immediately)
         .scrollPosition($listPosition)
-        .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
+        .overlay(alignment: .topLeading) {
+            UITestInteractiveMarker(loaded: library.isLoaded && !content.loading)
+            if backup.ready {
+                UITestStateMarker(identifier: "backupState", value:
+                    "cloud=\(settings.cloudBackup);voices=\(settings.includeSavedVoicesInBackups);dismissed=\(settings.backupNoticeDismissed)")
+            }
+        }
         .trashUndoSnackbar()
         .background(Color.paper)
+        .overlay(alignment: .bottom) {
+            if !model.isSearching, !searchPresented,
+               BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
+                .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
+                             dismissed: settings.backupNoticeDismissed) {
+                GeometryReader { geometry in
+                    VStack {
+                        Spacer(minLength: 0)
+                        BackupNoticeCard(maximumHeight: max(0, geometry.size.height - 24))
+                            .frame(maxWidth: ReadableWidth.content)
+                            .padding(.horizontal, 12).padding(.bottom, 12)
+                    }.frame(maxWidth: .infinity)
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
         }
@@ -121,7 +144,6 @@ struct LibraryView: View {
                 .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
         }
         activity.padding(.top, 6)
-        if library.isLoaded, !model.isSearching { BackupNoticeCard() }
         ImportCardsView()
     }
 

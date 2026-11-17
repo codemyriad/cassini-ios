@@ -40,15 +40,8 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(extra)
         let hero = app.staticTexts["heroTitle"]
-        // The Library audit covers the backup notice at the top. Dismiss it here to audit the hero:
-        // iOS 18's clipping audit resets the scroll offset when it changes text sizes, bringing an
-        // offscreen notice back into this audit and reporting its heading instead of the hero.
-        let dismissNotice = app.scrolledLibraryElement(app.buttons["backupNoticeDismiss"], description: "backup notice dismiss button")
-        let scroll = app.scrollViews["libraryScroll"]
-        dismissNotice.tapWhenSettled()
-        XCTAssertTrue(dismissNotice.waitForNonExistence(within: 15))
-        XCTAssertTrue(scroll.scroll(up: false, attempts: 12) { hero.exists && hero.isHittable },
-                      "The first-run hero is not on the screen")
+        XCTAssertTrue(hero.waitForExistence(within: 15))
+        XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists, "No backup notice before the first saved meeting")
         return app
     }
 
@@ -179,6 +172,44 @@ final class AccessibilityAuditTests: XCTestCase {
             screenshot.name = "audit-\(screen)"; screenshot.lifetime = .keepAlways; add(screenshot)
         }
         XCTAssertTrue(issues.isEmpty, issues.joined(separator: "\n"), file: file, line: line)
+    }
+
+    @MainActor func testBackupSurfacesPassTheAudit() {
+        auditBackupSurfaces([])
+    }
+
+    @MainActor func testBackupSurfacesWrapInFrenchAtLargestTextSize() {
+        auditBackupSurfaces(Self.largestText + ["-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR"])
+    }
+
+    @MainActor func testIPadBackupSurfacesWrapInFrenchAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        testBackupSurfacesWrapInFrenchAtLargestTextSize()
+    }
+
+    @MainActor private func auditBackupSurfaces(_ arguments: [String]) {
+        let app = library(arguments)
+        let dismiss = app.buttons["backupNoticeDismiss"]
+        XCTAssertTrue(dismiss.waitForExistence(within: 15))
+        audit(app, screen: "backupNotice")
+        dismiss.tap()
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=true;dismissed=true"))
+        app.buttons["settingsButton"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        let row = app.buttons["backupRow"]
+        XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable && app.frame.contains(row.frame) })
+        row.tap()
+        XCTAssertTrue(app.waitForSettingsPage("backup"))
+        audit(app, screen: "backup-settings", listRows: true)
+        let detail = app.buttons["backupInfoRow"]
+        XCTAssertTrue(app.scroll(attempts: 12) { detail.exists && detail.isHittable && app.frame.contains(detail.frame) })
+        detail.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["backupInfo"].waitForExistence(within: 15))
+        audit(app, screen: "backupDetails", listRows: true)
+        let final = app.descendants(matching: .any).matching(identifier: "backupZipReader").firstMatch
+        XCTAssertTrue(app.scroll(attempts: 12) { final.exists && final.isHittable && app.frame.contains(final.frame) })
+        audit(app, screen: "backupReaders", listRows: true)
+        app.terminate()
     }
 
     @MainActor func testTheLibraryPassesTheAudit() { audit(library(), screen: "library") }
