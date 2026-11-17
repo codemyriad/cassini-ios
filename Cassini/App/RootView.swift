@@ -32,7 +32,8 @@ struct RootView: View {
                 VStack {
                     UITestStateMarker(identifier: "archiveExport", value: fixture.state)
                     if fixture.state == "held" {
-                        Button("Release export") { fixture.release() }.accessibilityIdentifier("releaseArchiveExport")
+                        Button { fixture.release() } label: { Text(verbatim: "Release export") }
+                            .accessibilityIdentifier("releaseArchiveExport")
                     }
                 }
             }
