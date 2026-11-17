@@ -145,12 +145,28 @@ private struct SettingsForm: View {
             } header: { Text(SettingsPhase2Copy.app) }
             Section {
                 Button { router.push(.settingsPage(.about)) } label: {
-                    (typeSize.isAccessibilitySize
-                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-                     : AnyLayout(HStackLayout(spacing: 12))) {
-                        OrbitMark(size: 36)
-                        SettingsRowLabel(title: SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version),
-                                         subtitle: SettingsPhase2Copy.aboutSubtitle)
+                    Group {
+                        if typeSize.isAccessibilitySize {
+                            // Keep the disclosure beside the mark so long translations use the card's full width.
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    OrbitMark(size: 36)
+                                    Spacer()
+                                    Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version))
+                                        .foregroundStyle(Color.ink)
+                                    Text(SettingsPhase2Copy.aboutSubtitle).font(.subheadline).foregroundStyle(Color.muted)
+                                }
+                            }
+                        } else {
+                            HStack(spacing: 12) {
+                                OrbitMark(size: 36)
+                                SettingsRowLabel(title: SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version),
+                                                 subtitle: SettingsPhase2Copy.aboutSubtitle)
+                            }
+                        }
                     }.padding(.vertical, 6)
                 }.accessibilityIdentifier("aboutRow")
             }
