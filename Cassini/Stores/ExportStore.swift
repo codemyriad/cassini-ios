@@ -6,6 +6,9 @@ import CassiniNotebook
 /// Files made from a note for the share sheet, each in its own folder under `tmp/Exports/`, removed when the sheet
 /// closes or at the next launch. Exports wait for the launch work, whose sweep clears `tmp/Exports`.
 @MainActor @Observable final class ExportStore {
+    #if DEBUG
+    var archiveFixture: ArchiveExportFixture?
+    #endif
     @ObservationIgnored private let library: LibraryStore
     @ObservationIgnored private let service: ExportService?
     @ObservationIgnored private let portable: PortableExportService?
@@ -74,7 +77,17 @@ import CassiniNotebook
     func waitForDiscards() async { await discardTask?.value }
 
     /// The share sheet's item for the export at `url`, removed once the sheet is dismissed.
-    func shareItem(_ url: URL) -> ShareItem { ShareItem(url: url) { [weak self] in self?.discard(url) } }
+    func shareItem(_ url: URL) -> ShareItem {
+        ShareItem(url: url) { [weak self] in
+            guard let self else { return }
+            discard(url)
+            #if DEBUG
+            if let fixture = archiveFixture {
+                Task { await waitForDiscards(); await fixture.cleaned("shared") }
+            }
+            #endif
+        }
+    }
 
     /// The launch sweep: exports left from the last run and stale temporary files in the notes' directories.
     func sweep(now: Date) async { await service?.sweep(now: now) }
@@ -101,3 +114,40 @@ import CassiniNotebook
         return try await batch.export(notes, progress: progress)
     }
 }
+
+#if DEBUG
+/// UI tests stop after a real ZIP exists, then release or cancel through ordinary navigation.
+@MainActor @Observable final class ArchiveExportFixture {
+    private let folder: URL
+    private var continuation: AsyncStream<Void>.Continuation?
+    private(set) var state = "idle"
+    init(folder: URL) { self.folder = folder }
+
+    func wait() async throws {
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        self.continuation = continuation
+        state = "held"
+        for await _ in stream {}
+        self.continuation = nil
+        try Task.checkCancellation()
+    }
+
+    func release() { continuation?.finish(); state = "released" }
+
+    func finished(cancelled: Bool) async {
+        guard cancelled else { state = "completed"; return }
+        await cleaned("cancelled")
+    }
+
+    func cleaned(_ outcome: String) async {
+        let folder = folder
+        let files = await Task.detached {
+            let enumerator = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isRegularFileKey])
+            return (enumerator?.allObjects as? [URL] ?? []).filter {
+                (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            }.count
+        }.value
+        state = "\(outcome);files=\(files)"
+    }
+}
+#endif

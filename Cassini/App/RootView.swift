@@ -6,6 +6,7 @@ import CassiniEngine
 struct RootView: View {
     /// Restores the stack and the screens' scene storage (the library search); off for UI tests.
     var restoresNavigation = true
+    @Environment(ExportStore.self) private var exports
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -25,6 +26,18 @@ struct RootView: View {
             navigation
             #endif
         }
+        #if DEBUG
+        .overlay(alignment: .topTrailing) {
+            if let fixture = exports.archiveFixture {
+                VStack {
+                    UITestStateMarker(identifier: "archiveExport", value: fixture.state)
+                    if fixture.state == "held" {
+                        Button("Release export") { fixture.release() }.accessibilityIdentifier("releaseArchiveExport")
+                    }
+                }
+            }
+        }
+        #endif
         .fullScreenCover(item: $router.fullScreen) { _ in RecordingView() }
         .trashStopConfirmation()
         .alert(RootCopy.errorTitle, isPresented: Binding(get: { errors.current != nil }, set: { if !$0, let id = errors.current?.id { errors.dismiss(id) } }),

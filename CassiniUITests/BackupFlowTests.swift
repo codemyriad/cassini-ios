@@ -194,6 +194,76 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
     }
 
+    @MainActor func testExportSurvivesBothDetailLinksAndSharesAfterReturning() {
+        for id in ["backupInfoRow", "backupReadersRow"] {
+            let app = launch(["--seed", "library", "--hold-archive-export"])
+            openBackup(app)
+            let export = app.buttons["backupExportZIP"]
+            reveal(export, in: app); export.tapWhenSettled()
+            let state = app.staticTexts["uiTestState-archiveExport"]
+            XCTAssertTrue(state.waitForValue("held"))
+            let link = app.buttons[id]
+            XCTAssertTrue(app.scroll(up: false, attempts: 12) { link.isHittable && app.frame.contains(link.frame) })
+            link.tapWhenSettled()
+            XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
+            XCTAssertEqual(state.value as? String, "held")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.waitForSettingsPage("backup"))
+            XCTAssertEqual(state.value as? String, "held")
+            app.buttons["releaseArchiveExport"].tap()
+            XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
+            closeShareSheet(app)
+            let complete = app.staticTexts["zipExportCompleted"]
+            reveal(complete, in: app)
+            XCTAssertEqual(complete.label, "Exported 2 to a ZIP archive")
+        }
+    }
+
+    @MainActor func testExportCanFinishWhileReadingDetails() {
+        let app = launch(["--seed", "library", "--hold-archive-export"])
+        openBackup(app)
+        let export = app.buttons["backupExportZIP"]
+        reveal(export, in: app); export.tapWhenSettled()
+        let state = app.staticTexts["uiTestState-archiveExport"]
+        XCTAssertTrue(state.waitForValue("held"))
+        let link = app.buttons["backupInfoRow"]
+        XCTAssertTrue(app.scroll(up: false, attempts: 12) { link.isHittable && app.frame.contains(link.frame) })
+        link.tapWhenSettled()
+        XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
+        app.buttons["releaseArchiveExport"].tap()
+        XCTAssertTrue(state.waitForValue("completed"))
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
+        // The presenter's normal dismissal marker belongs to the covered Backup form.
+        // Wait for the export store's completed cleanup event, visible above either detail page.
+        let close = app.waitForShareSheetClose()
+        XCTAssertNotNil(close)
+        close?.tapWhenSettled()
+        XCTAssertTrue(state.waitForValue("shared;files=0"))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.waitForSettingsPage("backup"))
+        let complete = app.staticTexts["zipExportCompleted"]
+        reveal(complete, in: app)
+        XCTAssertEqual(complete.label, "Exported 2 to a ZIP archive")
+    }
+
+    @MainActor func testLeavingBackupCancelsExportAndRemovesItsZIP() {
+        let app = launch(["--seed", "library", "--hold-archive-export"])
+        openBackup(app)
+        let export = app.buttons["backupExportZIP"]
+        reveal(export, in: app); export.tapWhenSettled()
+        let state = app.staticTexts["uiTestState-archiveExport"]
+        XCTAssertTrue(state.waitForValue("held"))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.waitForSettingsPage("map"))
+        XCTAssertTrue(state.waitForValue("cancelled;files=0"))
+        XCTAssertFalse(app.otherElements["ActivityListView"].exists)
+        app.buttons["backupRow"].tap()
+        XCTAssertTrue(app.waitForSettingsPage("backup"))
+        reveal(export, in: app)
+        XCTAssertTrue(export.isEnabled)
+        XCTAssertFalse(app.staticTexts["zipExportCompleted"].exists)
+    }
+
     @MainActor func testOwnCopyExportsEverySavedMeeting() {
         let app = launch()
         openBackup(app)

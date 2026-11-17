@@ -115,7 +115,13 @@ private struct SettingsForm: View {
         }
         .readableListWidth()
         .shareSheet(item: $backupExport.shareItem)
-        .onDisappear { backupExport.cancel() }
+        // Pushing a detail page also disappears this form. Only leaving the Backup route cancels its work.
+        .onDisappear { cancelExportIfClosed() }
+        .onChange(of: router.path) { _, _ in cancelExportIfClosed() }
+    }
+
+    private func cancelExportIfClosed() {
+        if !router.path.contains(.settingsPage(.backup)) { backupExport.cancel() }
     }
 
     private var map: some View {
