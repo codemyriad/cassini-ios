@@ -633,7 +633,7 @@ final class NoteScreenTests: XCTestCase {
         let sheet = app.descendants(matching: .any)["transcribingDetailsSheet"]
         XCTAssertTrue(sheet.waitForExistence(within: 5))
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@",
-                                                                           "Intervenants et correspondance")).firstMatch.exists)
+                                                                           "Intervenants et reconnaissance")).firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)["audioDoneStat"].exists)
     }
 }
