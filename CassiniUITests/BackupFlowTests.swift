@@ -22,6 +22,26 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertTrue(app.scroll(attempts: 12) { element.exists && element.isHittable && app.frame.contains(element.frame) })
     }
 
+    @MainActor func testNoticeFloatsAboveCaptureAndLeavesMeetingRowsReachable() {
+        let app = launch()
+        let notice = app.descendants(matching: .any).matching(identifier: "backupNotice").firstMatch
+        XCTAssertTrue(notice.waitForExistence(within: 15))
+        let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "A quieter kind of productivity")).firstMatch
+        XCTAssertTrue(poll(within: uiWaitFloor) {
+            notice.frame.height < app.frame.height * 0.6 && row.isHittable
+        }, "The card sizes to its content and leaves the saved meeting reachable")
+        XCTAssertLessThanOrEqual(notice.frame.maxY, app.buttons["recordButton"].frame.minY)
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].isHittable)
+    }
+
+    @MainActor func testOwnCopyIsDisabledWithoutSavedMeetings() {
+        let app = launch([])
+        openBackup(app)
+        let export = app.buttons["backupExportZIP"]
+        reveal(export, in: app)
+        XCTAssertFalse(export.isEnabled)
+    }
+
     @MainActor func testEmptyLibraryDoesNotShowTheBackupNotice() {
         let app = launch([])
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
@@ -69,7 +89,9 @@ final class BackupFlowTests: XCTestCase {
     @MainActor func testExcludingMeetingsPreservesVoiceChoiceAndExcludesBothStoredKinds() {
         let app = launch()
         openBackup(app)
-        app.switches["cloudBackupToggle"].tapWhenSettled()
+        let control = app.switches["cloudBackupToggle"]
+        // A composite Toggle's AX frame includes its multiline label. Tap the native switch at its trailing edge.
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
         XCTAssertTrue(app.switches["cloudBackupToggle"].waitForValue("0"))
         XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
         XCTAssertEqual(app.staticTexts["backupAnswer"].label, "Marked to be left out")

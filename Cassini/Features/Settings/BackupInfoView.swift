@@ -160,19 +160,21 @@ private struct BackupInclusionRow: View {
 /// the available viewport, keeping both choices reachable without covering navigation or Record.
 struct BackupNoticeCard: View {
     let maximumHeight: CGFloat
+    @State private var contentHeight: CGFloat = 0
     @Environment(SettingsStore.self) private var settings
     @Environment(BackupModel.self) private var backup
     @Environment(ErrorPresenter.self) private var errors
 
     var body: some View {
-        ViewThatFits(in: .vertical) {
+        ScrollView {
             content.fixedSize(horizontal: false, vertical: true)
-            ScrollView { content }.scrollBounceBehavior(.basedOnSize)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-        .frame(maxHeight: maximumHeight)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: min(contentHeight > 0 ? contentHeight : maximumHeight, maximumHeight))
         .background(Color.paper, in: RoundedRectangle(cornerRadius: 24))
         .overlay { RoundedRectangle(cornerRadius: 24).stroke(Color.muted.opacity(0.2), lineWidth: 1).allowsHitTesting(false) }
-        .shadow(color: .black.opacity(0.12), radius: 16, y: 4)
+        .shadow(color: Color.shadow, radius: 16, y: 4)
         .disabled(backup.updating)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("backupNotice")
