@@ -86,7 +86,10 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings has not finished loading")
         // The first group can extend below the fold at the largest text size; reveal the row before tapping.
-        XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
+        let viewport = app.collectionViews.firstMatch
+        XCTAssertTrue(viewport.scroll(attempts: 12) {
+            row.exists && row.isHittable && viewport.frame.insetBy(dx: 0, dy: 8).contains(row.frame)
+        }, "Saved voices is not fully inside the list")
         row.tapWhenSettled()
         // At AX5 on iOS 18, tapping a row at the List's bottom edge can only scroll it into place.
         // A positive destination or a settled, hittable source row decides whether to retry.
