@@ -939,7 +939,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mover a Eliminados"
+            "value": "Mover a Eliminado recientemente"
           }
         },
         "fr": {
@@ -1004,7 +1004,7 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apagados recentemente"
+            "value": "Apagados"
           }
         }
       }
@@ -1021,7 +1021,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Eliminados está vacío"
+            "value": "Eliminado recientemente está vacío"
           }
         },
         "fr": {
@@ -1144,7 +1144,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "¿Detener la transcripción y mover a Eliminados?"
+            "value": "¿Detener la transcripción y mover a Eliminado recientemente?"
           }
         },
         "fr": {
@@ -1309,7 +1309,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "“%@” movida a Eliminados"
+            "value": "“%@” movida a Eliminado recientemente"
           }
         },
         "fr": {
