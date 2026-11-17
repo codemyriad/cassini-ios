@@ -133,6 +133,7 @@ import CassiniNotebook
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
         let drafts = library.noteStore.map { DraftNamesStore(notes: $0) }
         voices.drafts = drafts
+        settings.bindDraftNames(drafts)
         let coordinator = library.noteStore.map { notes in
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
@@ -288,6 +289,7 @@ import CassiniNotebook
             if library.loadFailure == nil { await voices.load() }
             await noticeCenter.refresh()
         }
+        startup.register(.load) { [settings] in await settings.settleDraftRecognition() }
         startup.register(.recover) { [recording] in await recording.recoverInterrupted() }
         startup.register(.reconcile) { [processing, recording] in
             try await processing.reconcileOnStart(activeNoteID: recording.state.noteID)

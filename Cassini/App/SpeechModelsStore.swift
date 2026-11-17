@@ -33,6 +33,7 @@ import CassiniWhistle
     @ObservationIgnored private var verificationTask: Task<Void, Never>?
     @ObservationIgnored var onChange: @MainActor () -> Void = {}
     @ObservationIgnored var onDownload: @MainActor () -> Void = {}
+    private(set) var whistleAvailable: Bool
     private(set) var installation: ParakeetInstallation = .missing
     private(set) var suggestion: ParakeetSuggestionState
     private(set) var promotionVisible = false
@@ -46,6 +47,7 @@ import CassiniWhistle
          verify: (@Sendable () throws -> Bool)? = nil,
          verifyBundle: @escaping @Sendable () async -> Bool = { await WhistleRuntime.verifyBundle() }) {
         self.verifyBundle = verifyBundle
+        whistleAvailable = whistle.available
         self.root = root; self.defaults = defaults; self.storage = storage; self.whistle = Mutex(whistle)
         self.physicalMemory = physicalMemory; self.availableMemory = availableMemory; self.platform = platform
         parakeetCapable = parakeetLinked && SpeechCapability.parakeetCapable(physicalMemory: physicalMemory)
@@ -65,7 +67,8 @@ import CassiniWhistle
     func verifyBundledSpeech() async {
         let verified = await verifyBundle()
         whistle.withLock { $0.bundleVerified = verified }
-        let recognizer = selectedRecognizer().rawValue
+        whistleAvailable = whistleCapability.available
+        let recognizer = displayRecognizer.rawValue
         Logger(subsystem: "io.codemyriad.cassini", category: "WhistleBundle")
             .notice("Speech selection after bundle verification; verified=\(verified, privacy: .public) physicalMemory=\(self.physicalMemory, privacy: .public) recognizer=\(recognizer, privacy: .public)")
         onChange()
@@ -73,7 +76,7 @@ import CassiniWhistle
 
     /// Rendering reads published installation facts, never file existence or free space.
     private var displayPolicy: SpeechModelPolicy {
-        SpeechModelPolicy(whistleAvailable: whistleCapability.available, parakeetLinked: parakeetCapable,
+        SpeechModelPolicy(whistleAvailable: whistleAvailable, parakeetLinked: parakeetCapable,
             physicalMemory: physicalMemory, availableMemory: availableMemory(), parakeetInstallation: installation,
             availableDiskBytes: 0, downloadPlan: ModelPlan([]))
     }
@@ -168,25 +171,30 @@ import CassiniWhistle
     /// runs; automatic/Parakeet cold-start admission awaits it through verifyInstalledSpeech().
     func refresh() {
         guard verificationTask == nil else { return }
-        guard parakeetCapable, installed() else { publish(.missing); return }
-        if verified() { publish(.verified); return }
+        guard parakeetCapable else { publish(.missing); return }
         publish(.checking)
-        let verify = verify
+        let verify = verify, installed = installed, verified = verified
         verificationTask = Task { [weak self] in
-            let result = await withCheckedContinuation { continuation in
+            let result: ParakeetInstallation = await withCheckedContinuation { continuation in
                 DispatchQueue.global(qos: .utility).async {
-                    do { continuation.resume(returning: Result<Bool, any Error>.success(try verify())) }
-                    catch { continuation.resume(returning: .failure(error)) }
+                    guard installed() else { continuation.resume(returning: .missing); return }
+                    if verified() { continuation.resume(returning: .verified); return }
+                    do {
+                        _ = try verify()
+                        continuation.resume(returning: installed() && verified() ? .verified : .missing)
+                    } catch {
+                        continuation.resume(returning: installed() && verified() ? .verified : .unavailable)
+                    }
                 }
             }
             guard let self else { return }
             self.verificationTask = nil
-            switch result {
-            case .success: self.publish(self.installed() && self.verified() ? .verified : .missing)
-            case .failure: self.publish(self.installed() && self.verified() ? .verified : .unavailable)
-            }
+            self.publish(result)
         }
     }
+
+    /// Event-based completion for callers which need the refreshed installation facts.
+    func settleVerification() async { await verificationTask?.value }
 
     private func publish(_ value: ParakeetInstallation) {
         installation = value

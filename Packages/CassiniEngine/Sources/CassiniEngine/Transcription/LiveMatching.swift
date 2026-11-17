@@ -34,7 +34,11 @@ public final class LiveMatching: @unchecked Sendable {
         let merged = names.merged(windows)
         prints = prints.filter { merged[$0.key] != nil }
         let pending = merged.filter { names.openForLive($0.key) && due($0.key, $0.value, rate: clips.sampleRate) }
-        guard !pending.isEmpty, !voices().isEmpty else { return }
+        guard !voices().isEmpty else {
+            drafts.mutate(noteID) { $0.withoutUnconfirmedMatches() }
+            return
+        }
+        guard !pending.isEmpty else { return }
         for (id, print) in try CheckedPrints.check(engines.prints(clips, windows: pending, active: active)) {
             attempts[id] = print.seconds
             prints[id] = SpeakerPrint(speakerID: id, model: VoiceprintModel.sha256, vector: print.vector,
@@ -42,6 +46,10 @@ public final class LiveMatching: @unchecked Sendable {
         }
         let open = prints.filter { names.openForLive($0.key) }
         let people = voices()
+        guard !people.isEmpty else {
+            drafts.mutate(noteID) { $0.withoutUnconfirmedMatches() }
+            return
+        }
         let matches = VoiceMatcher.match(prints: open.keys.sorted().compactMap { open[$0] }, voices: people,
                                          excluded: names.excluded(open.keys))
         let live = matches.mapValues { LiveMatch($0.voiceID, $0.score, $0.automatic && autoName ? .auto : .suggested) }

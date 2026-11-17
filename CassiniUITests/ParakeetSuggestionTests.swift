@@ -74,7 +74,7 @@ final class ParakeetSuggestionTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.staticTexts["Whistle"].firstMatch.waitForExistence(within: 15))
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage("map"))
         XCTAssertFalse(app.staticTexts[title].exists)
         XCTAssertFalse(app.staticTexts["Parakeet Ultra"].exists)
     }

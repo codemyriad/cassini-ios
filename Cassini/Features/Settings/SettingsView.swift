@@ -33,7 +33,7 @@ struct SettingsView: View {
         }
         .paperListBackground()
         .overlay(alignment: .topLeading) {
-            if loaded { UITestStateMarker(identifier: "settingsLoaded") }
+            if loaded { UITestStateMarker(identifier: "settingsLoaded", value: page?.rawValue ?? "map") }
             #if DEBUG
             if let recorder = installRecorder {
                 let installing = processing.models.isInstalling
@@ -42,6 +42,9 @@ struct SettingsView: View {
                 if !snapshot.requested.isEmpty {
                     UITestStateMarker(identifier: "modelInstallRequested",
                                       value: snapshot.requested.map(\.rawValue).joined(separator: ","))
+                    if !installing, download == nil, snapshot.completed.isEmpty {
+                        UITestStateMarker(identifier: "modelInstallCancelled", value: "cancelled")
+                    }
                     if !installing, download == nil, !snapshot.completed.isEmpty {
                         let consent: [ModelPart] = (settings.downloadsAllowed ? [.speech] : [])
                             + (settings.speakerDownloadsAllowed ? [.speakers] : [])
@@ -130,6 +133,7 @@ private struct SettingsForm: View {
                 Text(SettingsPhase2Copy.libraryStats
                     .replacingOccurrences(of: "{meetings}", with: SettingsPhase2Copy.meetingCount(model.library.notes))
                     .replacingOccurrences(of: "{hours}", with: audioDuration))
+                    .accessibilityIdentifier("libraryStats")
             }
             Section {
                 Button(action: model.openAppLanguage) {
@@ -155,7 +159,8 @@ private struct SettingsForm: View {
     }
 
     private var audioDuration: String {
-        model.library.duration >= 3600
+        if Int64(max(0, model.library.duration) * 1000) == 0 { return SettingsPhase2Copy.audioHours(0) }
+        return model.library.duration >= 3600
             ? SettingsPhase2Copy.audioHours(Int(model.library.duration / 3600))
             : MarkdownDate.duration(Int64(max(0, model.library.duration) * 1000), locale: locale,
                 underMinute: String(localized: "under 1 min", table: "Export"),
@@ -168,7 +173,7 @@ private struct SettingsForm: View {
             switch store.displayRecognizer {
             case .whistle: return SettingsPhase2Copy.whistle
             case .parakeet: return SettingsPhase2Copy.parakeet
-            case .appleSpeech: break
+            case .appleSpeech: return ModelPart.speech.settingsLabel
             }
         }
         if ports.recognizer == .parakeet { return SettingsPhase2Copy.parakeet }
@@ -180,7 +185,7 @@ private struct SettingsForm: View {
         @Bindable var settings = settings
         return Group {
             Section {
-                if let store = ports.speechModels, store.whistleCapability.available {
+                if let store = ports.speechModels, store.whistleAvailable {
                     SpeechChoicesView(store: store, rows: model.models)
                 } else {
                     ForEach(model.models.filter { $0.part == .speech }) { row in
@@ -200,6 +205,7 @@ private struct SettingsForm: View {
             if let store = ports.speechModels, store.promotionVisible {
                 Section { ParakeetSuggestionView(store: store, placement: .settings) }
             }
+            SettingsNoticesSection()
         }
     }
 
@@ -233,6 +239,7 @@ private struct SettingsForm: View {
                 }
             }
             VoiceSetupSection()
+            SettingsNoticesSection()
         }
     }
 
@@ -327,10 +334,17 @@ private struct SpeechChoicesView: View {
 
     private func choice(_ recognizer: SpeechRecognizer, title: String, subtitle: String) -> some View {
         let installed = recognizer == .whistle || store.installation == .verified
+        let row = rows.first { $0.part == .speech }
+        let action: SpeechModelRowAction = recognizer == .whistle ? .choose
+            : .parakeet(installation: store.installation, status: row?.status, runnable: store.canChooseParakeet)
         return HStack(alignment: .top, spacing: 12) {
             Button {
-                if installed { store.choose(recognizer) }
-                else { router.push(.parakeetDownload) }
+                switch action {
+                case .choose: store.choose(recognizer)
+                case .verify: store.refresh()
+                case .download: router.push(.parakeetDownload)
+                case .none: break
+                }
             } label: {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: store.displayRecognizer == recognizer ? "checkmark.circle.fill" : "circle")
@@ -349,15 +363,16 @@ private struct SpeechChoicesView: View {
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-            }.buttonStyle(.plain).disabled(installed && recognizer == .parakeet && !store.canChooseParakeet)
+            }.buttonStyle(.plain).disabled(action == .none)
                 .accessibilityIdentifier(recognizer == .whistle ? "chooseWhistle" : "chooseParakeet")
                 .accessibilityAddTraits(store.displayRecognizer == recognizer ? [.isSelected] : [])
             if recognizer == .parakeet, !installed {
                 VStack(spacing: 4) {
-                    Button(SettingsPhase2Copy.download) { router.push(.parakeetDownload) }
-                        .buttonStyle(.bordered).buttonBorderShape(.capsule)
-                        .accessibilityIdentifier("downloadParakeet")
-                        .disabled(store.installation == .checking)
+                    if action == .download {
+                        Button(SettingsPhase2Copy.download) { router.push(.parakeetDownload) }
+                            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+                            .accessibilityIdentifier("downloadParakeet")
+                    }
                     Text(SizeCopy.text(ModelDownloadPlan.fullDownloadBytes(.speech), locale: locale)).font(.caption).foregroundStyle(Color.muted)
                     if let row = rows.first(where: { $0.part == .speech }), row.status != .notDownloaded {
                         Text(row.status.label).font(.caption).foregroundStyle(row.status.tone.color)

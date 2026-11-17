@@ -71,7 +71,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let app = library(extra)
         let firstTopic = app.buttons["transcriptionRow"]
         XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+        XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings has not finished loading")
         return app
     }
@@ -90,7 +90,7 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         let firstTopic = app.buttons["transcriptionRow"], row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+        XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings has not finished loading")
         // The first group can extend below the fold at the largest text size; reveal the row before tapping.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")

@@ -112,6 +112,21 @@ import CassiniNotebook
         #expect(h.library.note(note.id)?.speakers?.first?.match == .unmatched)
     }
 
+    @Test(arguments: [false, true]) func recognitionOffKeepsManualNamesDuringReanalysis(remembered: Bool) async throws {
+        defer { h.tearDown() }
+        let note = try await namedNote()
+        if remembered { try await remember("Alex", in: note.id, voices: h.voices) }
+        else { try await h.voices.perform([.relabel(speakerID: "a", name: "Alex")], noteID: note.id, speakerID: "a") }
+        h.settings.recogniseSavedVoices = false
+        let analysis = SpeakerAnalysis(turns: [.init(speakerID: "new", start: 0, end: 12)],
+            prints: [.init(speakerID: "new", model: print.model, vector: print.vector, speechSeconds: 12)])
+        try await h.voices.applySpeakerAnalysis(analysis, to: note.id, generation: h.settings.voicesGeneration)
+        let updated = try #require(h.library.note(note.id))
+        #expect(updated.transcript.map(\.speaker) == ["Alex", "Alex"])
+        #expect(updated.speakers?.first?.match == .unmatched)
+        #expect(h.voices.savedVoices.count == (remembered ? 1 : 0))
+    }
+
     @Test func voiceSuggestionsAutoNamingAndTrashedEvidence() async throws {
         defer { h.tearDown() }
         let repository = try NoteRepository(root: h.root)

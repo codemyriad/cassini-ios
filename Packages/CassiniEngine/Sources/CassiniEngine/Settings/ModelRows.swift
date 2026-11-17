@@ -100,3 +100,17 @@ public enum ModelRows {
         progress.verifying ? .checking : .downloading(Double(progress.percent) / 100)
     }
 }
+
+/// The Parakeet row retries existing files separately from asking to download missing files.
+public enum SpeechModelRowAction: Sendable, Equatable {
+    case none, choose, download, verify
+
+    public static func parakeet(installation: ParakeetInstallation, status: ModelRowStatus?, runnable: Bool) -> Self {
+        switch installation {
+        case .verified: runnable ? .choose : .none
+        case .unavailable: .verify
+        case .missing: status?.opensModelDownload == true ? .download : .none
+        case .checking, .installing: .none
+        }
+    }
+}

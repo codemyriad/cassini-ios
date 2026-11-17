@@ -11,9 +11,21 @@ public final class FakeModelInstallRecorder: Sendable {
         public var completed: [ModelPart] = []
     }
     private let state = Mutex(Snapshot())
+    public let holdDownload: Bool
     private let onRequest: @Sendable (ModelPart) -> Void
 
-    public init(onRequest: @escaping @Sendable (ModelPart) -> Void = { _ in }) { self.onRequest = onRequest }
+    public init(holdDownload: Bool = false, onRequest: @escaping @Sendable (ModelPart) -> Void = { _ in }) {
+        self.holdDownload = holdDownload; self.onRequest = onRequest
+    }
+
+    /// An event gate for testing progress and Cancel; it ends only when the installer task is cancelled.
+    func waitIfHeld() async throws {
+        guard holdDownload else { return }
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        defer { continuation.finish() }
+        for await _ in stream {}
+        try Task.checkCancellation()
+    }
     public var snapshot: Snapshot { state.withLock { $0 } }
     func request(_ part: ModelPart) {
         state.withLock { $0.requested.append(part) }

@@ -183,6 +183,14 @@ public struct DraftNames: Hashable, Sendable {
         return next
     }
 
+    /// Turning recognition off removes suggestions, while keeping every explicit naming/Remember choice.
+    public func withoutUnconfirmedMatches() -> DraftNames {
+        var next = self
+        next.automatic = automatic.filter { !openForLive($0.key) }
+        next.live = live.filter { $0.value.state == .confirmed }
+        return next
+    }
+
     /// One round of live matching: `matches` covers every speaker with a print, so a speaker without an entry has no
     /// match now; `names` are the voices' names, for the automatic names. Speakers not open for live matching keep
     /// their state. A match is ignored when the user rejected that voice for that speaker, or when the voice is

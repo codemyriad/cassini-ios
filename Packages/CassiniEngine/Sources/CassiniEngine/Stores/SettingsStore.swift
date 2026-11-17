@@ -11,6 +11,28 @@ public final class SettingsStore {
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored nonisolated private let recognition = Mutex(true)
 
+    @ObservationIgnored private weak var draftNames: DraftNamesStore?
+    @ObservationIgnored private var recognitionCleanup: Task<Void, Never>?
+
+    /// Bind before restoring jobs. The flag changes immediately; paused drafts are scrubbed on a worker.
+    public func bindDraftNames(_ drafts: DraftNamesStore?) {
+        draftNames = drafts
+        updateDraftRecognition()
+    }
+
+    public func settleDraftRecognition() async { await recognitionCleanup?.value }
+
+    private func updateDraftRecognition() {
+        guard let drafts = draftNames else { return }
+        drafts.setRecognitionAllowed(recogniseSavedVoices)
+        guard !recogniseSavedVoices else { return }
+        let previous = recognitionCleanup
+        recognitionCleanup = Task.detached(priority: .utility) {
+            await previous?.value
+            drafts.mutateAll { $0.withoutUnconfirmedMatches() }
+        }
+    }
+
     /// Inference callbacks see the current switch without hopping to or blocking the main actor.
     public nonisolated var allowsSavedVoiceRecognition: Bool { recognition.withLock { $0 } }
 
@@ -45,6 +67,7 @@ public final class SettingsStore {
         didSet {
             recognition.withLock { $0 = recogniseSavedVoices }
             defaults.set(recogniseSavedVoices, forKey: SettingsKeys.recogniseSavedVoices)
+            updateDraftRecognition()
         }
     }
     public var automaticallyNameVoices: Bool {

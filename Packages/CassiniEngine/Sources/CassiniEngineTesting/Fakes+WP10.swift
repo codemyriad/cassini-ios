@@ -8,7 +8,8 @@ extension FakeAnalyzer {
     /// Reports the install as done at once; nothing is installed, so `modelStatus` stays as it was.
     public func installModels(progress: @escaping @Sendable (InstallProgress) -> Void) async throws {
         installRecorder?.request(.speakers)
-        progress(.downloading(1))
+        progress(.downloading(installRecorder?.holdDownload == true ? 0.46 : 1))
+        try await installRecorder?.waitIfHeld()
         installRecorder?.complete(.speakers)
     }
 

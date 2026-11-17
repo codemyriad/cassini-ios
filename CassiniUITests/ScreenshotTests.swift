@@ -75,7 +75,7 @@ final class ScreenshotTests: XCTestCase {
         let app = try launchPhone(["--seed", "library"])
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
+        XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings finishes loading model and language availability before capture")
         capture("05-settings")
     }
@@ -98,8 +98,13 @@ final class ScreenshotTests: XCTestCase {
         let button = app.buttons[id]
         app.scroll { button.exists && button.isHittable && app.frame.contains(button.frame) }
         XCTAssertTrue(button.waitForExistence(within: 15))
+        let mapTitle = app.navigationBars.firstMatch.identifier
         button.tap()
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
+        let page = String(id.dropLast(3))
+        // The localized destination title must replace Settings before capture.
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier != %@", mapTitle))
+            .firstMatch.waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(page))
         capture(name)
     }
 

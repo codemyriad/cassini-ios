@@ -51,7 +51,7 @@ final class SettingsFlowTests: XCTestCase {
     /// `testOnAParakeetDeviceTheSpeechRowShowsItsDownload`.
     @MainActor func testSettingsShowsTheModelRowsTheBannerTheCountsAndTheBundleVersion() {
         let app = openSettings()
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage("map"))
         XCTAssertTrue(app.buttons["transcriptionRow"].exists)
         XCTAssertTrue(app.buttons["speakersRow"].label.contains("On"))
         XCTAssertTrue(app.buttons["savedVoicesRow"].label.contains("0 people"))
@@ -63,6 +63,10 @@ final class SettingsFlowTests: XCTestCase {
         let language = app.buttons["appLanguageRow"]
         reveal(language, in: app)
         XCTAssertTrue(language.label.contains("English"))
+        let notifications = element(app, startingWith: "Notifications are off")
+        reveal(notifications, in: app)
+        XCTAssertTrue(notifications.exists)
+        XCTAssertTrue(app.buttons["Turn on"].exists)
         app.scroll(up: false) { app.buttons["transcriptionRow"].isHittable }
         openPage(app, "transcriptionRow", title: "Transcription")
         XCTAssertEqual(app.descendants(matching: .any)["speechLanguagePicker"].exists, DeviceUnderTest.appleSpeech)
@@ -79,7 +83,50 @@ final class SettingsFlowTests: XCTestCase {
         reveal(button, in: app)
         button.tap()
         XCTAssertTrue(app.navigationBars[title].waitForExistence(within: 15))
-        XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(String(id.dropLast(3))))
+    }
+
+    @MainActor func testTranscriptionDownloadShowsProgressAndCancelWithoutReopeningConsent() {
+        let app = openSettings(["--d78", "--d78-capable", "--hold-model-download"])
+        openPage(app, "transcriptionRow", title: "Transcription")
+        let download = app.buttons["downloadParakeet"]
+        XCTAssertTrue(download.waitForEnabled(within: 15))
+        download.tap()
+        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
+        app.buttons["Download"].tap()
+        assertProgressAndCancel(app, page: "transcription", title: "Transcription", checkChoice: true)
+    }
+
+    @MainActor func testSpeakersDownloadShowsProgressAndCancelOnItsPage() {
+        let app = openSettings(["--parakeet", "--models-missing", "--hold-model-download"])
+        openPage(app, "speakersRow", title: "Speakers")
+        let selected = row(app, startingWith: "Telling speakers apart")
+        reveal(selected, in: app)
+        selected.tap()
+        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
+        app.buttons["Download"].tap()
+        assertProgressAndCancel(app, page: "speakers", title: "Speakers", checkChoice: false)
+    }
+
+    @MainActor private func assertProgressAndCancel(_ app: XCUIApplication, page: String, title: String, checkChoice: Bool) {
+        XCTAssertTrue(app.navigationBars[title].waitForExistence(within: 15))
+        XCTAssertTrue(app.waitForSettingsPage(page))
+        let banner = app.descendants(matching: .any)["banner.DL_DOWNLOADING"]
+        reveal(banner, in: app)
+        XCTAssertTrue(banner.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "46%"))
+            .firstMatch.waitForExistence(within: 15))
+        if checkChoice {
+            app.scroll(up: false) { app.buttons["chooseParakeet"].isHittable }
+            XCTAssertFalse(app.buttons["chooseParakeet"].isEnabled)
+            XCTAssertFalse(app.buttons["downloadParakeet"].exists)
+            reveal(banner, in: app)
+        }
+        let cancel = app.buttons["Cancel"]
+        reveal(cancel, in: app)
+        cancel.tap()
+        // Cancellation publishes a positive journal event; absence is checked only after it.
+        XCTAssertTrue(app.staticTexts["uiTestState-modelInstallCancelled"].waitForValue("cancelled"))
+        XCTAssertFalse(banner.exists)
     }
 
     /// On a Parakeet device the speech row shows the model's precision and its download by the shared size rule, and

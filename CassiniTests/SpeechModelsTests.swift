@@ -1,5 +1,6 @@
 import XCTest
 import Synchronization
+import Observation
 import CassiniEngine
 import CassiniEngineTesting
 import CassiniInference
@@ -12,7 +13,7 @@ import CassiniWhistle
     private let accepted = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                             pipelineAccepted: true, deviceAccepted: true)
 
-    func testSettingsSelectionReadsPublishedFactsWithoutProbingFiles() throws {
+    func testSettingsSelectionReadsPublishedFactsWithoutProbingFiles() async throws {
         let suite = "cassini.settings-models.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -26,6 +27,7 @@ import CassiniWhistle
         XCTAssertFalse(store.canChooseParakeet)
         XCTAssertEqual(probes.withLock { $0 }, 0)
         store.refresh()
+        await store.settleVerification()
         let reads = probes.withLock { $0 }
         XCTAssertEqual(store.displayRecognizer, .parakeet)
         XCTAssertTrue(store.canChooseParakeet)
@@ -34,6 +36,61 @@ import CassiniWhistle
         store.choose(.parakeet)
         XCTAssertEqual(store.displayRecognizer, .parakeet)
         XCTAssertEqual(probes.withLock { $0 }, reads, "Rendering and choosing use published facts")
+    }
+
+    func testTransientVerificationFailureCanRetryWithoutDownloadingAndNeverProbesOnMain() async throws {
+        let suite = "cassini.retry.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let checked = Mutex(false), attempts = Mutex(0), mainProbes = Mutex(0)
+        let store = SpeechModelsStore(root: FileManager.default.temporaryDirectory, defaults: defaults,
+            storage: FakeStorage(), whistle: accepted, parakeetLinked: true, platform: .iOS26,
+            physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            installed: { if Thread.isMainThread { mainProbes.withLock { $0 += 1 } }; return true },
+            verified: { if Thread.isMainThread { mainProbes.withLock { $0 += 1 } }; return checked.withLock { $0 } },
+            verify: {
+                let attempt = attempts.withLock { $0 += 1; return $0 }
+                if attempt == 1 { throw CocoaError(.fileReadUnknown) }
+                checked.withLock { $0 = true }; return true
+            })
+        store.refresh()
+        await store.settleVerification()
+        XCTAssertEqual(store.installation, .unavailable)
+        store.refresh()
+        await store.settleVerification()
+        XCTAssertEqual(store.installation, .verified)
+        XCTAssertEqual(attempts.withLock { $0 }, 2)
+        XCTAssertEqual(mainProbes.withLock { $0 }, 0)
+    }
+
+    func testDelayedWhistleVerificationInvalidatesSettingsWhileParakeetIsStillChecking() async throws {
+        let suite = "cassini.bundle.\(UUID())", defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var cold = accepted; cold.bundleVerified = false
+        let bundle = AsyncStream<Bool>.makeStream()
+        let hashing = expectation(description: "Parakeet hashing"), release = DispatchSemaphore(value: 0)
+        defer { release.signal(); bundle.continuation.finish() }
+        let store = SpeechModelsStore(root: FileManager.default.temporaryDirectory, defaults: defaults,
+            storage: FakeStorage(), whistle: cold, parakeetLinked: true, platform: .iOS26,
+            physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
+            installed: { true }, verified: { false }, verify: { hashing.fulfill(); release.wait(); return false },
+            verifyBundle: { for await value in bundle.stream { return value }; return false })
+        XCTAssertEqual(store.displayRecognizer, .appleSpeech, "Uninstalled Parakeet is not the active answer")
+        store.refresh()
+        await fulfillment(of: [hashing], timeout: 30)
+        let changed = expectation(description: "Whistle availability observed")
+        withObservationTracking {
+            XCTAssertFalse(store.whistleAvailable)
+            XCTAssertEqual(store.displayRecognizer, .appleSpeech)
+        } onChange: { changed.fulfill() }
+        let verification = Task { await store.verifyBundledSpeech() }
+        bundle.continuation.yield(true)
+        await verification.value
+        await fulfillment(of: [changed], timeout: 30)
+        XCTAssertTrue(store.whistleAvailable)
+        XCTAssertEqual(store.displayRecognizer, .whistle)
+        XCTAssertEqual(store.installation, .checking)
+        release.signal()
+        await store.settleVerification()
     }
 
     func testVerificationPromotesOnlyNewDefaultsAndAnnouncesOnce() async throws {
@@ -67,6 +124,7 @@ import CassiniWhistle
             parakeetLinked: true, platform: .iOS26, physicalMemory: 6 << 30, availableMemory: { ParakeetMemory.beforeLoadBytes },
             installed: { true }, verified: { true }, verify: { true })
         reopened.refresh()
+        await reopened.settleVerification()
         XCTAssertFalse(reopened.promotionVisible)
         reopened.choose(.whistle)
         XCTAssertEqual(reopened.selectedRecognizer(), .whistle, "Whistle remains an explicit fallback choice")

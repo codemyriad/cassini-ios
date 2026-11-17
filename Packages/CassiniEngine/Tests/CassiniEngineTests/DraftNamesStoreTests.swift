@@ -30,6 +30,23 @@ import CassiniNotebook
         try Data(text.utf8).write(to: file(note))
     }
 
+    @Test func recognitionOffRejectsAnInferenceResultAlreadyInFlight() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let drafts = try store()
+        let expected = DraftNames.empty.confirm("S1", voice: anna, name: "Anna", generation: 2, score: 1)
+            .rename("S2", "Manual").reject("S3", voice: marta)
+        drafts.mutate(id) { _ in expected }
+        drafts.mutate(id) { names in
+            // A result has been computed, then the UI turns recognition off before it is committed.
+            drafts.setRecognitionAllowed(false)
+            return names.applyLive(["S4": LiveMatch(luca, 1, .auto)], names: [luca: "Luca"])
+        }
+        #expect(drafts.current(id) == expected)
+        #expect(try onDisk(id) == expected)
+        drafts.setRecognitionAllowed(true)
+        #expect(drafts.current(id) == expected, "Re-enabling does not resurrect stale matches")
+    }
+
     // ports: NamesStoreTest#namesWithoutTheNewMembersLoadAsEmpty
     @Test func namesWithoutTheNewMembersLoadAsEmpty() throws {
         defer { try? FileManager.default.removeItem(at: root) }
