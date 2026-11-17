@@ -138,33 +138,66 @@ import Testing
     }
 
     @Test func rememberBodyFollowsAutomaticNamingSettingAndDeviceIdiomInEveryLocale() {
-        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: false, language: "en")
-                == "Future meetings will suggest Luca. The voiceprint never leaves this device.")
-        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: false, language: "en")
-                == "Future meetings will suggest this person. The voiceprint never leaves this device.")
-        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: true, language: "en")
-                == "Future meetings will suggest Luca. The voiceprint never leaves this device.")
-        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: true, language: "en")
-                == "Future meetings will suggest this person. The voiceprint never leaves this device.")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: false, voicesBackedUp: true, language: "en")
+                == "Future meetings will suggest Luca. Cassini never uploads the voiceprint; system backups may include it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: false, voicesBackedUp: true, language: "en")
+                == "Future meetings will suggest this person. Cassini never uploads the voiceprint; system backups may include it.")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: true, voicesBackedUp: true, language: "en")
+                == "Future meetings will suggest Luca. Cassini never uploads the voiceprint; system backups may include it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: true, voicesBackedUp: true, language: "en")
+                == "Future meetings will suggest this person. Cassini never uploads the voiceprint; system backups may include it.")
 
-        #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: false, language: "en")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: false, voicesBackedUp: false, language: "en")
+                == "Future meetings will suggest Luca. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: false, voicesBackedUp: false, language: "en")
+                == "Future meetings will suggest this person. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: false, pad: true, voicesBackedUp: false, language: "en")
+                == "Future meetings will suggest Luca. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: false, pad: true, voicesBackedUp: false, language: "en")
+                == "Future meetings will suggest this person. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
+
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: false, voicesBackedUp: true, language: "en")
                 == "Luca is named automatically next time.\nThe voiceprint stays on this iPhone.")
-        #expect(SpeakersCopy.rememberBody("", automatic: true, pad: false, language: "en")
+        #expect(SpeakersCopy.rememberBody("", automatic: true, pad: false, voicesBackedUp: true, language: "en")
                 == "This person is named automatically next time.\nThe voiceprint stays on this iPhone.")
-        #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, language: "en")
-                == "Future meetings will name Luca automatically. The voiceprint never leaves this device.")
-        #expect(SpeakersCopy.rememberBody("", automatic: true, pad: true, language: "en")
-                == "Future meetings will name this person automatically. The voiceprint never leaves this device.")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, voicesBackedUp: true, language: "en")
+                == "Future meetings will name Luca automatically. Cassini never uploads the voiceprint; system backups may include it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: true, pad: true, voicesBackedUp: true, language: "en")
+                == "Future meetings will name this person automatically. Cassini never uploads the voiceprint; system backups may include it.")
+        #expect(SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, voicesBackedUp: false, language: "en")
+                == "Future meetings will name Luca automatically. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
+        #expect(SpeakersCopy.rememberBody("", automatic: true, pad: true, voicesBackedUp: false, language: "en")
+                == "Future meetings will name this person automatically. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.")
 
         for locale in Self.locales {
-            for pad in [false, true] {
-                let suggestedNamed = SpeakersCopy.rememberBody("Luca", automatic: false, pad: pad, language: locale)
-                let suggestedUnnamed = SpeakersCopy.rememberBody("", automatic: false, pad: pad, language: locale)
-                #expect(suggestedNamed.contains("Luca"), "\(locale) pad=\(pad)")
-                #expect(!suggestedNamed.localizedCaseInsensitiveContains("auto"), "\(locale) pad=\(pad): \(suggestedNamed)")
-                #expect(!suggestedUnnamed.localizedCaseInsensitiveContains("auto"), "\(locale) pad=\(pad): \(suggestedUnnamed)")
-                #expect(!suggestedNamed.contains("iPhone"), "\(locale) pad=\(pad): \(suggestedNamed)")
-                #expect(!suggestedUnnamed.contains("iPhone"), "\(locale) pad=\(pad): \(suggestedUnnamed)")
+            for voicesBackedUp in [true, false] {
+                for pad in [false, true] {
+                    let suggestedNamed = SpeakersCopy.rememberBody("Luca", automatic: false, pad: pad, voicesBackedUp: voicesBackedUp, language: locale)
+                    let suggestedUnnamed = SpeakersCopy.rememberBody("", automatic: false, pad: pad, voicesBackedUp: voicesBackedUp, language: locale)
+                    #expect(suggestedNamed.contains("Luca"), "\(locale) pad=\(pad) backedUp=\(voicesBackedUp)")
+                    #expect(suggestedNamed.contains("Cassini"), "\(locale) pad=\(pad) backedUp=\(voicesBackedUp): \(suggestedNamed)")
+                    #expect(!suggestedNamed.localizedCaseInsensitiveContains("auto"), "\(locale) pad=\(pad): \(suggestedNamed)")
+                    #expect(!suggestedUnnamed.localizedCaseInsensitiveContains("auto"), "\(locale) pad=\(pad): \(suggestedUnnamed)")
+                    #expect(!suggestedNamed.contains("iPhone"), "\(locale) pad=\(pad): \(suggestedNamed)")
+                    #expect(!suggestedUnnamed.contains("iPhone"), "\(locale) pad=\(pad): \(suggestedUnnamed)")
+                    #expect(!suggestedNamed.localizedCaseInsensitiveContains("never leaves"), "\(locale): \(suggestedNamed)")
+                    if !voicesBackedUp {
+                        #expect(suggestedNamed.contains("iCloud"), "\(locale): \(suggestedNamed)")
+                    }
+                }
+
+                let ipadNamed = SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, voicesBackedUp: voicesBackedUp, language: locale)
+                let ipadUnnamed = SpeakersCopy.rememberBody("", automatic: true, pad: true, voicesBackedUp: voicesBackedUp, language: locale)
+                #expect(ipadNamed.contains("Luca"), "\(locale): \(ipadNamed)")
+                #expect(ipadNamed.contains("Cassini"), "\(locale): \(ipadNamed)")
+                #expect(ipadNamed.localizedCaseInsensitiveContains("autom"), "\(locale): \(ipadNamed)")
+                #expect(ipadUnnamed.localizedCaseInsensitiveContains("autom"), "\(locale): \(ipadUnnamed)")
+                #expect(!ipadNamed.contains("iPhone"), "\(locale): \(ipadNamed)")
+                #expect(!ipadUnnamed.contains("iPhone"), "\(locale): \(ipadUnnamed)")
+                #expect(!ipadNamed.localizedCaseInsensitiveContains("never leaves"), "\(locale): \(ipadNamed)")
+                if !voicesBackedUp {
+                    #expect(ipadNamed.contains("iCloud"), "\(locale): \(ipadNamed)")
+                }
             }
 
             let iphoneNamed = SpeakersCopy.rememberBody("Luca", automatic: true, pad: false, language: locale)
@@ -174,14 +207,6 @@ import Testing
             #expect(iphoneUnnamed == MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed", language: locale))
             #expect(iphoneNamed.contains("\n") && iphoneNamed.contains("iPhone"))
             #expect(iphoneUnnamed.contains("\n") && iphoneUnnamed.contains("iPhone"))
-
-            let ipadNamed = SpeakersCopy.rememberBody("Luca", automatic: true, pad: true, language: locale)
-            let ipadUnnamed = SpeakersCopy.rememberBody("", automatic: true, pad: true, language: locale)
-            #expect(ipadNamed.contains("Luca"), "\(locale): \(ipadNamed)")
-            #expect(ipadNamed.localizedCaseInsensitiveContains("autom"), "\(locale): \(ipadNamed)")
-            #expect(ipadUnnamed.localizedCaseInsensitiveContains("autom"), "\(locale): \(ipadUnnamed)")
-            #expect(!ipadNamed.contains("iPhone"), "\(locale): \(ipadNamed)")
-            #expect(!ipadUnnamed.contains("iPhone"), "\(locale): \(ipadUnnamed)")
         }
 
         let liveSuggest = SpeakersCopy.rememberBody("Luca", automatic: false)

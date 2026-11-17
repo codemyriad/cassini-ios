@@ -45,8 +45,8 @@ only after you agree: Parakeet Ultra and every other model only from Cassini's m
 through its manifest (D4, D53.1), and, on iOS 26 or later on a device that uses Apple Speech, Apple's speech model
 for your language.
 Voiceprints
-stay in the app's private storage, are excluded from backups, and are never written into a document or an export.
-System backups may include recordings and transcripts.
+stay in the app's private storage (`PrivateVoices/`) and are never written into a document or an export.
+By default, recordings, transcripts and voiceprints are included in system backups when enabled; Settings → Moving and backup has independent switches to mark notes or saved voices to be left out of iCloud Backup (`NSURLIsExcludedFromBackupKey`, which iOS treats as backup guidance—a direct Quick Start transfer may still copy excluded files). Downloaded models are always excluded from backups.
 
 The build bundles pinned Whistle weights and a private Needle runtime (D75.2). Whistle transcribes immediately
 without a speech-model download. On supported devices, a calm, dismissible suggestion offers the more accurate

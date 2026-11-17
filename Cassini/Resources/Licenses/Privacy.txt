@@ -46,7 +46,9 @@ Cassini includes the Whistle speech model and its engine in the app. Whistle run
 
 ## Backup
 
-Your notes are kept in protected app storage and can be included in your iCloud or computer backups. Voiceprints and the downloaded models are excluded from backups.
+Your notes (recordings, transcripts and speaker names) and saved voices (voiceprints) are kept in protected app storage and are included in your iCloud or computer backups by default when system backups are enabled. Cassini itself never uploads them.
+
+Settings → Moving and backup has independent switches to mark your notes or saved voices to be left out of iCloud Backup (`NSURLIsExcludedFromBackupKey`). iOS treats backup exclusion as guidance rather than a guarantee: a direct device-to-device Quick Start transfer to a new iPhone or iPad may still copy excluded files. Turning a backup option off stops future backups and does not delete backups already stored. Downloaded models are always marked to be left out of backups.
 
 ## Copies that you save
 

@@ -79,7 +79,7 @@ final class SpeakerNamingFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["speakerQuote"].exists)
         let remember = app.switches["rememberVoice"]
         XCTAssertTrue(remember.exists)
-        XCTAssertTrue(remember.label.contains("Future meetings will suggest Sam. The voiceprint never leaves this device."),
+        XCTAssertTrue(remember.label.contains("Future meetings will suggest Sam. Cassini never uploads the voiceprint; system backups may include it."),
                       "automatic naming is off by default: \(remember.label)")
         XCTAssertTrue(app.buttons["mergeInto"].exists)
 
