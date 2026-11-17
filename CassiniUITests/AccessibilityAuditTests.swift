@@ -85,11 +85,25 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
         XCTAssertTrue(app.waitForSettingsPage("map"),
                       "Settings has not finished loading")
-        // The first group can extend below the fold at the largest text size; reveal the row before tapping.
+        // A full swipe can fling the English AX5 row above the navigation bar on iOS 18.
+        // Short drags stop before lifting, and the row's current position decides the direction.
         let viewport = app.collectionViews.firstMatch
-        XCTAssertTrue(viewport.scroll(attempts: 12) {
-            row.exists && row.isHittable && viewport.frame.insetBy(dx: 0, dy: 8).contains(row.frame)
-        }, "Saved voices is not fully inside the list")
+        var revealed = false
+        for _ in 0..<20 {
+            let bounds = viewport.frame.intersection(app.frame).insetBy(dx: 0, dy: 12)
+            let top = max(bounds.minY, app.navigationBars.firstMatch.frame.maxY)
+            let visible = CGRect(x: bounds.minX, y: top, width: bounds.width, height: bounds.maxY - top)
+            let frame = (try? row.snapshot())?.frame
+            if let frame, visible.contains(frame), row.isHittable {
+                revealed = true
+                break
+            }
+            let upward = frame.map { $0.midY > visible.midY } ?? true
+            let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: upward ? 0.6 : 0.4))
+            let end = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: upward ? 0.4 : 0.6))
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
+        }
+        XCTAssertTrue(revealed, "Saved voices is not fully inside the list")
         row.tapWhenSettled()
         // At AX5 on iOS 18, tapping a row at the List's bottom edge can only scroll it into place.
         // A positive destination or a settled, hittable source row decides whether to retry.
