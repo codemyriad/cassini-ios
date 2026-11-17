@@ -40,17 +40,23 @@ public final class SettingsStore {
     public private(set) var includeSavedVoicesInBackups: Bool
     public private(set) var backupNoticeDismissed: Bool
     public private(set) var voiceSetupAnswered: Bool
+    public private(set) var rememberPeopleIName: Bool
 
     public func dismissBackupNotice() {
         backupNoticeDismissed = true
         defaults.set(true, forKey: "backup.noticeDismissed")
     }
 
-    public func answerVoiceSetup(enable: Bool) {
-        automaticallyNameVoices = enable
+    /// Answer and default are one cached defaults record. Dismissing keeps the current default.
+    /// UserDefaults schedules persistence; no synchronous disk flush runs on the main actor.
+    public func answerVoiceSetup(enable: Bool?) {
+        let remember = enable ?? rememberPeopleIName
+        defaults.set(["answered": true, "remember": remember], forKey: "voices.rememberPreference")
+        rememberPeopleIName = remember
         voiceSetupAnswered = true
-        defaults.set(true, forKey: "voices.setupAnswered")
     }
+
+    public func setRememberPeopleIName(_ remember: Bool) { answerVoiceSetup(enable: remember) }
 
     func commitBackup(cloud: Bool, voices: Bool) {
         // One defaults record keeps both switches consistent across launches.
@@ -92,7 +98,10 @@ public final class SettingsStore {
         cloudBackup = inclusion?["cloud"] as? Bool ?? true
         includeSavedVoicesInBackups = inclusion?["voices"] as? Bool ?? true
         backupNoticeDismissed = defaults.bool(forKey: "backup.noticeDismissed")
-        voiceSetupAnswered = defaults.bool(forKey: "voices.setupAnswered")
+        let voicePreference = defaults.dictionary(forKey: "voices.rememberPreference")
+        voiceSetupAnswered = voicePreference?["answered"] as? Bool ?? defaults.bool(forKey: "voices.setupAnswered")
+        // Legacy naming always started with Remember on; auto-name is a separate choice.
+        rememberPeopleIName = voicePreference?["remember"] as? Bool ?? true
         let storedLanguage = defaults.string(forKey: SettingsKeys.speechLanguage)
         speechLanguage = storedLanguage.map { Locale(identifier: $0).identifier(.bcp47) } ?? defaultLanguage
         autoTranscribe = defaults.object(forKey: SettingsKeys.autoTranscribe) as? Bool ?? true

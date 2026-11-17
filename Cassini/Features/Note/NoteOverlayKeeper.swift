@@ -6,9 +6,9 @@ extension View {
     /// with the scene, and opens them again once the screen and its note are back after Cassini was closed (as the
     /// Library keeps its dialog). Off for UI tests, like the rest of the scene's state.
     func keepsNoteOverlay(noteID: UUID, note: Note?, readOnly: ReadOnlyReason?, sheet: Binding<NoteSheet?>,
-                          draft: Binding<String?>, dialog: Binding<NoteDialog?>) -> some View {
+                          draft: Binding<String?>, dialog: Binding<NoteDialog?>, ready: Binding<Bool>) -> some View {
         modifier(NoteOverlayKeeper(noteID: noteID, note: note, readOnly: readOnly, sheet: sheet, draft: draft,
-                                   dialog: dialog))
+                                   dialog: dialog, ready: ready))
     }
 }
 
@@ -19,6 +19,7 @@ private struct NoteOverlayKeeper: ViewModifier {
     @Binding var sheet: NoteSheet?
     @Binding var draft: String?
     @Binding var dialog: NoteDialog?
+    @Binding var ready: Bool
     @Environment(\.restoresSceneState) private var restoresSceneState
     @SceneStorage("note.overlay") private var saved: Data?
     @State private var restored = false
@@ -41,7 +42,8 @@ private struct NoteOverlayKeeper: ViewModifier {
     /// Opens what the scene kept, once, on the first appearance with the note. What cannot open now is dropped, so
     /// it does not open by itself on a later visit (`SavedNoteOverlay.restored`).
     private func restore() {
-        guard restoresSceneState, !restored, let note else { return }
+        guard !restored, let note else { return }
+        guard restoresSceneState else { restored = true; ready = true; return }
         restored = true
         let kept = SavedNoteOverlay(saved)?.restored(over: note, readOnly: readOnly)
         if sheet == nil, let overlay = kept?.overlay {
@@ -50,6 +52,7 @@ private struct NoteOverlayKeeper: ViewModifier {
         }
         if dialog == nil, let question = kept?.dialog { dialog = question }
         keep()
+        ready = true
     }
 
     private func keep() {

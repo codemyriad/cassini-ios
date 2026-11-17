@@ -1,19 +1,77 @@
 import SwiftUI
+import UIKit
 import CassiniEngine
 
-struct VoiceSetupSection: View {
-    @Environment(SettingsStore.self) private var settings
+/// D103's phone question; the containing note owns the one-time answer and dismissal.
+struct VoicesQuestionSheet: View {
+    let answer: (Bool) -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
+    @ScaledMetric(relativeTo: .subheadline) private var privacySize: CGFloat = 14
+    @State private var contentHeight: CGFloat = 580
     var body: some View {
-        if !settings.voiceSetupAnswered {
-            Section {
-                Text(Wave6Copy.voicesSetupTitle).font(.headline)
-                Text(Wave6Copy.voicesSetupBody)
-                Text(Wave6Copy.voicesSetupPrivacyPhone).font(.footnote).foregroundStyle(Color.muted)
-                Button(Wave6Copy.voicesSetupEnable) { settings.answerVoiceSetup(enable: true) }
-                Button(Wave6Copy.commonNotNow) { settings.answerVoiceSetup(enable: false) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: "person.2").font(.system(size: 30)).foregroundStyle(Color.accentInk)
+                    .accessibilityHidden(true)
+                VoicesQuestionHeading(text: SettingsPhase2Copy.voicesTitle, size: titleSize)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(SettingsPhase2Copy.voicesBody).font(.callout).foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "lock").accessibilityHidden(true)
+                    Text(SettingsPhase2Copy.voicesPrivacy).fixedSize(horizontal: false, vertical: true)
+                }.font(.system(size: privacySize)).foregroundStyle(Color.muted)
+                VStack(spacing: 10) {
+                    Button(SettingsPhase2Copy.voicesEnable) { answer(true) }
+                        .buttonStyle(PrimaryButtonStyle()).accessibilityIdentifier("voicesQuestionYes")
+                    Button(SettingsPhase2Copy.notNow) { answer(false) }
+                        .font(.body.weight(.semibold)).foregroundStyle(Color.ink)
+                        .padding(.vertical, 14).frame(maxWidth: .infinity, minHeight: 52)
+                        .background(Color.neutralTint, in: Capsule()).accessibilityIdentifier("voicesQuestionNotNow")
+                }
+                VStack(spacing: 4) {
+                    Text(SettingsPhase2Copy.voicesKindness)
+                    Text(SettingsPhase2Copy.voicesChangeLater).accessibilityIdentifier("voicesQuestionChangeLater")
+                }.font(.footnote).foregroundStyle(Color.muted).multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
-            .accessibilityIdentifier("voiceSetupQuestion")
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 26)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 + 24 }
         }
+        .accessibilityIdentifier("voicesQuestionScroll")
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(contentHeight), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(34)
+        .presentationBackground(Color.raised)
+    }
+}
+
+/// UIKit measures the same multiline heading it exposes to accessibility, including French at AX5.
+/// Its explicit width and intrinsic height keep long translations intact at the largest text size.
+private struct VoicesQuestionHeading: UIViewRepresentable {
+    let text: String
+    let size: CGFloat
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.accessibilityTraits = [.header, .staticText]
+        label.accessibilityIdentifier = "voicesQuestionTitle"
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
+        return label
+    }
+    func updateUIView(_ label: UILabel, context: Context) {
+        label.text = text
+        label.font = .systemFont(ofSize: size, weight: .bold)
+        label.textColor = UIColor(Color.ink)
+    }
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UILabel, context: Context) -> CGSize? {
+        guard let width = proposal.width else { return nil }
+        let measured = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: ceil(measured.height))
     }
 }
 

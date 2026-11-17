@@ -10,6 +10,67 @@ import CassiniNotebook
         return note
     }
 
+    @Test func questionCountIncludesChipOnlySpeakersAndRejectsStaleSnapshots() async {
+        let cache = TranscriptCache()
+        var note = note()
+        // A brief reply becomes an inline chip rather than its own paragraph header.
+        note.transcript.append(.init(text: "Yes", start: 2, end: 2.5, speakerID: "b"))
+        note.transcript.append(.init(text: "Let us continue", start: 2.5, end: 6, speakerID: "a"))
+        note.speakers?.append(.init(id: "b", name: "Bea", colourIndex: 1))
+        note.speakers?.append(.init(id: "unused", name: "No speech", colourIndex: 2))
+        let key = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        #expect(cache.speakerCount(sealed: key) == nil)
+        await cache.prepareSealed(key)
+        #expect(cache.speakerCount(sealed: key) == 2)
+        note.transcript = []
+        let empty = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        #expect(cache.speakerCount(sealed: empty) == nil)
+        await cache.prepareSealed(empty)
+        #expect(cache.speakerCount(sealed: empty) == 0)
+        #expect(cache.speakerCount(sealed: key) == nil)
+    }
+
+    @Test func draftQuestionCountWaitsForTheMatchingPreparedSnapshot() async {
+        let cache = TranscriptCache()
+        let draft = DraftState(words: [.init(speaker: "a", startMs: 0, endMs: 500, text: "Hello"),
+                                       .init(speaker: "b", startMs: 500, endMs: 1_000, text: "Yes")],
+                               tentativeFromMs: 1_000, namingOpen: true)
+        #expect(cache.speakerCount(draft: draft) == nil)
+        await cache.prepareDraft(draft)
+        #expect(cache.speakerCount(draft: draft) == 2)
+        var changed = draft
+        changed.words.removeLast()
+        #expect(cache.speakerCount(draft: changed) == nil)
+        await cache.prepareDraft(changed)
+        #expect(cache.speakerCount(draft: changed) == 1)
+    }
+
+    @Test func questionCountNeverFallsBackFromAnAbsentDraftOrHiddenTranscript() async {
+        let cache = TranscriptCache()
+        var note = note()
+        note.transcript.append(.init(text: "Yes", start: 2, end: 3, speakerID: "b"))
+        let key = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        await cache.prepareSealed(key)
+        #expect(cache.speakerCount(sealed: key) == 2)
+        let empty = DraftState(words: [], tentativeFromMs: 0)
+        await cache.prepareDraft(empty)
+        let hidden: [NoteMode?] = [nil, .processing, .paused(doneMs: 0, totalMs: 3_000, hasCheckpoint: false),
+            .queued(ahead: 0, overDocument: false), .failed(overDocument: false), .audioOnly, .unplayable]
+        for mode in hidden {
+            #expect(cache.speakerCount(mode: mode, draft: nil, sealed: key) == nil)
+            #expect(cache.speakerCount(mode: mode, draft: empty, sealed: key) == nil)
+        }
+        for mode in [NoteMode.reading, .queued(ahead: 0, overDocument: true), .failed(overDocument: true)] {
+            #expect(cache.speakerCount(mode: mode, draft: empty, sealed: key) == 2)
+        }
+        let draft = DraftState(words: [.init(speaker: "a", startMs: 0, endMs: 500, text: "New words")],
+                               tentativeFromMs: 500)
+        #expect(cache.speakerCount(mode: .processing, draft: draft, sealed: key) == nil)
+        await cache.prepareDraft(draft)
+        #expect(cache.speakerCount(mode: .processing, draft: draft, sealed: key) == 1)
+        #expect(cache.speakerCount(mode: .reading, draft: draft, sealed: key) == 2)
+    }
+
     @Test func preparationMatchesThePureRendererAndRefreshesNamesAndSearch() async {
         let cache = TranscriptCache()
         var note = note()

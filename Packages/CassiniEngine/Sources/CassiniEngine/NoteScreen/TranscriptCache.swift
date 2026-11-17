@@ -37,6 +37,26 @@ import CassiniNotebook
 
     public var shownSealed: NoteTranscript { sealedValue }
 
+    /// Questions use only the matching prepared snapshot, never stale presentation content.
+    public func speakerCount(sealed key: SealedKey) -> Int? {
+        sealedKey == key ? sealedValue.headerSpeakers.count : nil
+    }
+    public func speakerCount(draft key: DraftState) -> Int? {
+        draftKey == key ? draftValue.headerSpeakers.count : nil
+    }
+
+    /// Count only the content this mode actually displays. In particular, a speakers-only job has no draft:
+    /// a previously prepared sealed transcript must not make an empty processing screen eligible.
+    public func speakerCount(mode: NoteMode?, draft: DraftState?, sealed: SealedKey?) -> Int? {
+        guard let mode else { return nil }
+        if mode.showsDraft {
+            guard let draft, !draft.words.isEmpty else { return nil }
+            return speakerCount(draft: draft)
+        }
+        guard mode.showsReading, let sealed else { return nil }
+        return speakerCount(sealed: sealed)
+    }
+
     /// This cache belongs to one note screen. Keep its content (and scroll extent) while names, voices,
     /// suggestions or newly sealed words prepare. Removing the transcript still takes effect immediately.
     public func sealed(_ key: SealedKey) -> NoteTranscript {

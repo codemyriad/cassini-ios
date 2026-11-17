@@ -115,6 +115,42 @@ final class ScreenshotTests: XCTestCase {
         capture("27-backup-notice")
     }
 
+    @MainActor func test28FirstRun() throws {
+        let app = try launchPhone([])
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        capture("28-first-run")
+    }
+
+    @MainActor func test29VoicesQuestion() throws {
+        let app = try launchPhone(["--seed", "speakers", "--open-fixture", Self.fixture, "--ask-voices"])
+        XCTAssertTrue(app.staticTexts["voicesQuestionTitle"].waitForExistence(within: 15))
+        let footer = app.staticTexts["voicesQuestionChangeLater"]
+        var previous: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard let frame = (try? footer.snapshot())?.frame, app.frame.contains(frame) else { return false }
+            defer { previous = frame }
+            return frame == previous
+        })
+        capture("29-voices-question")
+    }
+
+    @MainActor func test30ModelDownload() throws {
+        let app = try launchPhone(["--seed", "library", "--open-fixture", "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB",
+                                   "--models-missing", "--parakeet"])
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 15))
+        app.buttons["Transcribe"].tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+        let primary = app.buttons["modelDownloadPrimary"]
+        var previous: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard primary.exists, primary.isHittable,
+                  let frame = (try? primary.snapshot())?.frame, app.frame.contains(frame) else { return false }
+            defer { previous = frame }
+            return frame == previous
+        })
+        capture("30-model-download")
+    }
+
     @MainActor private func captureSettingsPage(_ id: String, name: String, arguments: [String] = []) throws {
         let app = try launchPhone(["--seed", "voices"] + arguments)
         app.buttons["settingsButton"].tap()

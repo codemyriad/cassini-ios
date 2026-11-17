@@ -27,6 +27,40 @@ import Testing
 
     func effects(_ state: NamingState, _ event: NamingEvent) -> [NamingEffect] { SpeakerNaming.reduce(state, event).effects }
 
+    @Test func defaultOffNamesOnlyAndIndividualRememberCanOverride() throws {
+        var input = input()
+        input.rememberDefault = false
+        let opened = SpeakerNaming.open(input)
+        #expect(!opened.remember)
+        let named = try on(opened, .nameChanged("Someone new"))
+        #expect(effects(named, .save) == [.relabel(speakerID: "s3", name: "Someone new"), .close])
+        let remembered = try on(named, .rememberToggled(true))
+        #expect(effects(remembered, .save).contains(.rememberVoice(speakerID: "s3", voiceID: nil, name: "Someone new")))
+    }
+
+    @Test func boundVoiceOverridesDefaultButExplicitDraftChoiceWins() {
+        var input = input(label: "Anna Ricci", match: .confirmed(voice: anna.id, score: 1))
+        input.rememberDefault = false
+        #expect(SpeakerNaming.open(input).remember)
+        input.draft = true; input.willHavePrint = true
+        input.remembered = false
+        #expect(!SpeakerNaming.open(input).remember)
+        input.remembered = true
+        #expect(SpeakerNaming.open(input).remember)
+        input.voicesReadOnly = true
+        #expect(!SpeakerNaming.open(input).remember, "eligibility still wins")
+    }
+
+    @Test func draftChoiceFollowsMergesAndDistinguishesAutomaticLabels() throws {
+        let empty = DraftNames.empty
+        #expect(empty.rememberChoice("a") == nil)
+        let named = empty.rename("b", "Bea")
+        let merged = try named.merge("a", into: "b")
+        #expect(merged.rememberChoice("a") == false)
+        #expect(merged.remember("b", .new, generation: 0).rememberChoice("a") == true)
+        #expect(DraftNames(labels: ["a": "Auto"], automatic: ["a": "Auto"]).rememberChoice("a") == nil)
+    }
+
     // ports: SpeakerNamingTest#aPlaceholderOpensEmptyWithRememberOnAndNothingToSave
     @Test func aPlaceholderOpensEmptyWithRememberOnAndNothingToSave() {
         let ui = SpeakerNaming.ui(SpeakerNaming.open(input()))

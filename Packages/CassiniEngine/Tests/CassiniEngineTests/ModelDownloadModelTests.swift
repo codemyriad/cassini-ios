@@ -19,18 +19,22 @@ import CassiniNotebook
         var downloads: [[ModelPart]] = []
         var language: String? = "it-IT"
 
+        var beforePlan: (() async -> Void)?
+        var beforeStorage: (() async -> Void)?
+        var beforeNotifications: (() async -> Void)?
         var requested: [(UUID?, ModelPart?)] = []
         func plan(for noteID: UUID?, part: ModelPart?) async -> ModelDownloadPlan {
             requested.append((noteID, part))
+            await beforePlan?()
             return plan
         }
         func speechLanguage() -> String? { language }
-        func usableBytes() async -> Int64 { usable }
+        func usableBytes() async -> Int64 { await beforeStorage?(); return usable }
         func recordConsent(for parts: [ModelPart]) { consents.append(parts) }
         func recordDeclined() { declines += 1 }
         func transcribe(_ noteID: UUID) async -> TranscribeOutcome { transcribed.append(noteID); return .queued(changed: true) }
         func downloadModels(_ parts: [ModelPart]) { downloads.append(parts) }
-        func askNotificationsOnce() async { if askNotifications { notificationsAsked = true } }
+        func askNotificationsOnce() async { await beforeNotifications?(); if askNotifications { notificationsAsked = true } }
     }
 
     private let ports = FakePorts()
@@ -43,6 +47,64 @@ import CassiniNotebook
     }
 
     @MainActor private final class Effects { var list: [ModelDownloadModel.Effect] = [] }
+
+    @Test func closingDuringAStalePlanDoesNotQueueOrPresentLateContent() async {
+        let entered = AsyncStream<Void>.makeStream(), release = AsyncStream<Void>.makeStream()
+        ports.plan = ModelDownloadPlan(missing: [], requiredFreeBytes: 0)
+        ports.beforePlan = {
+            entered.continuation.yield(())
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+        }
+        let effects = Effects()
+        let model = ModelDownloadModel(noteID: Self.note, ports: ports)
+        model.onEffect = { effects.list.append($0) }
+        let loading = Task { await model.load() }
+        var iterator = entered.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        model.close()
+        release.continuation.yield(())
+        await loading.value
+        #expect(ports.transcribed.isEmpty && ports.consents.isEmpty)
+        #expect(model.plan == nil && effects.list == [.close])
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: ["plan", "storage", "notifications"])
+    func disappearanceDuringDownloadPreparationPreventsLateConsentAndQueue(_ phase: String) async {
+        let entered = AsyncStream<Void>.makeStream(), release = AsyncStream<Void>.makeStream()
+        let hold: () async -> Void = {
+            entered.continuation.yield(())
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+        }
+        switch phase {
+        case "plan": ports.beforePlan = hold
+        case "storage": ports.beforeStorage = hold
+        default: ports.beforeNotifications = hold
+        }
+        let model = ModelDownloadModel(noteID: Self.note, ports: ports)
+        let downloading = Task { await model.download() }
+        var iterator = entered.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        model.disappeared()
+        release.continuation.yield(())
+        await downloading.value
+        #expect(ports.consents.isEmpty && ports.transcribed.isEmpty && ports.downloads.isEmpty)
+    }
+
+    @Test func presentationSplitsOnlyMissingSpeakerModelsWithoutChangingInstallConsent() {
+        let catalog = ModelPlan([.init(.voices, [ModelCatalog.voiceprint])])
+        let plan = ModelDownloadPlan.plan(speech: .ready, speakers: .notDownloaded, forNote: true,
+            identifySpeakers: true, speakersInstallBytes: 100, recognizer: .parakeet, catalog: catalog)
+        #expect(plan.missing == [.speakers])
+        #expect(plan.displayParts == [.voices])
+        #expect(plan.displayBytes[.voices] == ModelCatalog.voiceprint.downloadBytes)
+        #expect(plan.totalDownloadBytes == ModelCatalog.voiceprint.downloadBytes)
+        let apple = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .ready, forNote: true,
+            identifySpeakers: true, speakersInstallBytes: 100, catalog: catalog)
+        #expect(apple.displayParts == [.speech] && apple.displayBytes[.speech] == nil)
+        #expect(apple.totalDownloadBytes == nil)
+    }
 
     // ports: ModelDownloadViewModelTest#showsTheMissingPartsWithTheirSizesAndTheSpaceTheInstallNeeds
     @Test func showsTheMissingPartsAndTheSpaceTheInstallNeeds() async {

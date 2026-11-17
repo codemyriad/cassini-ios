@@ -20,7 +20,7 @@ struct TrashView: View {
                 if items.isEmpty {
                     TrashEmptyCard()
                 } else {
-                    Text(TrashCopy.intro).font(.subheadline).foregroundStyle(Color.muted)
+                    Text(SettingsPhase2Copy.trashIntro).font(.subheadline).foregroundStyle(Color.muted)
                         .padding(.horizontal, 4).padding(.bottom, 6)
                     ForEach(items) { item in
                         TrashCard(item: item, restore: { trash.restore(item.id) }, deleteNow: { dialogs.askDeleteNow(item.id) })

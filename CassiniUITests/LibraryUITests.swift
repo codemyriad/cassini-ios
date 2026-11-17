@@ -188,7 +188,7 @@ final class LibraryUITests: XCTestCase {
         meeting.tap()
         XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
         app.buttons["stopRecording"].tap()
-        let notNow = app.buttons["Not now — keep the audio"]
+        let notNow = app.buttons["modelDownloadNotNow"]
         XCTAssertTrue(notNow.waitForExistence(within: uiWaitFloor))
         captureEvidence("Post-recording missing model consent", app)
         notNow.tap()
@@ -1047,7 +1047,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(subtitle.exists)
         XCTAssertEqual(subtitle.label, "None of it uploaded. (except for encrypted cloud backup)")
         let howTo = app.staticTexts["heroHowTo"]
-        XCTAssertEqual(howTo.label, "Record something, or import an audio file.")
+        XCTAssertEqual(howTo.label, "Press Record when the meeting starts and Stop when it ends. Cassini writes it all down.")
         let privacy = app.descendants(matching: .any)["heroPrivacy"]
         let expectedPrivacy = pad
             ? "Written down on this iPad. Never uploaded, except to your encrypted cloud backup."

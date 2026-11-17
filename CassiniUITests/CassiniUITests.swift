@@ -161,7 +161,7 @@ final class CassiniUITests: XCTestCase {
         app.buttons["Transcribe"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch
             .waitForExistence(within: 15))
-        XCTAssertFalse(app.staticTexts["Transcribe on this device"].exists, "an installed model needs no download consent")
+        XCTAssertFalse(app.staticTexts["modelDownloadTitle"].exists, "an installed model needs no download consent")
     }
     @MainActor func testRecordingOrUnavailableInputRecovery() {
         let app = launch(seed: false)

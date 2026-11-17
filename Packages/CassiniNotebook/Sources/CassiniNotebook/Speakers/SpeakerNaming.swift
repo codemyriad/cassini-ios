@@ -23,7 +23,7 @@ public enum SpeakerNaming {
             if case .confirmed = input.match { return voice.id }
             return NameMatch.same(voice.name, name) ? voice.id : nil
         }
-        let remember = rememberReason(input) == nil
+        let remember = (input.remembered ?? (input.rememberDefault || bound != nil)) && rememberReason(input) == nil
         return NamingState(input: input, name: name, boundVoiceID: bound, remember: remember, initialName: name,
                            initialBound: bound, initialRemember: remember)
     }

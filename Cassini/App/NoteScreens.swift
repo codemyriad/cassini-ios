@@ -79,6 +79,7 @@ extension AppGraph {
         }
         ports.savedVoices = { voices.savedVoices }
         ports.voicesReadOnly = { voices.isReadOnly }
+        ports.rememberDefault = { settings.rememberPeopleIName }
         return NoteScreens(ports: ports)
     }
 }

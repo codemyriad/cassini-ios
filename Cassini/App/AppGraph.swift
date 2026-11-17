@@ -36,6 +36,9 @@ import CassiniNotebook
         self.environment = environment
         settings = SettingsStore(defaults: environment.defaults, clock: environment.clock,
                                  defaultLanguage: environment.locale.identifier(.bcp47))
+        #if DEBUG
+        if environment.suppressVoicesQuestion { settings.answerVoiceSetup(enable: nil) }
+        #endif
         noticeCenter = NoticeCenter(settings: settings, notifier: environment.notifier) { [settings, transcriber = environment.transcriber] in
             // The shared notice rule must not offer an impossible download. This never records consent.
             let status = await transcriber.assetStatus(locale: Locale(identifier: settings.speechLanguage))

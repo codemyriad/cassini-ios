@@ -611,3 +611,22 @@ excluded. “Included” is conditional on iCloud Backup being enabled; Cassini 
 The once-only notice floats above Record after a saved recording or import, never over an empty first launch or a
 first live/interrupted recording. The notice temporarily yields to the Undo snackbar. Close and Keep backup on preserve choices; exclusion dismisses only after its
 storage transaction succeeds. Backup’s ZIP action uses the Library exporter and excludes live and interrupted captures.
+
+### Phase 2 onboarding and voices (D103)
+
+The one-time voices question opens over a visible meeting with more than one actual speaker, including
+speakers shown only in reply chips and live drafts. It waits while saved voices are read-only and for restored sheets
+and other overlays. Yes and Not now set the
+independent **Remember people I name** default; dismissal preserves it. A Settings change also answers the question.
+The default starts on and does not change automatic naming or recognition. Existing voice links and explicit draft
+Remember choices take precedence. Legacy answered flags remain answered; legacy auto-name values do not infer a
+Remember preference. The answer/default share one UserDefaults record, written through its asynchronous persistence
+mechanism without a main-actor disk flush.
+
+The shared copy is pinned to `cassini-ux` `dd06a62dc881034fed417b000f47004e577a3fb0` (all six languages).
+The iOS Saved voices page keeps guided **Add voice** enrollment as an existing platform extra; row playback,
+sample counts and Ready labels are removed. Download consent is a full-screen modal with a source-only detail page.
+Its displayed speaker models are separate rows while installation and consent retain their existing bundle grouping.
+Apple does not publish speech-asset download sizes, so that path retains the approved size-free body and estimated
+installation space. Standalone downloads retain **Download**, and speakers-only jobs retain **Download and identify
+speakers**: neither starts a transcription. These are platform constraints/existing iOS extras to the phone board.

@@ -252,6 +252,9 @@ private struct SettingsForm: View {
                 Text(pad ? SettingsPhase2Copy.runsOnIpad : SettingsPhase2Copy.runsOnIphone)
             }
             Section {
+                Toggle(isOn: Binding(get: { settings.rememberPeopleIName }, set: settings.setRememberPeopleIName)) {
+                    description(SettingsPhase2Copy.rememberDefault, SettingsPhase2Copy.rememberDefaultSubtitle)
+                }.accessibilityIdentifier("rememberPeopleToggle")
                 Toggle(isOn: $settings.automaticallyNameVoices) {
                     description(SettingsPhase2Copy.autoName, SettingsPhase2Copy.autoNameSubtitle)
                 }.accessibilityIdentifier("autoNameVoicesToggle")
@@ -263,7 +266,6 @@ private struct SettingsForm: View {
                     ModelRowView(row: row) { model.openModel(row.part) }
                 }
             }
-            VoiceSetupSection()
             SettingsNoticesSection()
         }
     }

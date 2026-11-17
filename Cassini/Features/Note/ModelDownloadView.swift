@@ -2,26 +2,63 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// "Transcribe on this device": consent for downloading the models a note, or a standalone download, needs.
+/// A route-backed full-screen offer preserves navigation restoration and returns to its caller on Close.
 struct ModelDownloadView: View {
     let noteID: UUID?
     var part: ModelPart? = nil
     var parakeetOnly = false
-    @Environment(ProcessingStore.self) private var processing
-    @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
-    @State private var model: ModelDownloadModel?
+    @State private var presented = false
+    @State private var didPresent = false
 
     var body: some View {
-        Group {
-            if let model, let plan = model.plan {
-                ModelDownloadContent(model: model, plan: plan)
-            } else {
-                Color.paper.ignoresSafeArea()
+        Color.paper.ignoresSafeArea()
+            .navigationBarBackButtonHidden()
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                guard !didPresent else { return }
+                didPresent = true
+                presented = true
+            }
+            .fullScreenCover(isPresented: $presented, onDismiss: { dismiss() }) {
+                ModelDownloadModal(noteID: noteID, part: part, parakeetOnly: parakeetOnly)
+            }
+    }
+}
+
+private struct ModelDownloadModal: View {
+    let noteID: UUID?
+    let part: ModelPart?
+    let parakeetOnly: Bool
+    @Environment(ProcessingStore.self) private var processing
+    @Environment(\.modelRoot) private var modelRoot
+    @Environment(\.dismiss) private var dismiss
+    @State private var model: ModelDownloadModel?
+    @State private var sources = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let model, let plan = model.plan {
+                    ModelDownloadContent(model: model, plan: plan)
+                } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            }
+            .background(Color.paper)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(NoteCopy.close, systemImage: "xmark") {
+                        if let model { model.close() } else { dismiss() }
+                    }
+                    .disabled(model?.busy == true)
+                    .accessibilityIdentifier("closeModelDownload")
+                }
+            }
+            .navigationDestination(isPresented: $sources) {
+                LicenseDetailView(entry: .modelSources, models: modelRoot)
             }
         }
-        .background(Color.paper)
-        .navigationBarTitleDisplayMode(.inline)
+        .interactiveDismissDisabled(model?.busy == true)
         .task {
             guard model == nil else { return }
             guard let ports = parakeetOnly ? processing.parakeetDownload : processing.modelDownload else { dismiss(); return }
@@ -29,12 +66,13 @@ struct ModelDownloadView: View {
             model.onEffect = { effect in
                 switch effect {
                 case .close: dismiss()
-                case .openLicenses: router.push(.licenses)
+                case .openLicenses: sources = true
                 }
             }
             self.model = model
             await model.load()
         }
+        .onDisappear { model?.disappeared() }
     }
 }
 
@@ -42,23 +80,31 @@ private struct ModelDownloadContent: View {
     let model: ModelDownloadModel
     let plan: ModelDownloadPlan
     @Environment(\.locale) private var locale
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 30
+    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     OrbitMark(size: 56)
-                    Text("Transcribe on this device", tableName: "Transcription")
-                        .font(.system(.largeTitle)).foregroundStyle(Color.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    intro(total: plan.totalDownloadBytes).font(.title3).foregroundStyle(Color.muted)
+                    Text(pad ? SettingsPhase2Copy.offerTitleIpad : SettingsPhase2Copy.offerTitleIphone)
+                        .font(.system(size: titleSize, weight: .bold)).foregroundStyle(Color.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("modelDownloadTitle")
+                    intro(total: plan.totalDownloadBytes).font(.body).foregroundStyle(Color.muted)
                     VStack(spacing: 0) {
-                        ForEach(Array(plan.missing.enumerated()), id: \.element) { index, part in
+                        ForEach(Array(plan.displayParts.enumerated()), id: \.element) { index, part in
                             if index > 0 { Divider().padding(.leading, 16) }
-                            HStack(spacing: 12) {
+                            let layout = typeSize.isAccessibilitySize
+                                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                                : AnyLayout(HStackLayout(spacing: 12))
+                            layout {
                                 Text(part.label).font(.body).foregroundStyle(Color.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                if let bytes = plan.downloadBytes[part] {
+                                if let bytes = plan.displayBytes[part] {
                                     Text(SizeCopy.text(bytes, locale: locale))
                                         .font(.subheadline.monospacedDigit()).foregroundStyle(Color.muted)
                                 }
@@ -66,25 +112,28 @@ private struct ModelDownloadContent: View {
                             .padding(.horizontal, 16).padding(.vertical, 14)
                             .accessibilityElement(children: .combine)
                         }
-                    }.cardBackground(radius: Radius.control)
+                    }.cardBackground(radius: 22)
                     if let language = model.speechLanguage {
                         // D59 (2): Apple Speech hears only the language set in Settings.
                         Text("Cassini recognises speech in \(name(of: language)). To transcribe another language, change it in Settings › Speech language.", tableName: "Transcription", comment: "On the consent screen of devices that use Apple’s speech models. %@ is the speech language’s name, e.g. Italian (Italy). ‘Settings › Speech language’ names the screen and the setting.")
                             .font(.subheadline).foregroundStyle(Color.muted)
                             .accessibilityIdentifier("speechLanguageLine")
                     }
-                    Text("Needs about \(SizeCopy.text(plan.requiredFreeBytes, locale: locale)) free while installing. Each file is checked before it is used.", tableName: "Transcription")
+                    Text(SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale)))
                         .font(.subheadline).foregroundStyle(Color.muted)
                     Button(action: model.openSources) {
-                        Text("Where the models come from · Privacy", tableName: "Transcription")
+                        Text(SettingsPhase2Copy.whereFrom)
                     }
                     .font(.subheadline.weight(.medium)).tint(.accent)
+                    .disabled(model.busy).accessibilityIdentifier("modelDownloadSources")
                     .frame(minHeight: HitTarget.minimum)
+                    if typeSize.isAccessibilitySize { ModelDownloadActions(model: model) }
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8).padding(.bottom, 16)
             }
             .scrollBounceBehavior(.basedOnSize)
-            ModelDownloadActions(model: model)
+            if !typeSize.isAccessibilitySize { ModelDownloadActions(model: model) }
         }
         .padding(.horizontal, 20).padding(.bottom, 24)
         .readableWidth()
@@ -100,9 +149,10 @@ private struct ModelDownloadContent: View {
             return Text("Cassini needs a one-time download. After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", tableName: "Transcription")
         }
         let size = SizeCopy.text(total, locale: locale).replacingOccurrences(of: " ", with: "\u{00A0}")
-        var text = AttributedString(String(localized: "Cassini needs a one-time download of about \(size). After that, recognising words and telling voices apart happen on this device, even offline. Your audio stays here.", table: "Transcription", comment: "Model download screen body with the total download, such as 531 MB"))
+        var text = AttributedString((pad ? SettingsPhase2Copy.offerBodyIpad : SettingsPhase2Copy.offerBodyIphone)
+            .replacingOccurrences(of: "{size}", with: size))
         if let range = text.range(of: size) {
-            text[range].font = .title3.weight(.bold)
+            text[range].font = .body.weight(.bold)
             text[range].foregroundColor = Color.ink
         }
         return Text(text)
@@ -126,17 +176,21 @@ private struct ModelDownloadActions: View {
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(model.busy)
-            Button(action: model.notNow) { Text("Not now — keep the audio", tableName: "Transcription") }
+            .disabled(model.busy).accessibilityIdentifier("modelDownloadPrimary")
+            Button(action: model.notNow) { Text(SettingsPhase2Copy.notNow) }
                 .font(.body.weight(.medium)).tint(.ink)
                 .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
-                .disabled(model.busy)
+                .disabled(model.busy).accessibilityIdentifier("modelDownloadNotNow")
+            if model.withNote {
+                Text(SettingsPhase2Copy.recordingKept).font(.footnote).foregroundStyle(Color.muted)
+                    .multilineTextAlignment(.center).frame(maxWidth: .infinity)
+            }
         }
     }
 
     private var primaryLabel: Text {
         if model.identifiesSpeakers { Text("Download and identify speakers", tableName: "Transcription") }
-        else if model.withNote { Text("Download and transcribe", tableName: "Transcription") }
+        else if model.withNote { Text(SettingsPhase2Copy.offerDownload) }
         else { Text("Download", tableName: "Transcription") }
     }
 }
@@ -145,9 +199,9 @@ extension ModelPart {
     /// The part's name on the model download screen.
     var label: String {
         switch self {
-        case .speech: String(localized: "Speech recognition", table: "Transcription")
-        case .speakers: String(localized: "Telling speakers apart", table: "Transcription")
-        case .voices: String(localized: "Recognising saved voices", table: "Transcription")
+        case .speech: SettingsPhase2Copy.offerSpeech
+        case .speakers: SettingsPhase2Copy.offerTellApart
+        case .voices: SettingsPhase2Copy.offerRecognise
         }
     }
 }

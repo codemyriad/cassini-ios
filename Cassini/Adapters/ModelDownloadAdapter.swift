@@ -30,7 +30,7 @@ import CassiniNotebook
     /// note's job, with the sizes of what the catalog still has to install.
     func plan(for noteID: UUID?, part: ModelPart?) async -> ModelDownloadPlan {
         if speechOnly {
-            let plan = ModelPlan(ModelPlan.of(root: models).missing.filter { $0.part == .speech })
+            let plan = ModelPlan((await Self.catalog(at: models)).missing.filter { $0.part == .speech })
             return ModelDownloadPlan(missing: plan.parts, requiredFreeBytes: plan.requiredFreeBytes,
                                      downloadBytes: plan.downloadBytes)
         }
@@ -46,11 +46,12 @@ import CassiniNotebook
             }
             speech = candidate
         } else { speech = transcriber }
+        let sizes = await Self.installBytes(speech: speech, analyzer: analyzer)
         return ModelDownloadPlan.plan(speech: await speech.assetStatus(locale: Locale(identifier: context?.language ?? settings.speechLanguage)),
                                       speakers: await analyzer.modelStatus(), forNote: noteID != nil,
                                       identifySpeakers: settings.identifySpeakers, speakersOnly: speakersOnly,
-                                      speakersInstallBytes: analyzer.modelInstallBytes, speechInstallBytes: speech.assetInstallBytes,
-                                      recognizer: speech.recognizer, catalog: ModelPlan.of(root: models), requestedPart: part)
+                                      speakersInstallBytes: sizes.speakers, speechInstallBytes: sizes.speech,
+                                      recognizer: speech.recognizer, catalog: await Self.catalog(at: models), requestedPart: part)
     }
 
     func speechLanguage(for noteID: UUID?) async -> String? {
@@ -64,7 +65,19 @@ import CassiniNotebook
 
     func speechLanguage() -> String? { platform.asksForSpeechLanguage(downloadTranscriber.recognizer) ? settings.speechLanguage : nil }
 
-    func usableBytes() async -> Int64 { storage.availableBytes(at: root) }
+    func usableBytes() async -> Int64 {
+        await Self.available(storage: storage, root: root)
+    }
+
+    @concurrent private static func installBytes(speech: any Transcribing, analyzer: any SpeakerAnalyzing) async
+        -> (speech: Int64, speakers: Int64) {
+        (speech.assetInstallBytes, analyzer.modelInstallBytes)
+    }
+
+    @concurrent private static func catalog(at root: URL) async -> ModelPlan { ModelPlan.of(root: root) }
+    @concurrent private static func available(storage: any StorageProbe, root: URL) async -> Int64 {
+        storage.availableBytes(at: root)
+    }
 
     func recordConsent(for parts: [ModelPart]) {
         if parts.contains(.speech) { settings.recordConsent() }

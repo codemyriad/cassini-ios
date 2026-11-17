@@ -18,12 +18,20 @@ struct NoteDetailView: View {
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(VoicesStore.self) private var voices
+    @Environment(SettingsStore.self) private var settings
+    @Environment(TrashService.self) private var trash
+    @Environment(ErrorPresenter.self) private var errors
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var visible = false
+    @State private var overlayReady = false
     @Environment(\.clock) private var clock
     @Environment(\.calendar) private var calendar
     @State private var model: NoteScreenModel
     @State private var cache = TranscriptCache()
     @State private var headerTitleVisible = true
     @State private var transcribingDetailsOpen = false
+    @State private var exportOpen = false
+    @State private var exportPresented = false
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -52,9 +60,16 @@ struct NoteDetailView: View {
         let _ = RenderProbe.rendered("screen")
         #endif
         @Bindable var model = model
+        let note = self.note
+        let mode = currentMode
+        let sealedKey = note.map {
+            TranscriptCache.SealedKey($0, voices: voices.savedVoices,
+                suggestions: readOnly == nil ? voices.suggestions(for: $0) : [])
+        }
+        let speakerCount = cache.speakerCount(mode: mode, draft: model.shownDraft, sealed: sealedKey)
         Group {
-            if let note, let mode = currentMode {
-                content(note, mode: mode)
+            if let note, let mode, let sealedKey {
+                content(note, mode: mode, sealedKey: sealedKey)
             } else {
                 ContentUnavailableView(NoteCopy.unavailableTitle, systemImage: "waveform.slash",
                                        description: Text(NoteCopy.unavailableBody))
@@ -64,8 +79,11 @@ struct NoteDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.playerKey) { model.updatePlayer() }
         .task(id: model.savedDraftKey) { await model.loadSavedDraft() }
-        .onDisappear { model.disappeared() }
-        .onAppear { model.appeared(start: requestedStart) }
+        .onDisappear { visible = false; model.disappeared() }
+        .onAppear { model.appeared(start: requestedStart); visible = true }
+        .onChange(of: shouldAskVoices(speakerCount: speakerCount), initial: true) { _, ask in
+            if ask { model.sheet = .voicesQuestion }
+        }
         .onChange(of: currentMode == .processing) { _, isProcessing in
             if !isProcessing { transcribingDetailsOpen = false }
         }
@@ -89,8 +107,27 @@ struct NoteDetailView: View {
         }
         .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
-                          dialog: $model.screen.dialog)
+                          dialog: $model.screen.dialog, ready: $overlayReady)
         .shareSheet(item: $model.shareItem)
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if let count = speakerCount {
+                UITestStateMarker(identifier: "voicesQuestionState",
+                    value: "speakers=\(count);answered=\(settings.voiceSetupAnswered);remember=\(settings.rememberPeopleIName);auto=\(settings.automaticallyNameVoices)")
+            }
+        }
+        #endif
+    }
+
+    private func shouldAskVoices(speakerCount: Int?) -> Bool {
+        guard !settings.voiceSetupAnswered else { return false }
+        return VoicesQuestion.shouldAsk(answered: settings.voiceSetupAnswered, speakerCount: speakerCount,
+            visible: visible && scenePhase == .active && router.path.last?.noteID == noteID,
+            writable: !voices.isReadOnly, overlayReady: overlayReady,
+            obstructed: model.sheet != nil || model.screen.dialog != nil || model.shareItem != nil
+                || model.exportingDocument || model.exportingFile || exportOpen || exportPresented
+                || transcribingDetailsOpen || trash.stopConfirmation != nil
+                || errors.current != nil || router.fullScreen != nil)
     }
 
     // MARK: Content
@@ -99,9 +136,7 @@ struct NoteDetailView: View {
         mode.showsDraft
     }
 
-    private func content(_ note: Note, mode: NoteMode) -> some View {
-        let sealedKey = TranscriptCache.SealedKey(note, voices: voices.savedVoices,
-                                                 suggestions: readOnly == nil ? voices.suggestions(for: note) : [])
+    private func content(_ note: Note, mode: NoteMode, sealedKey: TranscriptCache.SealedKey) -> some View {
         let transcript = mode.showsReading ? cache.sealed(sealedKey) : .empty
         let searchKey = TranscriptCache.SearchKey(transcript, query: model.screen.search?.query ?? "")
         let matches = model.screen.search == nil ? [] : cache.matches(searchKey)
@@ -182,7 +217,8 @@ struct NoteDetailView: View {
                         .accessibilityIdentifier("searchTranscript")
                 }
                 NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), transcribeAction: model.transcribeAction,
-                         exportingDocument: model.exportingDocument,
+                         exportingDocument: model.exportingDocument || model.exportingFile,
+                         exportOpen: $exportOpen, exportPresented: $exportPresented,
                          perform: { model.perform($0) })
             }
         }

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -40,6 +40,48 @@ import CassiniNotebook
 
     func send(_ model: NameSpeakerModel, _ events: NamingEvent...) {
         for event in events { model.send(event) { [actions] in actions.record($0) } }
+    }
+
+    @Test func restoredTypedTextPreservesDefaultOffAndExistingLink() async throws {
+        fake.namingInput?.rememberDefault = false
+        let model = await open(draft: "Restored text")
+        #expect(model.state?.name == "Restored text")
+        #expect(model.state?.remember == false)
+        fake.namingInput?.match = .confirmed(voice: anna.id, score: 1)
+        fake.namingInput?.label = anna.name
+        let linked = await open(draft: "Restored text")
+        #expect(linked.state?.remember == true)
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true]) func draftNamingUsesDefaultUnlessAnExplicitChoiceExists(_ defaultOn: Bool) async throws {
+        fake.job = Job(noteID: screen.noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date())
+        fake.speakerModelsReady = true
+        fake.runningDraft = DraftState(words: [DraftWord(speaker: "s1", startMs: 0, endMs: 8_000, text: "Hello")],
+                                       tentativeFromMs: 8_000, namingOpen: true)
+        var ports = fake.ports
+        ports.rememberDefault = { defaultOn }
+        let names = AsyncStream<DraftNames>.makeStream()
+        ports.draftNames = { _ in names.stream }
+        let screen = NoteScreenModel(noteID: screen.noteID, ports: ports)
+        screen.appeared(start: nil)
+        defer { screen.disappeared(); names.continuation.finish() }
+        func apply(_ expected: DraftNames) async {
+            names.continuation.yield(expected)
+            for await value in ObservedValues({ screen.draftNames }) {
+                if value == expected { return }
+            }
+        }
+        func opened() async -> NamingState? {
+            let model = screen.naming("s1")
+            await model.open(draft: "Restored") { _ in }
+            return model.state
+        }
+        #expect(await opened()?.remember == defaultOn)
+        let named = DraftNames.empty.rename("s1", "Manual")
+        await apply(named)
+        #expect(await opened()?.remember == false)
+        await apply(named.remember("s1", .new, generation: 0))
+        #expect(await opened()?.remember == true)
     }
 
     // ports: NoteViewModelTest#aDraftSpeakerIsNamedThroughTheDraftNames

@@ -23,6 +23,7 @@ import CassiniEngineTesting
     var transcriptionUptimeMs: @Sendable () -> Int64 = TranscriptionJob.uptimeMs
     #if DEBUG
     var holdArchiveExport = false
+    var suppressVoicesQuestion = false
     var draftClock: PermitClock?
     var modelInstallRecorder: FakeModelInstallRecorder?
     #endif
@@ -221,6 +222,7 @@ extension AppEnvironment {
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
         environment.holdArchiveExport = arguments.contains("--hold-archive-export")
+        environment.suppressVoicesQuestion = !arguments.contains("--ask-voices")
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
         environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
         environment.launch.importingFixture = arguments.contains("--importing-fixture")
@@ -259,7 +261,8 @@ extension AppEnvironment {
         let script: FakeTranscriber.Script = switch seed {
         case .processing where modelDownloading: .downloading(fraction: 0.46)
         case .processing where draftGrowing:
-            .growing(TestFixtures.growingDraft, every: .milliseconds(1_200), total: TestFixtures.processingDuration)
+            .growing(draftSpeakerSuggestion ? TestFixtures.processingSpeakerDraft : TestFixtures.growingDraft,
+                     every: .milliseconds(1_200), total: TestFixtures.processingDuration)
         case .processing:
             .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
                     draft: draftSpeakerSuggestion ? TestFixtures.processingSpeakerDraft : TestFixtures.processingDraft,

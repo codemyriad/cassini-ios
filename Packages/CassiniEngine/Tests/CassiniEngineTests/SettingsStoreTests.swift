@@ -56,6 +56,38 @@ import CassiniNotebook
         #expect(DraftNamesStore(notes: try NoteStore(root: root)).current(note) == expected)
     }
 
+    @Test func rememberAnswerPersistsIndependentlyAndDismissalPreservesIt() {
+        defer { cleanUp() }
+        let settings = store()
+        #expect(settings.rememberPeopleIName && !settings.voiceSetupAnswered)
+        settings.automaticallyNameVoices = true
+        settings.answerVoiceSetup(enable: false)
+        #expect(store().voiceSetupAnswered && !store().rememberPeopleIName)
+        #expect(store().automaticallyNameVoices && store().recogniseSavedVoices)
+        settings.answerVoiceSetup(enable: nil)
+        #expect(!store().rememberPeopleIName)
+        settings.setRememberPeopleIName(true)
+        #expect(store().voiceSetupAnswered && store().rememberPeopleIName)
+        settings.automaticallyNameVoices = false
+        #expect(store().rememberPeopleIName)
+    }
+
+    @Test func legacyAnsweredDoesNotInferRememberFromAutomaticNaming() {
+        defer { cleanUp() }
+        defaults().set(true, forKey: "voices.setupAnswered")
+        defaults().set(false, forKey: SettingsKeys.automaticallyNameVoices)
+        #expect(store().voiceSetupAnswered && store().rememberPeopleIName)
+        store().answerVoiceSetup(enable: false)
+        #expect(!store().rememberPeopleIName)
+    }
+
+    @Test func dismissingFirstQuestionRecordsAnswerAndRetainsDefault() {
+        defer { cleanUp() }
+        store().answerVoiceSetup(enable: nil)
+        #expect(store().voiceSetupAnswered && store().rememberPeopleIName)
+        #expect(!store().automaticallyNameVoices)
+    }
+
     // ports: SettingsRepositoryTest#defaultsBeforeAnyWrite
     @Test func defaultsBeforeAnyWrite() {
         defer { cleanUp() }
