@@ -198,6 +198,7 @@ struct BackupNoticeCard: View {
         .frame(height: min(contentHeight > 0 ? contentHeight : maximumHeight, maximumHeight))
         .background(Color.raised, in: RoundedRectangle(cornerRadius: 24))
         .overlay { RoundedRectangle(cornerRadius: 24).stroke(Color.line, lineWidth: 0.5).allowsHitTesting(false) }
+        .compositingGroup()
         .shadow(color: Color.shadow, radius: 16, y: 4)
         .disabled(backup.updating)
         .accessibilityElement(children: .contain)
