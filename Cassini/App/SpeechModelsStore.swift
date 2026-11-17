@@ -31,6 +31,8 @@ import CassiniWhistle
     @ObservationIgnored private let verify: @Sendable () throws -> Bool
     @ObservationIgnored private let verifyBundle: @Sendable () async -> Bool
     @ObservationIgnored private var verificationTask: Task<Void, Never>?
+    @ObservationIgnored private var speechInstalling = false
+    @ObservationIgnored private var installationRevision = 0
     @ObservationIgnored var onChange: @MainActor () -> Void = {}
     @ObservationIgnored var onDownload: @MainActor () -> Void = {}
     private(set) var whistleAvailable: Bool
@@ -151,12 +153,14 @@ import CassiniWhistle
     }
 
     func installerChanged(_ status: PinnedModelInstaller.Status) {
-        switch status {
-        case .installing(let parts, _, _) where parts.contains(.speech):
+        let wasInstalling = speechInstalling
+        if case .installing(let parts, _, _) = status { speechInstalling = parts.contains(.speech) }
+        else { speechInstalling = false }
+        if wasInstalling != speechInstalling { installationRevision += 1 }
+        if speechInstalling {
             if installation != .verified { publish(.installing) }
-        case .idle: refresh()
-        default: break
-        }
+        } else if case .idle = status { refresh() }
+        else if wasInstalling { refresh() }
     }
 
     /// Resolve installed-model verification before releasing cold-start queue/recording/import admission.
@@ -164,37 +168,53 @@ import CassiniWhistle
     func verifyInstalledSpeech() async {
         refresh()
         if preference == .whistle && whistleCapability.available { return }
-        await verificationTask?.value
+        await settleVerification()
     }
 
-    /// A size-matching directory is only a candidate. An explicit Whistle choice remains usable while this check
-    /// runs; automatic/Parakeet cold-start admission awaits it through verifyInstalledSpeech().
+    /// Read file facts off-main before changing the displayed state. Only unchecked files need a checking state;
+    /// routine refreshes preserve the installed choice, its one-time promotion and an active download's progress.
     func refresh() {
-        guard verificationTask == nil else { return }
+        guard verificationTask == nil, !speechInstalling else { return }
         guard parakeetCapable else { publish(.missing); return }
-        publish(.checking)
         let verify = verify, installed = installed, verified = verified
+        let revision = installationRevision
         verificationTask = Task { [weak self] in
-            let result: ParakeetInstallation = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
-                    guard installed() else { continuation.resume(returning: .missing); return }
-                    if verified() { continuation.resume(returning: .verified); return }
-                    do {
-                        _ = try verify()
-                        continuation.resume(returning: installed() && verified() ? .verified : .missing)
-                    } catch {
-                        continuation.resume(returning: installed() && verified() ? .verified : .unavailable)
-                    }
-                }
+            let precheck = await Self.fileWork {
+                guard installed() else { return .missing }
+                return verified() ? .verified : .checking
             }
             guard let self else { return }
-            self.verificationTask = nil
+            defer {
+                self.verificationTask = nil
+                // An install that began/ended during this read supersedes it. Once idle, read the new files.
+                if revision != self.installationRevision { self.refresh() }
+            }
+            guard revision == self.installationRevision, !self.speechInstalling else { return }
+            guard precheck == .checking else { self.publish(precheck); return }
+            self.publish(.checking)
+            let result = await Self.fileWork {
+                do {
+                    _ = try verify()
+                    return installed() && verified() ? .verified : .missing
+                } catch {
+                    return installed() && verified() ? .verified : .unavailable
+                }
+            }
+            guard revision == self.installationRevision, !self.speechInstalling else { return }
             self.publish(result)
         }
     }
 
-    /// Event-based completion for callers which need the refreshed installation facts.
-    func settleVerification() async { await verificationTask?.value }
+    nonisolated private static func fileWork(_ work: @escaping @Sendable () -> ParakeetInstallation) async -> ParakeetInstallation {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async { continuation.resume(returning: work()) }
+        }
+    }
+
+    /// Includes a replacement verification when an install superseded an earlier precheck.
+    func settleVerification() async {
+        while let verificationTask { await verificationTask.value }
+    }
 
     private func publish(_ value: ParakeetInstallation) {
         installation = value

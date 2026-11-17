@@ -238,6 +238,10 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(parakeet.wait(until: NSPredicate(format: "selected == true"), within: 15))
         XCTAssertTrue(app.staticTexts["installedParakeetSize"].label.contains("444 MB"))
         XCTAssertFalse(app.buttons["downloadParakeet"].exists)
+        let promotion = app.staticTexts["New meetings now use Parakeet Ultra."]
+        XCTAssertTrue(app.scroll { promotion.exists && app.frame.contains(promotion.frame) },
+                      "The one-time announcement remains readable after loading: \(app.debugDescription)")
+        app.scroll(up: false) { whistle.isHittable }
         whistle.tap()
         XCTAssertTrue(whistle.wait(until: NSPredicate(format: "selected == true"), within: 15))
         app.launchArguments.removeAll { $0 == "--reset-test-data" }
