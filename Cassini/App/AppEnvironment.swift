@@ -261,7 +261,8 @@ extension AppEnvironment {
         let script: FakeTranscriber.Script = switch seed {
         case .processing where modelDownloading: .downloading(fraction: 0.46)
         case .processing where draftGrowing:
-            .growing(TestFixtures.growingDraft, every: .milliseconds(1_200), total: TestFixtures.processingDuration)
+            .growing(draftSpeakerSuggestion ? TestFixtures.processingSpeakerDraft : TestFixtures.growingDraft,
+                     every: .milliseconds(1_200), total: TestFixtures.processingDuration)
         case .processing:
             .frozen(done: 0.62 * TestFixtures.processingDuration, total: TestFixtures.processingDuration,
                     draft: draftSpeakerSuggestion ? TestFixtures.processingSpeakerDraft : TestFixtures.processingDraft,

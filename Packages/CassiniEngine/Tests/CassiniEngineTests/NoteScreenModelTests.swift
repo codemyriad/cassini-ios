@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -138,6 +138,50 @@ import CassiniNotebook
     }
 
     // MARK: Exports and the start action
+
+    @Test func onlyAnActuallyPresentedVoicesQuestionCountsAsDismissed() {
+        model.sheet = .voicesQuestion
+        #expect(!model.dismissPresentedSheet(), "A rejected presentation must leave the question unanswered")
+        #expect(model.sheet == nil)
+        model.sheet = .voicesQuestion
+        model.sheetAppeared(.voicesQuestion)
+        #expect(model.dismissPresentedSheet(), "Native dismissal after appearance consumes the question")
+        #expect(!model.dismissPresentedSheet(), "A duplicate dismissal cannot answer it again")
+        model.sheet = .voicesQuestion
+        model.sheetAppeared(.voicesQuestion)
+        model.sheet = .speakers
+        model.sheetAppeared(.voicesQuestion) // A late appearance from a replaced sheet is ignored.
+        #expect(!model.dismissPresentedSheet())
+        model.sheet = .voicesQuestion
+        #expect(!model.dismissPresentedSheet(), "A previous question's appearance cannot leak into a new attempt")
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true], [false, true])
+    func fileExportStaysBusyUntilSharingOrFailure(audio: Bool, fails: Bool) async {
+        let entered = AsyncStream<Void>.makeStream(), release = AsyncStream<Void>.makeStream()
+        let export: @MainActor (UUID) async throws(ExportError) -> URL = { _ throws(ExportError) in
+            entered.continuation.yield(())
+            var iterator = release.stream.makeAsyncIterator()
+            _ = await iterator.next()
+            if fails { throw .cannotSave }
+            return URL(fileURLWithPath: "/unused/export.txt")
+        }
+        var ports = fake.ports
+        ports.copyAudio = export
+        ports.exportTranscript = { id, _ throws(ExportError) in try await export(id) }
+        let model = NoteScreenModel(noteID: noteID, ports: ports)
+        model.perform(audio ? .shareAudio : .exportTranscript(.subtitles))
+        #expect(model.exportingFile, "Block the question synchronously, before the export task starts")
+        var iterator = entered.stream.makeAsyncIterator()
+        _ = await iterator.next()
+        #expect(model.exportingFile && model.shareItem == nil)
+        model.perform(.exportDocument)
+        #expect(!model.exportingDocument, "Do not overlap file preparation with another export")
+        release.continuation.yield(())
+        for await busy in ObservedValues({ model.exportingFile }) { if !busy { break } }
+        #expect((model.shareItem != nil) == !fails)
+        #expect(fake.problems.isEmpty == !fails)
+    }
 
     @Test func anExportIsSharedAndRemovedOnceTheSheetIsDone() async throws {
         model.perform(.exportTranscript(.subtitles))

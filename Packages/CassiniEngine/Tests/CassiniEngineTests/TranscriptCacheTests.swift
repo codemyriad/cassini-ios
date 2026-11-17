@@ -45,6 +45,32 @@ import CassiniNotebook
         #expect(cache.speakerCount(draft: changed) == 1)
     }
 
+    @Test func questionCountNeverFallsBackFromAnAbsentDraftOrHiddenTranscript() async {
+        let cache = TranscriptCache()
+        var note = note()
+        note.transcript.append(.init(text: "Yes", start: 2, end: 3, speakerID: "b"))
+        let key = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        await cache.prepareSealed(key)
+        #expect(cache.speakerCount(sealed: key) == 2)
+        let empty = DraftState(words: [], tentativeFromMs: 0)
+        await cache.prepareDraft(empty)
+        let hidden: [NoteMode?] = [nil, .processing, .paused(doneMs: 0, totalMs: 3_000, hasCheckpoint: false),
+            .queued(ahead: 0, overDocument: false), .failed(overDocument: false), .audioOnly, .unplayable]
+        for mode in hidden {
+            #expect(cache.speakerCount(mode: mode, draft: nil, sealed: key) == nil)
+            #expect(cache.speakerCount(mode: mode, draft: empty, sealed: key) == nil)
+        }
+        for mode in [NoteMode.reading, .queued(ahead: 0, overDocument: true), .failed(overDocument: true)] {
+            #expect(cache.speakerCount(mode: mode, draft: empty, sealed: key) == 2)
+        }
+        let draft = DraftState(words: [.init(speaker: "a", startMs: 0, endMs: 500, text: "New words")],
+                               tentativeFromMs: 500)
+        #expect(cache.speakerCount(mode: .processing, draft: draft, sealed: key) == nil)
+        await cache.prepareDraft(draft)
+        #expect(cache.speakerCount(mode: .processing, draft: draft, sealed: key) == 1)
+        #expect(cache.speakerCount(mode: .reading, draft: draft, sealed: key) == 2)
+    }
+
     @Test func preparationMatchesThePureRendererAndRefreshesNamesAndSearch() async {
         let cache = TranscriptCache()
         var note = note()

@@ -11,12 +11,14 @@ struct NoteMenu: View {
     var transcribeAction: TranscribeAction?
     /// A Cassini document is being prepared.
     let exportingDocument: Bool
+    @Binding var exportOpen: Bool
+    /// Remains true through the sheet dismissal animation, until sharing starts in onDismiss.
+    @Binding var exportPresented: Bool
     let perform: (NoteMenuAction) -> Void
     @Environment(RecordingStore.self) private var recording
     @Environment(ProcessingStore.self) private var processing
     private var speechUnavailable: Bool { processing.models.speechUnavailability == .model }
 
-    @State private var exportOpen = false
     @State private var confirmedExport: ExportSheetState.Choice?
 
     var body: some View {
@@ -37,7 +39,10 @@ struct NoteMenu: View {
             Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
             if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
             Divider()
-            Button(LibraryCopy.export, systemImage: "square.and.arrow.up") { exportOpen = true }
+            Button(LibraryCopy.export, systemImage: "square.and.arrow.up") {
+                exportPresented = true
+                exportOpen = true
+            }
                 .accessibilityIdentifier("exportOpen")
                 .disabled(exportingDocument || finishing || note.isRecording)
             if let transcribeRow {
@@ -61,6 +66,7 @@ struct NoteMenu: View {
     }
 
     private func shareConfirmed() {
+        defer { exportPresented = false }
         guard let choice = confirmedExport else { return }
         confirmedExport = nil
         if let format = choice.transcriptFormat { perform(.exportTranscript(format)) }

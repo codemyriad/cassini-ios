@@ -19,8 +19,9 @@ private struct NoteSheetsAndDialogs: ViewModifier {
         @Bindable var model = model
         content
             .sheet(item: Binding(get: { model.sheet }, set: { value in
-                if model.sheet == .voicesQuestion, value == nil { settings.answerVoiceSetup(enable: nil) }
-                model.sheet = value
+                if value == nil {
+                    if model.dismissPresentedSheet() { settings.answerVoiceSetup(enable: nil) }
+                } else { model.sheet = value }
             }), content: sheet)
             .alert(title, isPresented: shown, presenting: model.screen.dialog, actions: actions, message: message)
     }
@@ -32,6 +33,7 @@ private struct NoteSheetsAndDialogs: ViewModifier {
                 settings.answerVoiceSetup(enable: answer)
                 model.sheet = nil
             }
+            .onAppear { model.sheetAppeared(.voicesQuestion) }
         case .rename(let draft): RenameNoteDialog(noteID: noteID, draft: draft) { model.sheetDraft = $0 }
         case .speakers: SpeakersView(model: model)
         case .versions: TranscriptVersionsView(model: model)

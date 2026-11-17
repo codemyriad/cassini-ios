@@ -56,6 +56,41 @@ final class VoicesQuestionFlowTests: XCTestCase {
         XCTAssertFalse(title.exists)
     }
 
+    @MainActor private func questionWaitsForOverlay(export: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "processing", "--draft-growing",
+            "--draft-speaker-suggestion", "--ask-voices", "--open-fixture", "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"]
+            + DeviceUnderTest.workingSpeech
+        app.launchAndWait()
+        app.appendDraft(sentences: 1)
+        let marker = app.staticTexts["uiTestState-voicesQuestionState"]
+        XCTAssertTrue(marker.waitForValue("speakers=1;answered=false;remember=true;auto=false"))
+        app.buttons["noteActions"].tap()
+        if export {
+            app.buttons["exportOpen"].tapWhenSettled()
+            XCTAssertTrue(app.buttons["exportConfirm"].waitForExistence(within: 15))
+        } else {
+            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            XCTAssertTrue(app.alerts["Stop transcription and move to Recently Deleted?"].waitForExistence(within: 15))
+        }
+        app.appendDraft(sentences: 1)
+        XCTAssertTrue(marker.waitForValue("speakers=2;answered=false;remember=true;auto=false"))
+        XCTAssertFalse(app.staticTexts["voicesQuestionTitle"].exists)
+        if export { app.buttons["Cancel"].tapWhenSettled() }
+        else { app.alerts["Stop transcription and move to Recently Deleted?"].buttons["Cancel"].tapWhenSettled() }
+        XCTAssertTrue(app.buttons["voicesQuestionNotNow"].waitForExistence(within: 15))
+        app.buttons["voicesQuestionNotNow"].tap()
+        XCTAssertTrue(marker.waitForValue("speakers=2;answered=true;remember=false;auto=false"))
+    }
+
+    @MainActor func testSecondDraftSpeakerWaitsForExportSheetToClose() {
+        questionWaitsForOverlay(export: true)
+    }
+
+    @MainActor func testSecondDraftSpeakerWaitsForStopAndTrashAlertToClose() {
+        questionWaitsForOverlay(export: false)
+    }
+
     @MainActor func testFirstLaunchAndOneSpeakerNeverAsk() {
         let first = launch(seed: nil)
         XCTAssertTrue(first.staticTexts["heroTitle"].waitForExistence(within: 15))

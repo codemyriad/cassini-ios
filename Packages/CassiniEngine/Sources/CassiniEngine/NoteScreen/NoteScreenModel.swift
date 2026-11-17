@@ -164,12 +164,29 @@ public final class NoteScreenModel {
 
     public let noteID: UUID
     public var screen: NoteScreenState
-    public var sheet: NoteSheet?
+    public var sheet: NoteSheet? {
+        didSet { if oldValue != sheet { voicesQuestionPresented = false } }
+    }
+    @ObservationIgnored private var voicesQuestionPresented = false
+
+    /// Presentation may be refused by SwiftUI while another modal is leaving. Only an actually shown question
+    /// counts as dismissed; an aborted presentation leaves the one-time choice unanswered.
+    public func sheetAppeared(_ presented: NoteSheet) {
+        if sheet == presented, presented == .voicesQuestion { voicesQuestionPresented = true }
+    }
+
+    @discardableResult public func dismissPresentedSheet() -> Bool {
+        let dismissedQuestion = sheet == .voicesQuestion && voicesQuestionPresented
+        sheet = nil
+        return dismissedQuestion
+    }
     /// The text typed so far into Name this speaker or Rename, kept with the open sheet.
     public var sheetDraft: String?
     public var shareItem: ShareItem?
     /// A Cassini document is being prepared.
     public private(set) var exportingDocument = false
+    /// Transcript/audio file preparation, before its share sheet is available.
+    public private(set) var exportingFile = false
     public var showBookmarks = false
     /// The saved progress of a stopped, failed, queued or resuming job, for its read-only draft.
     public private(set) var savedDraft: [DraftWord] = []
@@ -313,13 +330,17 @@ public final class NoteScreenModel {
     /// Shares the file `file` writes for the note, or says why there is none. The file is removed once the sheet is
     /// done with it.
     private func export(_ file: @escaping @MainActor (Ports, UUID) async throws(ExportError) -> URL) {
+        guard !exportingFile, !exportingDocument else { return }
+        exportingFile = true
         Task {
+            defer { exportingFile = false }
             do throws(ExportError) { shareItem = shared(try await file(ports, noteID)) }
             catch { ports.present(.export(error)) }
         }
     }
 
     private func exportDocument() {
+        guard !exportingFile, !exportingDocument else { return }
         exportingDocument = true
         Task {
             do { shareItem = shared(try await ports.exportDocument(noteID)) }
