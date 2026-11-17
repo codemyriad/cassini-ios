@@ -132,6 +132,23 @@ import CassiniNotebook
         #expect(failures.isEmpty, "\(scheme): \(failures.joined(separator: "\n"))")
     }
 
+    @Test func recordingBannersMeetContrastInDarkMode() {
+        var darkPairs: [Pair] = [
+            Self.text("filled banner action label on dark ink pill", .paper, on: .ink),
+            Self.text("outlined banner action label on dark tint", .ink, on: .recordingBackground, Tone.error.background, .ink.opacity(0.1)),
+        ]
+        for (name, tone) in Self.tones {
+            darkPairs.append(Self.text("\(name) banner title on recording", tone.color, on: .recordingBackground, tone.background))
+            darkPairs.append(Self.text("ink on \(name) banner on recording", .ink, on: .recordingBackground, tone.background))
+            darkPairs.append(Self.nonText("\(name) dot on \(name) banner on recording", tone.color, on: .recordingBackground, tone.background))
+        }
+        let failures = darkPairs.compactMap { pair -> String? in
+            let ratio = Self.contrast(pair.foreground, on: pair.background, .dark)
+            return ratio < pair.minimum ? "\(pair.label): \(String(format: "%.2f", ratio)) < \(pair.minimum)" : nil
+        }
+        #expect(failures.isEmpty, "dark recording banners: \(failures.joined(separator: "\n"))")
+    }
+
     /// The resolution itself: white on black is 21:1, and a token resolves to its own value in each appearance.
     @Test func theResolutionReadsTheTokens() {
         #expect(abs(Self.contrast(.white, on: [.black], .light) - 21) < 0.01)

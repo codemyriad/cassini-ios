@@ -7,7 +7,6 @@ import CassiniNotebook
 /// appears.
 struct Banner: View {
     let spec: BannerSpec
-    var style: BannerStyle = .standard
     var onAction: (BannerAction) -> Void = { _ in }
     var onDismiss: (() -> Void)?
 
@@ -42,19 +41,15 @@ struct Banner: View {
         .background {
             let shape = RoundedRectangle(cornerRadius: Radius.control)
             ZStack {
-                if style == .onDark { shape.fill(Color.card) }
                 shape.fill(tone.background)
                 if spec.kind.tone == .plain { shape.strokeBorder(Color.line) }
             }
         }
-        // The dark Recording screen keeps the light tones.
-        .environment(\.colorScheme, style == .onDark ? .light : colorScheme)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("banner.\(spec.kind.rawValue)")
         .onAppear { if spec.announce { AccessibilityNotification.Announcement(title).post() } }
     }
 
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var locale
 
     private var actions: some View {
@@ -73,11 +68,6 @@ struct Banner: View {
                 .accessibilityIdentifier("bannerAction.\(action.rawValue)")
         }
     }
-}
-
-/// Where a banner sits: on the paper of most screens, or on the always-dark Recording screen.
-enum BannerStyle {
-    case standard, onDark
 }
 
 /// The banner buttons: the first filled with ink, the others outlined; at least 44 pt tall to tap.
@@ -101,7 +91,6 @@ private struct BannerButtonStyle: ButtonStyle {
 /// A screen's banner list, one under the other.
 struct BannerList: View {
     let specs: [BannerSpec]
-    var style: BannerStyle = .standard
     var onAction: (BannerSpec, BannerAction) -> Void
     var onDismiss: (BannerSpec) -> Void
 
@@ -109,7 +98,7 @@ struct BannerList: View {
         if !specs.isEmpty {
             VStack(spacing: Spacing.row) {
                 ForEach(specs) { spec in
-                    Banner(spec: spec, style: style, onAction: { onAction(spec, $0) }, onDismiss: { onDismiss(spec) })
+                    Banner(spec: spec, onAction: { onAction(spec, $0) }, onDismiss: { onDismiss(spec) })
                 }
             }
         }

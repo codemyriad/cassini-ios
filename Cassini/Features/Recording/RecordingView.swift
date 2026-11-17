@@ -25,7 +25,7 @@ struct RecordingView: View {
                         RecordingTitleField(title: Binding(get: { screen.title }, set: { screen.setTitle($0) }))
                             .padding(.top, 18)
                         if let banner = screen.banner {
-                            Banner(spec: banner, style: .onDark, onAction: { screen.perform($0) })
+                            Banner(spec: banner, onAction: { screen.perform($0) })
                             .padding(.top, 8)
                         }
                         Spacer(minLength: 16)
@@ -72,13 +72,15 @@ struct RecordingView: View {
 private struct RecordingCaption: View {
     let screen: RecordingScreenModel
     var body: some View {
-        Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
-            .multilineTextAlignment(.center).frame(maxWidth: 280)
+        if let caption {
+            Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
+                .multilineTextAlignment(.center).frame(maxWidth: 280)
+        }
     }
 
-    private var caption: String {
+    private var caption: String? {
         switch screen.phase {
-        case .needsPermission: String(localized: "Cassini needs the microphone to record.", table: "Recording")
+        case .needsPermission: nil
         case .starting: String(localized: "Starting the microphone…", table: "Recording")
         case .stopping: String(localized: "Saving the recording…", table: "Recording")
         case .recording, .paused: RecordingCopy.hint(screen.space)

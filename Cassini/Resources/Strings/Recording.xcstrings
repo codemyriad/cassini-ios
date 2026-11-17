@@ -248,47 +248,6 @@
         }
       }
     },
-    "Cassini needs the microphone to record.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini needs the microphone to record."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini necesita el micrófono para grabar."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini a besoin du microphone pour enregistrer."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini ha bisogno del microfono per registrare."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Cassini precisa do microfone para gravar."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Cassini precisa do microfone para gravar."
-          }
-        }
-      }
-    },
     "Keeps recording with the screen off or in another app.": {
       "extractionState": "manual",
       "localizations": {
