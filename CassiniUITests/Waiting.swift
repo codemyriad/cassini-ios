@@ -256,7 +256,8 @@ extension XCUIApplication {
             let search = textFields["librarySearch"]
             let top = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY,
                           search.exists ? search.frame.maxY : frame.minY) + 8
-            let bottom = min(frame.maxY, bar.frame.minY) - 8
+            let notice = descendants(matching: .any).matching(identifier: "backupNotice").firstMatch
+            let bottom = min(frame.maxY, bar.frame.minY, notice.exists ? notice.frame.minY : frame.maxY) - 8
             return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
         }
         for _ in 0..<12 {
@@ -281,7 +282,11 @@ extension XCUIApplication {
                             withVelocity: .slow, thenHoldForDuration: 0)
                 continue
             }
-            viewport.swipeUp(velocity: .slow)
+            let clear = clearFrame()
+            let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+                .withOffset(CGVector(dx: 0, dy: clear.midY - viewport.frame.minY))
+            start.press(forDuration: 0, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -clear.height * 0.45)),
+                        withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTFail("The \(description) did not become clear of the navigation and capture bars")
         return element

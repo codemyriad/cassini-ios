@@ -28,6 +28,7 @@ struct LibraryView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedNotes: Set<UUID> = []
     @State private var archiveExport = ArchiveExportModel()
+    @State private var backupNoticeHeight: CGFloat = 0
     @State private var exportTarget: ExportTarget?
     @State private var confirmedExport: (UUID, ExportSheetState.Choice)?
 
@@ -35,11 +36,17 @@ struct LibraryView: View {
         @Bindable var model = model
         let content = model.listContent
         let exportable = Set(ArchiveSelection.ids(library.notes))
+        let showsBackupNotice = !model.isSearching && !searchPresented
+            && BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
+                .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
+                             dismissed: settings.backupNoticeDismissed)
         ScrollView {
             libraryStack(content, exportable: exportable)
             // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
             .id(content.results != nil)
-            .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
+            .padding(.horizontal, Spacing.gutter).padding(.top, 12)
+            // The notice floats over content, but the last row can still scroll fully above it.
+            .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
             .readableWidth()
         }
         .accessibilityIdentifier("libraryScroll")
@@ -56,14 +63,12 @@ struct LibraryView: View {
         .trashUndoSnackbar()
         .background(Color.paper)
         .overlay(alignment: .bottom) {
-            if !model.isSearching, !searchPresented,
-               BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
-                .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
-                             dismissed: settings.backupNoticeDismissed) {
+            if showsBackupNotice {
                 GeometryReader { geometry in
                     VStack {
                         Spacer(minLength: 0)
                         BackupNoticeCard(maximumHeight: max(0, geometry.size.height - 24))
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { backupNoticeHeight = $0 }
                             .frame(maxWidth: ReadableWidth.content)
                             .padding(.horizontal, 12).padding(.bottom, 12)
                     }.frame(maxWidth: .infinity)

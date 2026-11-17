@@ -34,6 +34,17 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["backupNoticeDismiss"].isHittable)
     }
 
+    @MainActor func testLastMeetingCanScrollAboveTheFloatingNotice() {
+        let app = launch(["--seed", "statuses"])
+        XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
+        let row = app.scrolledLibraryRow("Thoughts from the morning walk")
+        let notice = app.descendants(matching: .any).matching(identifier: "backupNotice").firstMatch
+        XCTAssertLessThanOrEqual(row.frame.maxY, notice.frame.minY)
+        row.tap()
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        XCTAssertEqual(app.staticTexts["noteTitle"].label, "Thoughts from the morning walk")
+    }
+
     @MainActor func testOwnCopyIsDisabledWithoutSavedMeetings() {
         let app = launch([])
         openBackup(app)
