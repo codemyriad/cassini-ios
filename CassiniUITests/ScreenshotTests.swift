@@ -292,10 +292,7 @@ final class ScreenshotTests: XCTestCase {
         let search = app.textFields["librarySearch"]
         XCTAssertTrue(search.waitForExistence(within: 15))
         let searchFrame = search.frame
-        let quiet = row(app, "Quiet room")
-        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll(attempts: 12) {
-            quiet.exists && quiet.isHittable && quiet.frame.maxY < app.buttons["recordButton"].frame.minY
-        })
+        _ = app.scrolledLibraryRow("Quiet room")
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "the pinned field stays fully visible")
         XCTAssertEqual(search.frame, searchFrame, "the search capsule stays pinned while the list scrolls")
         capture("20-library-scrolled")

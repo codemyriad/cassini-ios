@@ -16,17 +16,9 @@ final class ModelDownloadFlowTests: XCTestCase {
     }
 
     @MainActor private func transcribeTheWalk(_ app: XCUIApplication) {
-        // Without the speech model the Library starts with "Record now, transcribe later", which pushes the row down
-        // under the capture bar.
+        // The download banner pushes this row down; scroll it clear of the floating notice and capture bar.
         XCTAssertTrue(app.otherElements["banner.DL_RECORD_NOW"].waitForExistence(within: 5))
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Thoughts from the morning walk")).firstMatch
-        let list = app.scrollViews.firstMatch
-        let capture = app.buttons["recordButton"]
-        guard list.scroll(until: {
-            guard row.exists && row.isHittable else { return false }
-            let frame = row.frame
-            return list.frame.contains(frame) && frame.maxY <= capture.frame.minY
-        }) else { XCTFail("The note did not scroll clear of the capture controls"); return }
+        let row = app.scrolledLibraryRow("Thoughts from the morning walk")
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
