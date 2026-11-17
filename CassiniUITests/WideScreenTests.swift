@@ -61,8 +61,8 @@ final class WideScreenTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         assertCentred([app.staticTexts["Old interview draft"], app.buttons["Restore"].firstMatch], in: detailColumn(app))
         app.buttons["Settings"].tap()
-        let language = app.buttons["appLanguageRow"]
-        assertCentred([language], in: detailColumn(app))
+        let firstTopic = app.buttons["transcriptionRow"]
+        assertCentred([firstTopic], in: detailColumn(app))
     }
 
     /// Recording covers the whole window.
@@ -91,8 +91,8 @@ final class WideScreenTests: XCTestCase {
 
     @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {
         let app = try launch(["--seed", "voices"])
-        let language = app.buttons["appLanguageRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
+        let firstTopic = app.buttons["transcriptionRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
         let row = app.buttons["savedVoicesRow"]
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tap()

@@ -74,7 +74,7 @@ final class ScreenshotTests: XCTestCase {
     @MainActor func test05Settings() throws {
         let app = try launchPhone(["--seed", "library"])
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
         XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
                       "Settings finishes loading model and language availability before capture")
         capture("05-settings")
@@ -138,7 +138,7 @@ final class ScreenshotTests: XCTestCase {
     @MainActor func test09SavedVoices() throws {
         let app = try launchPhone(["--seed", "voices"])
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.buttons["appLanguageRow"].waitForExistence(within: 5), "Settings shows")
+        XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
         let savedVoices = app.buttons["savedVoicesRow"]
         app.scroll(attempts: 6) { savedVoices.exists && savedVoices.isHittable }
         savedVoices.tap()

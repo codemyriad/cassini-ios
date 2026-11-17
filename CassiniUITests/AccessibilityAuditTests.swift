@@ -69,8 +69,8 @@ final class AccessibilityAuditTests: XCTestCase {
 
     @MainActor private func settings(_ extra: [String] = []) -> XCUIApplication {
         let app = library(extra)
-        let language = app.buttons["appLanguageRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
+        let firstTopic = app.buttons["transcriptionRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
         XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
                       "Settings has not finished loading")
         return app
@@ -88,12 +88,11 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func savedVoices(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "voices"] + extra)
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
-        let language = app.buttons["appLanguageRow"], row = app.buttons["savedVoicesRow"]
-        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { language.exists }), "Settings did not open")
+        let firstTopic = app.buttons["transcriptionRow"], row = app.buttons["savedVoicesRow"]
+        XCTAssertTrue(app.buttons["settingsButton"].tapWhenInteractive(in: app, until: { firstTopic.exists }), "Settings did not open")
         XCTAssertTrue(app.staticTexts["uiTestState-settingsLoaded"].waitForExistence(within: 15),
                       "Settings has not finished loading")
-        // At the largest text size the row is about six swipes down, more when a loaded host makes each fling shorter:
-        // six once stopped a row short of it.
+        // The first group can extend below the fold at the largest text size; reveal the row before tapping.
         XCTAssertTrue(app.scroll(attempts: 12) { row.exists && row.isHittable }, "Saved voices is not on the screen")
         row.tapWhenSettled()
         // At AX5 on iOS 18, tapping a row at the List's bottom edge can only scroll it into place.
