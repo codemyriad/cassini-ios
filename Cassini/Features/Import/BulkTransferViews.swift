@@ -46,12 +46,18 @@ struct ImportBatchesView: View {
             do {
                 let url = try await exports.exportArchive(ids) { value in await MainActor.run { self.progress = value } }
                 pending = url
+                #if DEBUG
+                try await exports.archiveFixture?.wait()
+                #endif
                 try Task.checkCancellation()
                 shareItem = exports.shareItem(url)
                 pending = nil
                 completedCount = ids.count
             } catch is CancellationError {} catch { errors.present(ExportCopy.notSaved) }
             if let pending { exports.discard(pending); await exports.waitForDiscards() }
+            #if DEBUG
+            await exports.archiveFixture?.finished(cancelled: Task.isCancelled)
+            #endif
             progress = nil; task = nil
         }
     }

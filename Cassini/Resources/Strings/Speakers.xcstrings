@@ -697,7 +697,7 @@
       }
     },
     "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forgetEveryone.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.savedVoices.forgetEveryone.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -841,7 +841,7 @@
       }
     },
     "Cassini stops recognising this voice. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, android.savedVoices.forget.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, android.savedVoices.forget.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -924,7 +924,7 @@
       }
     },
     "Deletes the voiceprints of every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.savedVoices.forgetAllData.body.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.savedVoices.forgetAllData.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2403,7 +2403,7 @@
       }
     },
     "People in this meeting": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.peopleInMeeting.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.peopleInMeeting.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2991,7 +2991,7 @@
       }
     },
     "The meeting could not be saved. Nothing was changed.": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, ios.speakers.meetingSaveFailed.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, ios.speakers.meetingSaveFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {

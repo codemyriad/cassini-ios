@@ -664,8 +664,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testANoteWhistleTranscribedAfterParakeetCouldNotRunSaysSo() {
         let app = launch(["--seed", "search"])
         let notice = app.staticTexts["Parakeet Ultra couldn’t run on this device for this recording, so Whistle transcribed it."]
-        let review = row(app, "Notes from the design review")
-        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll { review.exists && review.isHittable })
+        let review = scrolledRow(app, "Notes from the design review")
         review.tap()
         XCTAssertTrue(notice.waitForExistence(within: 15))
     }
@@ -916,15 +915,11 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testPinnedSearchClosesAndResetsItsDateFilterAcrossNoteNavigation() {
         let app = launch(["--seed", "statuses"] + DeviceUnderTest.workingSpeech)
         let search = app.textFields["librarySearch"]
-        let list = app.scrollViews["libraryScroll"]
         XCTAssertTrue(row(app, "Weekly planning call").waitForExistence(within: 15))
         XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings")
         let initialSearchFrame = settledFrame(search)
         let emptyQueryValue = search.value as? String
-        let last = row(app, "Quiet room")
-        XCTAssertTrue(list.scroll(attempts: 12) {
-            last.exists && last.isHittable && last.frame.maxY < app.buttons["recordButton"].frame.minY
-        })
+        _ = scrolledRow(app, "Quiet room")
         capture("Library scrolled before opening Search")
         XCTAssertEqual(search.frame, initialSearchFrame, "Search is pinned outside the scrolling list")
 
@@ -1140,6 +1135,12 @@ final class LibraryUITests: XCTestCase {
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "statuses",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launchAndWait()
+        // This regression measures the capture bar at the largest text size. The notice has its own
+        // scroll/clearance regressions; dismiss it explicitly before exercising the underlying list.
+        let closeNotice = app.buttons["backupNoticeDismiss"]
+        XCTAssertTrue(closeNotice.waitForExistence(within: uiWaitFloor))
+        closeNotice.tap()
+        XCTAssertTrue(app.staticTexts["uiTestState-backupState"].waitForValue("cloud=true;voices=true;dismissed=true"))
         let last = row(app, "Thoughts from the morning walk")
         // Up to the end of the list: once the last row is built, until a swipe no longer moves it.
         var previous = CGRect.null

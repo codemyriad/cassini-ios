@@ -7,6 +7,9 @@ import CassiniNotebook
 struct LibraryView: View {
     @Environment(LibraryScreenModel.self) private var model
     @Environment(ImportStore.self) private var imports
+    @Environment(SettingsStore.self) private var settings
+    @Environment(BackupModel.self) private var backup
+    @Environment(TrashUndo.self) private var trashUndo
     @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
@@ -26,6 +29,7 @@ struct LibraryView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedNotes: Set<UUID> = []
     @State private var archiveExport = ArchiveExportModel()
+    @State private var backupNoticeHeight: CGFloat = 0
     @State private var exportTarget: ExportTarget?
     @State private var confirmedExport: (UUID, ExportSheetState.Choice)?
 
@@ -33,20 +37,47 @@ struct LibraryView: View {
         @Bindable var model = model
         let content = model.listContent
         let exportable = Set(ArchiveSelection.ids(library.notes))
+        let showsBackupNotice = !model.isSearching && !searchPresented
+            // Undo is time-limited and must remain reachable above the capture bar.
+            && trashUndo.pending == nil && trashUndo.snackbar == nil
+            && BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
+                .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
+                             dismissed: settings.backupNoticeDismissed)
         ScrollView {
             libraryStack(content, exportable: exportable)
             // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
             .id(content.results != nil)
-            .padding(.horizontal, Spacing.gutter).padding(.top, 12).padding(.bottom, 28)
+            .padding(.horizontal, Spacing.gutter).padding(.top, 12)
+            // The notice floats over content, but the last row can still scroll fully above it.
+            .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
             .readableWidth()
         }
         .accessibilityIdentifier("libraryScroll")
         .meetingScrollEdge()
         .scrollDismissesKeyboard(.immediately)
         .scrollPosition($listPosition)
-        .overlay(alignment: .topLeading) { UITestInteractiveMarker(loaded: library.isLoaded && !content.loading) }
+        .overlay(alignment: .topLeading) {
+            UITestInteractiveMarker(loaded: library.isLoaded && !content.loading)
+            if backup.ready {
+                UITestStateMarker(identifier: "backupState", value:
+                    "cloud=\(settings.cloudBackup);voices=\(settings.includeSavedVoicesInBackups);dismissed=\(settings.backupNoticeDismissed)")
+            }
+        }
         .trashUndoSnackbar()
         .background(Color.paper)
+        .overlay(alignment: .bottom) {
+            if showsBackupNotice {
+                GeometryReader { geometry in
+                    VStack {
+                        Spacer(minLength: 0)
+                        BackupNoticeCard(maximumHeight: max(0, geometry.size.height - 24))
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { backupNoticeHeight = $0 }
+                            .frame(maxWidth: ReadableWidth.content)
+                            .padding(.horizontal, 12).padding(.bottom, 12)
+                    }.frame(maxWidth: .infinity)
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
         }
@@ -121,7 +152,6 @@ struct LibraryView: View {
                 .accessibilityAddTraits(.isHeader).accessibilityIdentifier("librarySearchCount")
         }
         activity.padding(.top, 6)
-        if library.isLoaded, !model.isSearching { BackupNoticeCard() }
         ImportCardsView()
     }
 

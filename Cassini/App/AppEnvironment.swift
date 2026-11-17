@@ -22,6 +22,7 @@ import CassiniEngineTesting
     /// Monotonic time of transcription reports and their progress projection.
     var transcriptionUptimeMs: @Sendable () -> Int64 = TranscriptionJob.uptimeMs
     #if DEBUG
+    var holdArchiveExport = false
     var draftClock: PermitClock?
     var modelInstallRecorder: FakeModelInstallRecorder?
     #endif
@@ -219,6 +220,7 @@ extension AppEnvironment {
                   bundledCapable: arguments.contains("--d78-capable"), bundledVerified: arguments.contains("--d78-verified"),
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
+        environment.holdArchiveExport = arguments.contains("--hold-archive-export")
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
         environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
         environment.launch.importingFixture = arguments.contains("--importing-fixture")

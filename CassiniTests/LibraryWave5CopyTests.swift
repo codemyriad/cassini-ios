@@ -45,9 +45,9 @@ import CassiniNotebook
                 "(sauf pour la sauvegarde cloud chiffrée)",
                 "Rien n’est mis en ligne. (sauf pour la sauvegarde cloud chiffrée)",
                 "Transcrit sur cet iPhone. Jamais mis en ligne, sauf dans votre sauvegarde cloud chiffrée.",
-                "Transcrit sur cet iPhone. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de Sauvegarde iCloud.",
+                "Transcrit sur cet iPhone. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud.",
                 "Transcrit sur cet iPad. Jamais mis en ligne, sauf dans votre sauvegarde cloud chiffrée.",
-                "Transcrit sur cet iPad. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de Sauvegarde iCloud.",
+                "Transcrit sur cet iPad. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud.",
             ]),
             ("es", [
                 "Cada palabra transcrita.",

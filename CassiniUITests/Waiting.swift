@@ -171,7 +171,7 @@ extension XCUIApplication {
     private static let options: [String: Bool] = [
         "--ui-testing": false, "--reset-test-data": false, "--seed-test-data": false, "--seed": true,
         "--open-fixture": true, "--models-missing": false, "--notifications-denied": false, "--capture-held": false,
-        "--draft-speaker-suggestion": false,
+        "--draft-speaker-suggestion": false, "--hold-archive-export": false,
     ]
     /// The system arguments of the process this runner launched last; nil when a new process must come first.
     private static var processArguments: [String]?
@@ -237,13 +237,13 @@ extension XCUIApplication {
 }
 
 extension XCUIApplication {
-    /// The row titled `title`, fully between the navigation and capture bars before a tap or long-press.
+    /// The row titled `title`, clear of navigation, capture and the floating notice before a tap or long-press.
     @MainActor func scrolledLibraryRow(_ title: String) -> XCUIElement {
         let element = buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
         return scrolledLibraryElement(element, description: "row \(title)")
     }
 
-    /// A Library control or row, fully clear of both bars before interacting with it.
+    /// A Library control or row, fully clear of both bars and any floating backup notice.
     @MainActor func scrolledLibraryElement(_ element: XCUIElement, description: String) -> XCUIElement {
         let bar = buttons["recordButton"]
         let viewport = scrollViews["libraryScroll"], navigation = navigationBars.firstMatch
@@ -256,7 +256,8 @@ extension XCUIApplication {
             let search = textFields["librarySearch"]
             let top = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY,
                           search.exists ? search.frame.maxY : frame.minY) + 8
-            let bottom = min(frame.maxY, bar.frame.minY) - 8
+            let notice = descendants(matching: .any).matching(identifier: "backupNotice").firstMatch
+            let bottom = min(frame.maxY, bar.frame.minY, notice.exists ? notice.frame.minY : frame.maxY) - 8
             return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
         }
         for _ in 0..<12 {
@@ -281,7 +282,11 @@ extension XCUIApplication {
                             withVelocity: .slow, thenHoldForDuration: 0)
                 continue
             }
-            viewport.swipeUp(velocity: .slow)
+            let clear = clearFrame()
+            let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+                .withOffset(CGVector(dx: 0, dy: clear.midY - viewport.frame.minY))
+            start.press(forDuration: 0, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -clear.height * 0.45)),
+                        withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTFail("The \(description) did not become clear of the navigation and capture bars")
         return element

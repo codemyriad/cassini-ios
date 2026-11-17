@@ -89,6 +89,7 @@ struct SettingsView: View {
 }
 
 private struct SettingsForm: View {
+    @State private var backupExport = ArchiveExportModel()
     let model: SettingsModel
     let page: SettingsPage?
     @Environment(SettingsStore.self) private var settings
@@ -109,10 +110,18 @@ private struct SettingsForm: View {
             case .transcription: transcription
             case .speakers: speakers
             case .about: about
-            case .backup: BackupSection()
+            case .backup: BackupSection(archiveExport: backupExport)
             }
         }
         .readableListWidth()
+        .shareSheet(item: $backupExport.shareItem)
+        // Pushing a detail page also disappears this form. Only leaving the Backup route cancels its work.
+        .onDisappear { cancelExportIfClosed() }
+        .onChange(of: router.path) { _, _ in cancelExportIfClosed() }
+    }
+
+    private func cancelExportIfClosed() {
+        if !router.path.contains(.settingsPage(.backup)) { backupExport.cancel() }
     }
 
     private var map: some View {

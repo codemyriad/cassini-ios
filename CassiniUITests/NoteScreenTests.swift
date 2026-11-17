@@ -342,12 +342,7 @@ final class NoteScreenTests: XCTestCase {
         XCTAssertEqual(ahead.label, "Starts after the current transcription.")
 
         app.navigationBars.buttons["Back to all meetings"].tap()
-        let walk = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@",
-                                                    "Thoughts from the morning walk")).firstMatch
-        XCTAssertTrue(walk.waitForExistence(within: 5))
-        // The capture bar floats over the end of the list: the row is scrolled above it.
-        let bar = app.buttons["recordButton"]
-        XCTAssertTrue(app.scroll(attempts: 4) { walk.isHittable && walk.frame.maxY < bar.frame.minY }, "the row scrolls into view")
+        let walk = app.scrolledLibraryRow("Thoughts from the morning walk")
         walk.tap()
         let transcribe = app.buttons["Transcribe"].firstMatch
         XCTAssertTrue(transcribe.waitForExistence(within: 5))
@@ -638,7 +633,7 @@ final class NoteScreenTests: XCTestCase {
         let sheet = app.descendants(matching: .any)["transcribingDetailsSheet"]
         XCTAssertTrue(sheet.waitForExistence(within: 5))
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@",
-                                                                           "Intervenants et correspondance")).firstMatch.exists)
+                                                                           "Intervenants et reconnaissance")).firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)["audioDoneStat"].exists)
     }
 }
