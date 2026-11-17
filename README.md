@@ -623,7 +623,7 @@ Remember choices take precedence. Legacy answered flags remain answered; legacy 
 Remember preference. The answer/default share one UserDefaults record, written through its asynchronous persistence
 mechanism without a main-actor disk flush.
 
-The shared copy remains pinned to `cassini-ux` `1ffebfa94d02ec966a048d8dded567ce29106702` (all six languages).
+The shared copy is pinned to `cassini-ux` `dd06a62dc881034fed417b000f47004e577a3fb0` (all six languages).
 The iOS Saved voices page keeps guided **Add voice** enrollment as an existing platform extra; row playback,
 sample counts and Ready labels are removed. Download consent is a full-screen modal with a source-only detail page.
 Its displayed speaker models are separate rows while installation and consent retain their existing bundle grouping.

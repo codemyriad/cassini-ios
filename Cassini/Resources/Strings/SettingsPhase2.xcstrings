@@ -1598,7 +1598,7 @@
       }
     },
     "common.notNow": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, common.notNow.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, common.notNow.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1724,7 +1724,7 @@
       }
     },
     "firstRun.howTo": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.howTo.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.howTo.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1754,7 +1754,7 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Toque em Gravar quando a reunião começar e em Parar quando terminar. O Cassini transcreve tudo."
+            "value": "Pressione Gravar quando a reunião começar e Parar quando terminar. O Cassini transcreve tudo."
           }
         },
         "pt-PT": {
@@ -2036,7 +2036,7 @@
       }
     },
     "models.offer.body.ipad": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.body.ipad.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.body.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2078,7 +2078,7 @@
       }
     },
     "models.offer.body.iphone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.body.iphone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.body.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2120,7 +2120,7 @@
       }
     },
     "models.offer.download": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.download.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.download.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2156,13 +2156,13 @@
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Descarregar e transcrever"
+            "value": "Transferir e transcrever"
           }
         }
       }
     },
     "models.offer.part.recognise": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.recognise.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.part.recognise.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2204,7 +2204,7 @@
       }
     },
     "models.offer.part.speech": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.speech.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.part.speech.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2246,7 +2246,7 @@
       }
     },
     "models.offer.part.tellApart": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.tellApart.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.part.tellApart.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2270,13 +2270,13 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Distinción de hablantes"
+            "value": "Separación de hablantes"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Distinção de locutores"
+            "value": "Separação de locutores"
           }
         },
         "pt-PT": {
@@ -2288,7 +2288,7 @@
       }
     },
     "models.offer.recordingKept": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.recordingKept.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.recordingKept.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2330,7 +2330,7 @@
       }
     },
     "models.offer.spaceNeeded": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.spaceNeeded.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.spaceNeeded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2372,7 +2372,7 @@
       }
     },
     "models.offer.title.ipad": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.title.ipad.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.title.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2414,7 +2414,7 @@
       }
     },
     "models.offer.title.iphone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.title.iphone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, models.offer.title.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2876,7 +2876,7 @@
       }
     },
     "savedVoices.forgetEveryone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.forgetEveryone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.forgetEveryone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2918,7 +2918,7 @@
       }
     },
     "savedVoices.howToAdd.short": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.howToAdd.short.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.howToAdd.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2936,7 +2936,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé. Oublier une voix conserve les noms déjà présents dans vos réunions."
+            "value": "Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé. Si vous oubliez une voix, les noms déjà présents dans vos réunions sont conservés."
           }
         },
         "es": {
@@ -3104,7 +3104,7 @@
       }
     },
     "savedVoices.privacy.phone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.privacy.phone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3146,7 +3146,7 @@
       }
     },
     "savedVoices.row.forgetEllipsis": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.forgetEllipsis.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.forgetEllipsis.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3188,7 +3188,7 @@
       }
     },
     "savedVoices.row.options.a11y": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.options.a11y.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.options.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3230,7 +3230,7 @@
       }
     },
     "savedVoices.row.rename": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.rename.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, savedVoices.row.rename.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4382,7 +4382,7 @@
       }
     },
     "trash.phone.intro": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, trash.phone.intro.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, trash.phone.intro.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4424,7 +4424,7 @@
       }
     },
     "voices.rememberDefault.subtitle": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.rememberDefault.subtitle.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.rememberDefault.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4436,7 +4436,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La prossima volta Cassini darà loro il nome per te."
+            "value": "La prossima volta Cassini inserirà i loro nomi per te."
           }
         },
         "fr": {
@@ -4466,7 +4466,7 @@
       }
     },
     "voices.rememberDefault.title": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.rememberDefault.title.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.rememberDefault.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4508,7 +4508,7 @@
       }
     },
     "voices.setup.body.phone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.body.phone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.body.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4550,7 +4550,7 @@
       }
     },
     "voices.setup.changeLater.phone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.changeLater.phone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.changeLater.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4592,7 +4592,7 @@
       }
     },
     "voices.setup.enable.phone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.enable.phone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.enable.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4634,7 +4634,7 @@
       }
     },
     "voices.setup.kindness": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.kindness.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.kindness.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4646,19 +4646,19 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "È gentile chiedere alle persone prima di salvare la loro voce."
+            "value": "È cortese chiedere il permesso prima di salvare la voce di qualcuno."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il est courtois de demander aux personnes avant de mémoriser leur voix."
+            "value": "Il est courtois de demander l’accord des personnes avant de mémoriser leur voix."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Es amable preguntar a las personas antes de guardar su voz."
+            "value": "Es un gesto de cortesía preguntar antes de guardar la voz de alguien."
           }
         },
         "pt-BR": {
@@ -4676,7 +4676,7 @@
       }
     },
     "voices.setup.privacy.phone": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.privacy.phone.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4718,7 +4718,7 @@
       }
     },
     "voices.setup.title": {
-      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.title.",
+      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, voices.setup.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
