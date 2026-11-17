@@ -140,6 +140,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 15))
         app.buttons["Transcribe"].tap()
         XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+        let primary = app.buttons["modelDownloadPrimary"]
+        var previous: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard primary.exists, primary.isHittable,
+                  let frame = (try? primary.snapshot())?.frame, app.frame.contains(frame) else { return false }
+            defer { previous = frame }
+            return frame == previous
+        })
         capture("30-model-download")
     }
 
