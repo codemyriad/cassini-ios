@@ -69,47 +69,47 @@ enum SpeakersCopy {
     static func notName(_ name: String) -> String { String(localized: "Not \(name)?", table: "Speakers") }
     static var remember: String { MeetingPhase1Copy.speakerRememberTitle }
 
-    /// What remembering does: on iPhone with automatic naming on, the shared Phase 1 two-line copy
-    /// (`speakers.rememberVoice.cardBody.iphone` / `.unnamed`). While automatic naming is off (the iOS default), or on
-    /// iPad where "this iPhone" does not fit, the `Speakers` device strings.
-    static func rememberBody(_ name: String, automatic: Bool, pad: Bool = false, language: String? = nil,
-                             bundle: Bundle = .main) -> String {
-        if automatic && !pad {
-            if let language {
-                if name.isEmpty {
-                    return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed",
-                                                      language: language, bundle: bundle)
-                }
-                return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone",
-                                                  language: language, bundle: bundle)
-                    .replacingOccurrences(of: "{name}", with: name)
-            }
-            return name.isEmpty ? MeetingPhase1Copy.speakerRememberUnnamed : MeetingPhase1Copy.speakerRememberBody(name)
-        }
+    /// What remembering does: the `Speakers` device strings reflecting automatic naming and whether saved voices are
+    /// included in backups (`voicesBackedUp`), across both iPhone and iPad.
+    static func rememberBody(_ name: String, automatic: Bool, pad: Bool = false, voicesBackedUp: Bool = true,
+                             language: String? = nil, bundle: Bundle = .main) -> String {
         if let language {
             let locale = Locale(identifier: language)
             let selected = Bundle.preferredLocalizations(from: bundle.localizations,
                 forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
             let localized = bundle.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
-            return deviceRememberBody(name, automatic: automatic, bundle: localized, locale: locale)
+            return deviceRememberBody(name, automatic: automatic, voicesBackedUp: voicesBackedUp,
+                                      bundle: localized, locale: locale)
         }
-        return deviceRememberBody(name, automatic: automatic)
+        return deviceRememberBody(name, automatic: automatic, voicesBackedUp: voicesBackedUp)
     }
 
-    private static func deviceRememberBody(_ name: String, automatic: Bool, bundle: Bundle? = nil,
-                                           locale: Locale = .current) -> String {
-        switch (name.isEmpty, automatic) {
-        case (false, true):
-            String(localized: "Future meetings will name \(name) automatically. The voiceprint never leaves this device.",
+    private static func deviceRememberBody(_ name: String, automatic: Bool, voicesBackedUp: Bool,
+                                           bundle: Bundle? = nil, locale: Locale = .current) -> String {
+        switch (name.isEmpty, automatic, voicesBackedUp) {
+        case (false, true, true):
+            String(localized: "Future meetings will name \(name) automatically. Cassini never uploads the voiceprint; system backups may include it.",
                    table: "Speakers", bundle: bundle, locale: locale)
-        case (true, true):
-            String(localized: "Future meetings will name this person automatically. The voiceprint never leaves this device.",
+        case (true, true, true):
+            String(localized: "Future meetings will name this person automatically. Cassini never uploads the voiceprint; system backups may include it.",
                    table: "Speakers", bundle: bundle, locale: locale)
-        case (false, false):
-            String(localized: "Future meetings will suggest \(name). The voiceprint never leaves this device.",
+        case (false, false, true):
+            String(localized: "Future meetings will suggest \(name). Cassini never uploads the voiceprint; system backups may include it.",
                    table: "Speakers", bundle: bundle, locale: locale)
-        case (true, false):
-            String(localized: "Future meetings will suggest this person. The voiceprint never leaves this device.",
+        case (true, false, true):
+            String(localized: "Future meetings will suggest this person. Cassini never uploads the voiceprint; system backups may include it.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (false, true, false):
+            String(localized: "Future meetings will name \(name) automatically. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (true, true, false):
+            String(localized: "Future meetings will name this person automatically. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (false, false, false):
+            String(localized: "Future meetings will suggest \(name). Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.",
+                   table: "Speakers", bundle: bundle, locale: locale)
+        case (true, false, false):
+            String(localized: "Future meetings will suggest this person. Cassini never uploads the voiceprint and marks it to be left out of iCloud Backup; a direct transfer may still copy it.",
                    table: "Speakers", bundle: bundle, locale: locale)
         }
     }

@@ -40,10 +40,8 @@ PHASE2_TABLES = {
         'Cassini stops recognising this voice. Names already in your meetings stay.': 'android.savedVoices.forget.body',
         'Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.': 'android.savedVoices.forgetEveryone.body',
         'Deletes the voiceprints of every meeting. Names already in your meetings stay.': 'ios.savedVoices.forgetAllData.body',
-        'Future meetings will name %@ automatically. The voiceprint never leaves this device.': 'ios.speakers.rememberVoice.description',
-        'Future meetings will name this person automatically. The voiceprint never leaves this device.': 'ios.speakers.rememberVoice.description.unnamed',
-        'Future meetings will suggest %@. The voiceprint never leaves this device.': 'ios.speakers.suggestVoice.description',
-        'Future meetings will suggest this person. The voiceprint never leaves this device.': 'ios.speakers.suggestVoice.description.unnamed',
+        # D98 backup-aware Remember copy is maintained in Speakers.xcstrings directly until cassini-ux updates
+        # ios.speakers.{remember,suggest}Voice.description*.
         'People in this meeting': 'ios.speakers.peopleInMeeting',
         'The meeting could not be saved. Nothing was changed.': 'ios.speakers.meetingSaveFailed',
     },

@@ -314,7 +314,8 @@ struct NameSpeakerSheet: View {
         let subtitle = ui.rememberReason.map(SpeakersCopy.rememberReason)
             ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces),
                                          automatic: settings.automaticallyNameVoices,
-                                         pad: UIDevice.current.userInterfaceIdiom == .pad)
+                                         pad: UIDevice.current.userInterfaceIdiom == .pad,
+                                         voicesBackedUp: settings.cloudBackup && settings.includeSavedVoicesInBackups)
         return Toggle(isOn: Binding(get: { ui.remember }, set: { send(.rememberToggled($0)) })) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(SpeakersCopy.remember)
