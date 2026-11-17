@@ -37,6 +37,14 @@ import CassiniNotebook
 
     public var shownSealed: NoteTranscript { sealedValue }
 
+    /// Questions use only the matching prepared snapshot, never stale presentation content.
+    public func speakerCount(sealed key: SealedKey) -> Int? {
+        sealedKey == key ? sealedValue.headerSpeakers.count : nil
+    }
+    public func speakerCount(draft key: DraftState) -> Int? {
+        draftKey == key ? draftValue.headerSpeakers.count : nil
+    }
+
     /// This cache belongs to one note screen. Keep its content (and scroll extent) while names, voices,
     /// suggestions or newly sealed words prepare. Removing the transcript still takes effect immediately.
     public func sealed(_ key: SealedKey) -> NoteTranscript {

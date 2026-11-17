@@ -136,7 +136,7 @@ import CassiniNotebook
         #expect(self.settings().backupNoticeDismissed && self.settings().voiceSetupAnswered)
         #expect(!self.settings().automaticallyNameVoices)
         settings.answerVoiceSetup(enable: true)
-        #expect(self.settings().automaticallyNameVoices)
+        #expect(self.settings().rememberPeopleIName && !self.settings().automaticallyNameVoices)
         #expect(self.settings().cloudBackup && self.settings().includeSavedVoicesInBackups)
     }
 

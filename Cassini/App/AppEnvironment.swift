@@ -23,6 +23,7 @@ import CassiniEngineTesting
     var transcriptionUptimeMs: @Sendable () -> Int64 = TranscriptionJob.uptimeMs
     #if DEBUG
     var holdArchiveExport = false
+    var suppressVoicesQuestion = false
     var draftClock: PermitClock?
     var modelInstallRecorder: FakeModelInstallRecorder?
     #endif
@@ -221,6 +222,7 @@ extension AppEnvironment {
                   platform: arguments.contains("--ios18-platform") ? .iOS18 : LivePlatform.facts,
                   inProcess: inProcess, token: token)
         environment.holdArchiveExport = arguments.contains("--hold-archive-export")
+        environment.suppressVoicesQuestion = !arguments.contains("--ask-voices")
         environment.launch.badgeGallery = arguments.contains("--badge-gallery")
         environment.launch.failedImportFixture = arguments.contains("--failed-import-fixture")
         environment.launch.importingFixture = arguments.contains("--importing-fixture")

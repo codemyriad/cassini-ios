@@ -106,8 +106,6 @@ final class AccessibilityAuditTests: XCTestCase {
             row.tapWhenSettled()
         }
         XCTAssertTrue(list.waitForExistence(within: 15), "Saved voices did not open")
-        // Audit the new setup question before scrolling to the existing saved-voice rows at AX5.
-        if extra.contains(Self.largestText[1]) { audit(app, screen: "largest-voiceSetup", .textClipped) }
         let person = app.staticTexts["Alex Moreau"]
         XCTAssertTrue(app.scroll(attempts: 12) { person.exists && person.isHittable },
                       "The saved voice is not on the screen below setup")
@@ -210,6 +208,50 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertTrue(app.scroll(attempts: 12) { final.exists && final.isHittable && app.frame.contains(final.frame) })
         audit(app, screen: "backupReaders", listRows: true)
         app.terminate()
+    }
+
+    @MainActor func testVoicesAndDownloadWrapInFrenchAtLargestTextSize() {
+        let arguments = Self.largestText + ["-AppleLanguages", "(fr)", "-AppleLocale", "fr_FR"]
+        let voices = launch(["--seed", "speakers", "--open-fixture", Self.fixture, "--ask-voices"] + arguments)
+        XCTAssertTrue(voices.staticTexts["voicesQuestionTitle"].waitForExistence(within: 15))
+        audit(voices, screen: "voices-question-fr-ax5", .textClipped)
+        let yes = voices.buttons["voicesQuestionYes"]
+        XCTAssertTrue(voices.scroll(attempts: 12) { yes.exists && yes.isHittable && voices.frame.contains(yes.frame) })
+        audit(voices, screen: "voices-question-actions-fr-ax5", .textClipped)
+        yes.tap()
+        voices.terminate()
+        let download = launch(["--seed", "library", "--open-fixture", "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB",
+                               "--models-missing", "--parakeet"] + arguments)
+        let action = download.buttons["bannerAction.transcribe"]
+        let title = download.staticTexts["modelDownloadTitle"]
+        let viewport = download.scrollViews["noteReadingScroll"]
+        let player = download.descendants(matching: .any).matching(identifier: "playbackBar").firstMatch
+        XCTAssertTrue(viewport.scroll(attempts: 12) {
+            guard action.exists, action.isHittable, viewport.frame.contains(action.frame) else { return false }
+            return !player.exists || action.frame.maxY < player.frame.minY
+        })
+        let before = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        before.name = "download-trigger-fr-ax5"; before.lifetime = .keepAlways; add(before)
+        action.tapWhenSettled()
+        let opened = title.waitForExistence(within: 15)
+        if !opened {
+            let image = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            image.name = "download-trigger-failed-fr-ax5"; image.lifetime = .keepAlways; add(image)
+        }
+        XCTAssertTrue(opened)
+        audit(download, screen: "model-download-fr-ax5", .textClipped)
+        let primary = download.buttons["modelDownloadPrimary"]
+        XCTAssertTrue(download.scroll(attempts: 12) { primary.exists && primary.isHittable && download.frame.contains(primary.frame) })
+        audit(download, screen: "model-download-actions-fr-ax5", .textClipped)
+        download.terminate()
+        let saved = savedVoices(arguments)
+        audit(saved, screen: "saved-voices-fr-ax5", .textClipped, listRows: true)
+        saved.terminate()
+    }
+
+    @MainActor func testIPadVoicesAndDownloadWrapInFrenchAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad)
+        testVoicesAndDownloadWrapInFrenchAtLargestTextSize()
     }
 
     @MainActor func testTheLibraryPassesTheAudit() { audit(library(), screen: "library") }

@@ -18,6 +18,9 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     public var speakersOnly: Bool
     /// The download shown next to each missing part; Apple's speech assets have none.
     public var downloadBytes: [ModelPart: Int64]
+    /// Presentation separates the two speaker models without changing the install/consent group.
+    public var displayParts: [ModelPart]
+    public var displayBytes: [ModelPart: Int64]
 
     public init(missing: [ModelPart], requiredFreeBytes: Int64, speakersOnly: Bool = false,
                 downloadBytes: [ModelPart: Int64] = [:]) {
@@ -25,6 +28,8 @@ public struct ModelDownloadPlan: Hashable, Sendable {
         self.requiredFreeBytes = requiredFreeBytes
         self.speakersOnly = speakersOnly
         self.downloadBytes = downloadBytes.filter { missing.contains($0.key) }
+        self.displayParts = self.missing
+        self.displayBytes = self.downloadBytes
     }
 
     /// The plan for `missing`, asking for `speechInstallBytes` for the speech model and `speakersInstallBytes` (what
@@ -78,6 +83,22 @@ public struct ModelDownloadPlan: Hashable, Sendable {
         if parakeet, plan.missing.contains(.speech) {
             let all = plan.missing.flatMap(items)
             if !all.isEmpty { plan.requiredFreeBytes = ModelPlan(all).requiredFreeBytes }
+        }
+        plan.displayParts = []
+        plan.displayBytes = [:]
+        for part in plan.missing {
+            if part == .speakers {
+                let found = items(part)
+                let parts = found.isEmpty ? [.speakers, .voices] : ModelPart.allCases.filter { p in found.contains { $0.part == p } }
+                for p in parts {
+                    plan.displayParts.append(p)
+                    let models = found.isEmpty ? p.models : found.filter { $0.part == p }.flatMap(\.models)
+                    plan.displayBytes[p] = models.reduce(0) { $0 + $1.downloadBytes }
+                }
+            } else {
+                plan.displayParts.append(part)
+                plan.displayBytes[part] = plan.downloadBytes[part]
+            }
         }
         return plan
     }
@@ -190,9 +211,11 @@ public final class ModelDownloadModel {
     /// Reads the plan once the screen is shown.
     public func load() async {
         let plan = await ports.plan(for: noteID, part: part)
+        guard !closing, !Task.isCancelled else { return }
         if plan.isEmpty { await closeStale(); return }
         if plan.speakersOnly || (!withNote && !plan.missing.contains(.speech)) { speechLanguage = nil }
         else { speechLanguage = await ports.speechLanguage(for: noteID) }
+        guard !closing, !Task.isCancelled else { return }
         self.plan = plan
     }
 
@@ -201,27 +224,34 @@ public final class ModelDownloadModel {
         guard !busy, !closing else { return }
         busy = true
         let plan = await ports.plan(for: noteID, part: part)
+        guard !closing, !Task.isCancelled else { return }
         if plan.isEmpty { await closeStale(); return }
         self.plan = plan
-        guard await ports.usableBytes() >= plan.requiredFreeBytes else {
+        let usable = await ports.usableBytes()
+        guard !closing, !Task.isCancelled else { return }
+        guard usable >= plan.requiredFreeBytes else {
             noSpaceBytes = plan.requiredFreeBytes
             busy = false
             return
         }
         noSpaceBytes = nil
         await ports.askNotificationsOnce()
+        guard !closing, !Task.isCancelled else { return }
         ports.recordConsent(for: plan.missing)
         if let noteID { await ports.transcribe(noteID) } else { ports.downloadModels(plan.missing) }
         close()
     }
 
     public func notNow() {
-        guard !closing else { return }
+        guard !busy, !closing else { return }
         if plan?.missing.contains(.speech) == true { ports.recordDeclined() }
         close()
     }
 
-    public func openSources() { onEffect(.openLicenses) }
+    public func openSources() { if !busy, !closing { onEffect(.openLicenses) } }
+
+    /// The modal left while an asynchronous plan/space/permission lookup was pending.
+    public func disappeared() { closing = true }
 
     public func close() {
         guard !closing else { return }
@@ -231,6 +261,7 @@ public final class ModelDownloadModel {
 
     /// Nothing is missing: the note (when there is one) goes in the queue, and the screen goes.
     private func closeStale() async {
+        guard !closing, !Task.isCancelled else { return }
         plan = nil
         if let noteID { await ports.transcribe(noteID) }
         close()

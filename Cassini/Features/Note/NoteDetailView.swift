@@ -18,6 +18,11 @@ struct NoteDetailView: View {
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(VoicesStore.self) private var voices
+    @Environment(SettingsStore.self) private var settings
+    @Environment(ErrorPresenter.self) private var errors
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var visible = false
+    @State private var overlayReady = false
     @Environment(\.clock) private var clock
     @Environment(\.calendar) private var calendar
     @State private var model: NoteScreenModel
@@ -64,8 +69,11 @@ struct NoteDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: model.playerKey) { model.updatePlayer() }
         .task(id: model.savedDraftKey) { await model.loadSavedDraft() }
-        .onDisappear { model.disappeared() }
-        .onAppear { model.appeared(start: requestedStart) }
+        .onDisappear { visible = false; model.disappeared() }
+        .onAppear { model.appeared(start: requestedStart); visible = true }
+        .onChange(of: shouldAskVoices, initial: true) { _, ask in
+            if ask { model.sheet = .voicesQuestion }
+        }
         .onChange(of: currentMode == .processing) { _, isProcessing in
             if !isProcessing { transcribingDetailsOpen = false }
         }
@@ -89,8 +97,37 @@ struct NoteDetailView: View {
         }
         .noteSheetsAndDialogs(model: model)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
-                          dialog: $model.screen.dialog)
+                          dialog: $model.screen.dialog, ready: $overlayReady)
         .shareSheet(item: $model.shareItem)
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if let count = preparedSpeakerCount {
+                UITestStateMarker(identifier: "voicesQuestionState",
+                    value: "speakers=\(count);answered=\(settings.voiceSetupAnswered);remember=\(settings.rememberPeopleIName);auto=\(settings.automaticallyNameVoices)")
+            }
+        }
+        #endif
+    }
+
+    private var preparedSpeakerCount: Int? {
+        let count: Int?
+        if currentMode?.showsDraft == true, let draft = model.shownDraft {
+            count = cache.speakerCount(draft: draft)
+        } else if let note {
+            count = cache.speakerCount(sealed: .init(note, voices: voices.savedVoices,
+                suggestions: readOnly == nil ? voices.suggestions(for: note) : []))
+        } else { count = nil }
+        return count
+    }
+
+    private var shouldAskVoices: Bool {
+        guard !settings.voiceSetupAnswered else { return false }
+        return VoicesQuestion.shouldAsk(answered: settings.voiceSetupAnswered, speakerCount: preparedSpeakerCount,
+            visible: visible && scenePhase == .active && router.path.last?.noteID == noteID,
+            writable: !voices.isReadOnly, overlayReady: overlayReady,
+            obstructed: model.sheet != nil || model.screen.dialog != nil || model.shareItem != nil
+                || model.exportingDocument || transcribingDetailsOpen
+                || errors.current != nil || router.fullScreen != nil)
     }
 
     // MARK: Content

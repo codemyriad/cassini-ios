@@ -3828,47 +3828,6 @@
         }
       }
     },
-    "Record something, or import an audio file.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Record something, or import an audio file."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Graba algo o importa un archivo de audio."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrez quelque chose ou importez un fichier audio."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra qualcosa o importa un file audio."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grave algo ou importe um arquivo de áudio."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Grave algo ou importe um ficheiro de áudio."
-          }
-        }
-      }
-    },
     "Recording ended. The audio so far is in your library.": {
       "extractionState": "manual",
       "localizations": {

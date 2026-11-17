@@ -55,6 +55,8 @@ public struct NamingInput: Hashable, Sendable {
     public var draft: Bool
     public var willHavePrint: Bool
     public var quote: String
+    public var rememberDefault: Bool
+    public var remembered: Bool?
 
     public init(speakerID: String, label: String, ordinal: Int = 0, speakingTime: Double = 0, sample: SampleWindow? = nil,
                 print: SpeakerPrint? = nil, match: VoiceMatchState = .unmatched, voices: [SavedVoice] = [],
@@ -63,7 +65,7 @@ public struct NamingInput: Hashable, Sendable {
                 mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
                 draft: Bool = false, willHavePrint: Bool = false,
                 colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil,
-                quote: String = "") {
+                quote: String = "", rememberDefault: Bool = true, remembered: Bool? = nil) {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
         self.sample = sample; self.print = print; self.match = match; self.voices = voices
         self.voicesReadOnly = voicesReadOnly; self.voiceModelReady = voiceModelReady; self.currentModel = currentModel
@@ -71,6 +73,7 @@ public struct NamingInput: Hashable, Sendable {
         self.draft = draft; self.willHavePrint = willHavePrint
         self.colourIndex = colourIndex; self.provenance = provenance
         self.quote = quote
+        self.rememberDefault = rememberDefault; self.remembered = remembered
     }
 
     /// The same fixed slots and explicit naming provenance as transcript headers.
@@ -101,7 +104,7 @@ public struct NamingInput: Hashable, Sendable {
     /// voices as they are now; nil when the note has no such speaker. Merge targets are the other speakers who say
     /// something. Remember works with a print of its own, or once the voiceprint model is installed (`voiceModelReady`).
     public static func of(_ note: Note, speakerID: String, print: SpeakerPrint?, voices: [SavedVoice],
-                          voicesReadOnly: Bool, voiceModelReady: Bool) -> NamingInput? {
+                          voicesReadOnly: Bool, voiceModelReady: Bool, rememberDefault: Bool = true) -> NamingInput? {
         let palette = Note.assignColourIndices(note.speakers ?? [], order: SpeakerColourOrder.segments(note.transcript))
         guard let index = palette.firstIndex(where: { $0.byteID == Data(speakerID.utf8) }) else { return nil }
         let speaker = palette[index]
@@ -121,6 +124,6 @@ public struct NamingInput: Hashable, Sendable {
             voiceModelReady: print != nil || voiceModelReady,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
             canSample: note.audio.isPlayable, colourIndex: speaker.colourIndex, provenance: speaker.provenance,
-            quote: quote)
+            quote: quote, rememberDefault: rememberDefault)
     }
 }

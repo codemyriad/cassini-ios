@@ -14,7 +14,7 @@ final class ParakeetSuggestionTests: XCTestCase {
         let download = app.buttons["downloadParakeet"]
         app.scroll { download.exists && download.isHittable }
         download.tap()
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 15))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
         let speech = app.staticTexts["Speech recognition"].firstMatch
         XCTAssertTrue(speech.waitForExistence(within: 15))
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart")).firstMatch.exists, "The advertised upgrade does not add speaker-model downloads")

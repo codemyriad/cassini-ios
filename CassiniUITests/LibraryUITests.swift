@@ -188,7 +188,7 @@ final class LibraryUITests: XCTestCase {
         meeting.tap()
         XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
         app.buttons["stopRecording"].tap()
-        let notNow = app.buttons["Not now — keep the audio"]
+        let notNow = app.buttons["modelDownloadNotNow"]
         XCTAssertTrue(notNow.waitForExistence(within: uiWaitFloor))
         captureEvidence("Post-recording missing model consent", app)
         notNow.tap()

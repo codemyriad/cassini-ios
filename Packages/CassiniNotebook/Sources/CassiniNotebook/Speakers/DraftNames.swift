@@ -244,6 +244,14 @@ public struct DraftNames: Hashable, Sendable {
     /// `speakerID` after following every merge; itself when it is not merged (or the merges are damaged).
     public func resolve(_ speakerID: String) -> String { (try? SpeakerMerges.resolve(speakerID, aliases: merges)) ?? speakerID }
 
+    /// An explicit draft choice survives changes to the global default and speaker merges.
+    public func rememberChoice(_ speakerID: String) -> Bool? {
+        let id = resolve(speakerID)
+        if remembered[id] != nil { return true }
+        if labels[id] != nil, automatic[id] == nil { return false }
+        return nil
+    }
+
     private func guarded(_ id: String) -> Bool { live[id]?.state == .confirmed || labels[id] != nil }
 }
 

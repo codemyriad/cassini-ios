@@ -64,7 +64,8 @@ import Testing
         let note = F.weeklySync
         let segment = try #require(note.transcript.first)
         for sheet in [NoteSheet.rename(draft: "Ret"), .speakers, .versions, .documentInfo, .naming("a", draft: "An"), .editing(segment)] {
-            #expect(NoteSheet(sheet.overlay, draft: sheet.draft, in: note) == sheet)
+            let overlay = try #require(sheet.overlay)
+            #expect(NoteSheet(overlay, draft: sheet.draft, in: note) == sheet)
         }
     }
 

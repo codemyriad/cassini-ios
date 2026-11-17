@@ -83,10 +83,10 @@ final class WideScreenTests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
-        let title = app.staticTexts["Transcribe on this device"]
+        let title = app.staticTexts["modelDownloadTitle"]
         XCTAssertTrue(title.waitForExistence(within: 5))
         let speech = app.staticTexts[DeviceUnderTest.appleSpeech ? "Speech recognition" : "Speech recognition, 444 MB"]
-        assertCentred([title, speech, app.buttons["Download and transcribe"]], in: detailColumn(app))
+        assertCentred([title, speech, app.buttons["Download and transcribe"]], in: app.windows.firstMatch.frame)
     }
 
     @MainActor func testIPadSavedVoicesAreCappedAndCentred() throws {

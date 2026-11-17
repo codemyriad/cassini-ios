@@ -118,11 +118,17 @@ enum SettingsPhase2Copy {
     static var backupVoicesWhy: String {
         String(localized: "backup.savedVoices.switch.why", table: "SettingsPhase2")
     }
+    static var notNow: String {
+        String(localized: "common.notNow", table: "SettingsPhase2")
+    }
     static var savedVoices: String {
         String(localized: "common.savedVoices", table: "SettingsPhase2")
     }
     static var speakers: String {
         String(localized: "common.speakers", table: "SettingsPhase2")
+    }
+    static var firstRunHowTo: String {
+        String(localized: "firstRun.howTo", table: "SettingsPhase2")
     }
     static func meetingCount(_ count: Int) -> String {
         String(localized: "library.meetingCount", defaultValue: "\(count) meetings", table: "SettingsPhase2")
@@ -135,6 +141,36 @@ enum SettingsPhase2Copy {
     }
     static var keepTranscript: String {
         String(localized: "models.keepTranscript", table: "SettingsPhase2")
+    }
+    static var offerBodyIpad: String {
+        String(localized: "models.offer.body.ipad", table: "SettingsPhase2")
+    }
+    static var offerBodyIphone: String {
+        String(localized: "models.offer.body.iphone", table: "SettingsPhase2")
+    }
+    static var offerDownload: String {
+        String(localized: "models.offer.download", table: "SettingsPhase2")
+    }
+    static var offerRecognise: String {
+        String(localized: "models.offer.part.recognise", table: "SettingsPhase2")
+    }
+    static var offerSpeech: String {
+        String(localized: "models.offer.part.speech", table: "SettingsPhase2")
+    }
+    static var offerTellApart: String {
+        String(localized: "models.offer.part.tellApart", table: "SettingsPhase2")
+    }
+    static var recordingKept: String {
+        String(localized: "models.offer.recordingKept", table: "SettingsPhase2")
+    }
+    static var offerSpace: String {
+        String(localized: "models.offer.spaceNeeded", table: "SettingsPhase2")
+    }
+    static var offerTitleIpad: String {
+        String(localized: "models.offer.title.ipad", table: "SettingsPhase2")
+    }
+    static var offerTitleIphone: String {
+        String(localized: "models.offer.title.iphone", table: "SettingsPhase2")
     }
     static var parakeetDescription: String {
         String(localized: "models.parakeetUltra.description.short", table: "SettingsPhase2")
@@ -166,8 +202,26 @@ enum SettingsPhase2Copy {
     static var whistle: String {
         String(localized: "models.whistle.name", table: "SettingsPhase2")
     }
+    static var forgetEveryone: String {
+        String(localized: "savedVoices.forgetEveryone", table: "SettingsPhase2")
+    }
+    static var voicesHowToAdd: String {
+        String(localized: "savedVoices.howToAdd.short", table: "SettingsPhase2")
+    }
     static func peopleCount(_ count: Int) -> String {
         String(localized: "savedVoices.peopleCount", defaultValue: "\(count) people", table: "SettingsPhase2")
+    }
+    static var savedVoicesPrivacy: String {
+        String(localized: "savedVoices.privacy.phone", table: "SettingsPhase2")
+    }
+    static var voiceForget: String {
+        String(localized: "savedVoices.row.forgetEllipsis", table: "SettingsPhase2")
+    }
+    static var voiceOptions: String {
+        String(localized: "savedVoices.row.options.a11y", table: "SettingsPhase2")
+    }
+    static var voiceRename: String {
+        String(localized: "savedVoices.row.rename", table: "SettingsPhase2")
     }
     static var off: String {
         String(localized: "settings.answer.off", table: "SettingsPhase2")
@@ -240,5 +294,32 @@ enum SettingsPhase2Copy {
     }
     static var transcription: String {
         String(localized: "settings.tab.transcription", table: "SettingsPhase2")
+    }
+    static var trashIntro: String {
+        String(localized: "trash.phone.intro", table: "SettingsPhase2")
+    }
+    static var rememberDefaultSubtitle: String {
+        String(localized: "voices.rememberDefault.subtitle", table: "SettingsPhase2")
+    }
+    static var rememberDefault: String {
+        String(localized: "voices.rememberDefault.title", table: "SettingsPhase2")
+    }
+    static var voicesBody: String {
+        String(localized: "voices.setup.body.phone", table: "SettingsPhase2")
+    }
+    static var voicesChangeLater: String {
+        String(localized: "voices.setup.changeLater.phone", table: "SettingsPhase2")
+    }
+    static var voicesEnable: String {
+        String(localized: "voices.setup.enable.phone", table: "SettingsPhase2")
+    }
+    static var voicesKindness: String {
+        String(localized: "voices.setup.kindness", table: "SettingsPhase2")
+    }
+    static var voicesPrivacy: String {
+        String(localized: "voices.setup.privacy.phone", table: "SettingsPhase2")
+    }
+    static var voicesTitle: String {
+        String(localized: "voices.setup.title", table: "SettingsPhase2")
     }
 }

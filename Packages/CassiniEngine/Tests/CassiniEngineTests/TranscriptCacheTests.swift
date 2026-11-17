@@ -10,6 +10,41 @@ import CassiniNotebook
         return note
     }
 
+    @Test func questionCountIncludesChipOnlySpeakersAndRejectsStaleSnapshots() async {
+        let cache = TranscriptCache()
+        var note = note()
+        // A brief reply becomes an inline chip rather than its own paragraph header.
+        note.transcript.append(.init(text: "Yes", start: 2, end: 2.5, speakerID: "b"))
+        note.transcript.append(.init(text: "Let us continue", start: 2.5, end: 6, speakerID: "a"))
+        note.speakers?.append(.init(id: "b", name: "Bea", colourIndex: 1))
+        note.speakers?.append(.init(id: "unused", name: "No speech", colourIndex: 2))
+        let key = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        #expect(cache.speakerCount(sealed: key) == nil)
+        await cache.prepareSealed(key)
+        #expect(cache.speakerCount(sealed: key) == 2)
+        note.transcript = []
+        let empty = TranscriptCache.SealedKey(note, voices: [], suggestions: [])
+        #expect(cache.speakerCount(sealed: empty) == nil)
+        await cache.prepareSealed(empty)
+        #expect(cache.speakerCount(sealed: empty) == 0)
+        #expect(cache.speakerCount(sealed: key) == nil)
+    }
+
+    @Test func draftQuestionCountWaitsForTheMatchingPreparedSnapshot() async {
+        let cache = TranscriptCache()
+        let draft = DraftState(words: [.init(speaker: "a", startMs: 0, endMs: 500, text: "Hello"),
+                                       .init(speaker: "b", startMs: 500, endMs: 1_000, text: "Yes")],
+                               tentativeFromMs: 1_000, namingOpen: true)
+        #expect(cache.speakerCount(draft: draft) == nil)
+        await cache.prepareDraft(draft)
+        #expect(cache.speakerCount(draft: draft) == 2)
+        var changed = draft
+        changed.words.removeLast()
+        #expect(cache.speakerCount(draft: changed) == nil)
+        await cache.prepareDraft(changed)
+        #expect(cache.speakerCount(draft: changed) == 1)
+    }
+
     @Test func preparationMatchesThePureRendererAndRefreshesNamesAndSearch() async {
         let cache = TranscriptCache()
         var note = note()

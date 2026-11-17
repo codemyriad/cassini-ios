@@ -138,7 +138,7 @@ enum BannerCopy {
                    table: "Notices")
         case .dlRecordNow: String(localized: "Transcription needs a one-time download. Audio is safe meanwhile.", table: "Notices")
 
-        case .libEmpty: String(localized: "Record something, or import an audio file.", table: "Notices")
+        case .libEmpty: SettingsPhase2Copy.firstRunHowTo
         case .libNoMatch: String(localized: "Try another word or title.", table: "Notices")
         case .importing: nil
         case .importTooLarge: String(localized: "Choose a file under 4 GB.", table: "Notices")

@@ -40,6 +40,10 @@ SHOTS = {
     "26-backup-details": ("Backup details", "P2BackupDetails-Phones", "test26BackupDetails", "voices"),
     "27-backup-notice": ("Backup notice", "P2BackupNote-Phones", "test27BackupNotice", "library"),
 
+    "28-first-run": ("First run", "P2FirstRun-Phones", "test28FirstRun", "empty"),
+    "29-voices-question": ("Voices question", "P2Voices-Phones", "test29VoicesQuestion", "speakers"),
+    "30-model-download": ("Model download", "P2Download-Phones", "test30ModelDownload", "library"),
+
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),
 }

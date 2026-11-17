@@ -164,7 +164,7 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(speakers.label.contains("88 MB"))
         // D59: the download screen does not point at the Speech language picker Settings hides.
         speakers.tap()
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Download"].exists)
         // The line would come with the plan, which lists the speaker models.
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Telling speakers apart"))
@@ -180,7 +180,7 @@ final class SettingsFlowTests: XCTestCase {
         reveal(speech, in: app)
         XCTAssertEqual(speech.label, "Speech recognition, INT8 · 444 MB, Not downloaded")
         speech.tap()
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Download"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "Speech recognition, 444 MB")).firstMatch
             .exists)
@@ -221,7 +221,7 @@ final class SettingsFlowTests: XCTestCase {
         let speakers = row(app, startingWith: "Telling speakers apart")
         reveal(speakers, in: app)
         speakers.tap()
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 5))
         XCTAssertTrue(app.buttons["Download"].exists, "with no note the screen offers a standalone Download")
         app.buttons["Download"].tap()
         XCTAssertTrue(app.navigationBars["Speakers"].waitForExistence(within: 5))

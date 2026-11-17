@@ -185,9 +185,10 @@ import CassiniNotebook
         let voices = savedVoices
         let readOnly = isReadOnly
         let ready = await printsReady()
+        let rememberDefault = settings.rememberPeopleIName
         return await Task.detached(priority: .userInitiated) {
             NamingInput.of(note, speakerID: speakerID, print: print, voices: voices, voicesReadOnly: readOnly,
-                           voiceModelReady: ready)
+                           voiceModelReady: ready, rememberDefault: rememberDefault)
         }.value
     }
 

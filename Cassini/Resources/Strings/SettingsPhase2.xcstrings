@@ -1597,6 +1597,48 @@
         }
       }
     },
+    "common.notNow": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, common.notNow.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus tard"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não"
+          }
+        }
+      }
+    },
     "common.savedVoices": {
       "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, common.savedVoices.",
       "extractionState": "manual",
@@ -1677,6 +1719,48 @@
           "stringUnit": {
             "state": "translated",
             "value": "Oradores"
+          }
+        }
+      }
+    },
+    "firstRun.howTo": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, firstRun.howTo.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press Record when the meeting starts and Stop when it ends. Cassini writes it all down."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premi Registra quando inizia la riunione e Ferma quando finisce. Cassini trascrive tutto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appuyez sur Enregistrer quand la réunion commence et sur Arrêter quand elle se termine. Cassini transcrit tout."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulsa Grabar cuando empiece la reunión y Detener cuando termine. Cassini lo transcribe todo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toque em Gravar quando a reunião começar e em Parar quando terminar. O Cassini transcreve tudo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carregue em Gravar quando a reunião começar e em Parar quando terminar. O Cassini transcreve tudo."
           }
         }
       }
@@ -1947,6 +2031,426 @@
           "stringUnit": {
             "state": "translated",
             "value": "As reuniões já transcritas mantêm a sua transcrição."
+          }
+        }
+      }
+    },
+    "models.offer.body.ipad": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.body.ipad.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini needs a one-time download of {size}. After that, everything happens on this iPad, even offline."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ha bisogno di un unico download di {size}. Dopo, tutto avviene su questo iPad, anche offline."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini a besoin d’un seul téléchargement de {size}. Ensuite, tout se passe sur cet iPad, même hors ligne."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini necesita una única descarga de {size}. Después, todo ocurre en este iPad, incluso sin conexión."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de um único download de {size}. Depois disso, tudo acontece neste iPad, mesmo offline."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de uma única transferência de {size}. Depois disso, tudo acontece neste iPad, mesmo sem ligação."
+          }
+        }
+      }
+    },
+    "models.offer.body.iphone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.body.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini needs a one-time download of {size}. After that, everything happens on this iPhone, even offline."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ha bisogno di un unico download di {size}. Dopo, tutto avviene su questo iPhone, anche offline."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini a besoin d’un seul téléchargement de {size}. Ensuite, tout se passe sur cet iPhone, même hors ligne."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini necesita una única descarga de {size}. Después, todo ocurre en este iPhone, incluso sin conexión."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de um único download de {size}. Depois disso, tudo acontece neste iPhone, mesmo offline."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini precisa de uma única transferência de {size}. Depois disso, tudo acontece neste iPhone, mesmo sem ligação."
+          }
+        }
+      }
+    },
+    "models.offer.download": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.download.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download and transcribe"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scarica e trascrivi"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger et transcrire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar y transcribir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar e transcrever"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descarregar e transcrever"
+          }
+        }
+      }
+    },
+    "models.offer.part.recognise": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.recognise.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognising saved voices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento delle voci salvate"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance des voix mémorisées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voces guardadas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes salvas"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de vozes guardadas"
+          }
+        }
+      }
+    },
+    "models.offer.part.speech": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.speech.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscimento vocale"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaissance vocale"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconocimiento de voz"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecimento de fala"
+          }
+        }
+      }
+    },
+    "models.offer.part.tellApart": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.part.tellApart.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telling speakers apart"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinzione delle voci"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinction des intervenants"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinción de hablantes"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinção de locutores"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinção de oradores"
+          }
+        }
+      }
+    },
+    "models.offer.recordingKept": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.recordingKept.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your recording is kept either way."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione viene conservata in ogni caso."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre enregistrement est conservé dans tous les cas."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu grabación se conserva en cualquier caso."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sua gravação é mantida de qualquer forma."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A sua gravação é mantida de qualquer forma."
+          }
+        }
+      }
+    },
+    "models.offer.spaceNeeded": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.spaceNeeded.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs about {size} free while it installs. Each file is checked before it is used."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servono circa {size} liberi durante l’installazione. Ogni file viene verificato prima dell’uso."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il faut environ {size} d’espace libre pendant l’installation. Chaque fichier est vérifié avant d’être utilisé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Necesita unos {size} libres mientras se instala. Cada archivo se comprueba antes de usarlo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de cerca de {size} livres durante a instalação. Cada arquivo é verificado antes de ser usado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de cerca de {size} livres durante a instalação. Cada ficheiro é verificado antes de ser usado."
+          }
+        }
+      }
+    },
+    "models.offer.title.ipad": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.title.ipad.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this iPad"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi su questo iPad"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire sur cet iPad"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribir en este iPad"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste iPad"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste iPad"
+          }
+        }
+      }
+    },
+    "models.offer.title.iphone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, models.offer.title.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this iPhone"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi su questo iPhone"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrire sur cet iPhone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribir en este iPhone"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste iPhone"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrever neste iPhone"
           }
         }
       }
@@ -2371,6 +2875,90 @@
         }
       }
     },
+    "savedVoices.forgetEveryone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.forgetEveryone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget everyone…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimentica tutti…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier tout le monde…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar a todos…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer todos…"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer todos…"
+          }
+        }
+      }
+    },
+    "savedVoices.howToAdd.short": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.howToAdd.short.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To add someone, name a speaker in a meeting and keep “Remember this voice” on. Forgetting a voice keeps the names already in your meetings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per aggiungere qualcuno, dai un nome a una voce in una riunione e lascia attivo “Ricorda questa voce”. Se dimentichi una voce, i nomi già presenti nelle tue riunioni restano."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé. Oublier une voix conserve les noms déjà présents dans vos réunions."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado “Recordar esta voz”. Si olvidas una voz, los nombres que ya están en tus reuniones se mantienen."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para adicionar alguém, dê nome a um locutor em uma reunião e deixe “Lembrar esta voz” ativado. Esquecer uma voz mantém os nomes que já estão nas suas reuniões."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para adicionar alguém, dê nome a um orador numa reunião e deixe «Memorizar esta voz» ativado. Esquecer uma voz mantém os nomes que já estão nas suas reuniões."
+          }
+        }
+      }
+    },
     "savedVoices.peopleCount": {
       "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.peopleCount.",
       "extractionState": "manual",
@@ -2511,6 +3099,174 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "savedVoices.privacy.phone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.privacy.phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voiceprints are created on this phone and are never written into exported or shared files. Only the names you choose are."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impronte vocali vengono create su questo telefono e non vengono mai scritte nei file esportati o condivisi. Vengono inclusi solo i nomi che scegli."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Seuls les noms que vous choisissez y figurent."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las huellas de voz se crean en este teléfono y nunca se incluyen en los archivos exportados o compartidos. Solo se incluyen los nombres que eliges."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste celular e nunca são incluídas em arquivos exportados ou compartilhados. Só os nomes que você escolhe são incluídos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões vocais são criadas neste telemóvel e nunca são incluídas nos ficheiros exportados ou partilhados. Só os nomes que escolher são incluídos."
+          }
+        }
+      }
+    },
+    "savedVoices.row.forgetEllipsis": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.forgetEllipsis.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimentica…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer…"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer…"
+          }
+        }
+      }
+    },
+    "savedVoices.row.options.a11y": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.options.a11y.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Options for {name}"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni per {name}"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Options pour {name}"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opciones de {name}"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opções de {name}"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opções de {name}"
+          }
+        }
+      }
+    },
+    "savedVoices.row.rename": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, savedVoices.row.rename.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename…"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renommer…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renombrar…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renomear…"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mudar o nome…"
           }
         }
       }
@@ -3621,6 +4377,384 @@
           "stringUnit": {
             "state": "translated",
             "value": "Transcrição"
+          }
+        }
+      }
+    },
+    "trash.phone.intro": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, trash.phone.intro.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings here are deleted for good after 30 days."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le riunioni qui vengono eliminate per sempre dopo 30 giorni."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les réunions placées ici sont supprimées définitivement après 30 jours."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las reuniones de aquí se eliminan definitivamente tras 30 días."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões aqui são excluídas para sempre após 30 dias."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As reuniões aqui são eliminadas definitivamente após 30 dias."
+          }
+        }
+      }
+    },
+    "voices.rememberDefault.subtitle": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.rememberDefault.subtitle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next time, Cassini names them for you."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prossima volta Cassini darà loro il nome per te."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prochaine fois, Cassini les nommera pour vous."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La próxima vez, Cassini les pondrá nombre por ti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da próxima vez, o Cassini dá nome a elas para você."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da próxima vez, o Cassini dá-lhes nome por si."
+          }
+        }
+      }
+    },
+    "voices.rememberDefault.title": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.rememberDefault.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remember people I name"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ricorda le persone a cui do un nome"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mémoriser les personnes que je nomme"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recordar a las personas a las que pongo nombre"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrar as pessoas que eu nomear"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Memorizar as pessoas a quem dou nome"
+          }
+        }
+      }
+    },
+    "voices.setup.body.phone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.body.phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you name a speaker, Cassini can remember their voice and name them for you in later meetings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando dai un nome a una voce, Cassini può ricordarla e dare il nome a quella persona nelle riunioni successive."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand vous nommez un intervenant, Cassini peut mémoriser sa voix et le nommer pour vous dans les réunions suivantes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando pones nombre a un hablante, Cassini puede recordar su voz y ponerle nombre por ti en reuniones posteriores."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando você dá nome a um locutor, o Cassini pode lembrar a voz dele e dar o nome por você nas próximas reuniões."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando dá nome a um orador, o Cassini pode memorizar a voz e dar-lhe nome por si nas reuniões seguintes."
+          }
+        }
+      }
+    },
+    "voices.setup.changeLater.phone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.changeLater.phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can change this in Settings › Speakers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puoi cambiare questa scelta in Impostazioni › Voci."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous pouvez modifier ce choix dans Réglages › Intervenants."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puedes cambiarlo en Ajustes › Hablantes."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você pode mudar isso em Ajustes › Locutores."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pode alterar isto em Definições › Oradores."
+          }
+        }
+      }
+    },
+    "voices.setup.enable.phone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.enable.phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yes, remember voices"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sì, ricorda le voci"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oui, mémoriser les voix"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sí, recordar voces"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sim, lembrar vozes"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sim, memorizar vozes"
+          }
+        }
+      }
+    },
+    "voices.setup.kindness": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.kindness.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It’s kind to ask people before you save their voice."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "È gentile chiedere alle persone prima di salvare la loro voce."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il est courtois de demander aux personnes avant de mémoriser leur voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Es amable preguntar a las personas antes de guardar su voz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "É gentil perguntar às pessoas antes de salvar a voz delas."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "É simpático perguntar às pessoas antes de guardar a voz delas."
+          }
+        }
+      }
+    },
+    "voices.setup.privacy.phone": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.privacy.phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voiceprints are created on this phone and are never written into exported or shared files. You can choose in Settings whether backups include them."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impronte vocali vengono create su questo telefono e non vengono mai scritte nei file esportati o condivisi. Nelle impostazioni puoi scegliere se includerle nei backup."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les empreintes vocales sont créées sur ce téléphone et ne sont jamais écrites dans les fichiers exportés ou partagés. Vous pouvez choisir dans les réglages si les sauvegardes les incluent."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las huellas de voz se crean en este teléfono y nunca se incluyen en los archivos exportados o compartidos. En Ajustes puedes elegir si se incluyen en las copias de seguridad."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste celular e nunca são incluídas em arquivos exportados ou compartilhados. Nos Ajustes, você pode escolher se elas entram nos backups."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões vocais são criadas neste telemóvel e nunca são incluídas nos ficheiros exportados ou partilhados. Nas definições, pode escolher se são incluídas nas cópias de segurança."
+          }
+        }
+      }
+    },
+    "voices.setup.title": {
+      "comment": "Generated from cassini-ux 1ffebfa94d02ec966a048d8dded567ce29106702, voices.setup.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognise people you name?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconoscere le persone a cui dai un nome?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnaître les personnes que vous nommez ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Reconocer a las personas a las que pones nombre?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecer as pessoas que você nomear?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconhecer as pessoas a quem der nome?"
           }
         }
       }

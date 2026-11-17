@@ -10,11 +10,6 @@ struct SavedVoicesView: View {
     @Environment(ErrorPresenter.self) private var errors
     @SceneStorage("savedVoices.dialog") private var dialogKey: String?
     @State private var enrolling = false
-    @Environment(LibraryStore.self) private var library
-    @Environment(PlaybackStore.self) private var playback
-    @State private var playingVoiceID: UUID?
-    @State private var sampleOwner = PlaybackOwner()
-    @State private var samples: [UUID: SavedVoicePlayback] = [:]
     @Environment(Router.self) private var router
     @State private var forgettingAllData = false
 
@@ -24,7 +19,6 @@ struct SavedVoicesView: View {
 
     var body: some View {
         List {
-            VoiceSetupSection()
             Section {
                 Button(Wave6Copy.voicesEnrollAddAction) {
                     Task {
@@ -37,7 +31,7 @@ struct SavedVoicesView: View {
             Section {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "lock").accessibilityHidden(true)
-                    Text(Wave6Copy.savedVoicesPrivacyPhone).fixedSize(horizontal: false, vertical: true)
+                    Text(SettingsPhase2Copy.savedVoicesPrivacy).fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.footnote).foregroundStyle(Color.muted)
             }
@@ -59,19 +53,13 @@ struct SavedVoicesView: View {
             } else {
                 Section {
                     ForEach(people) { person in
-                        PersonRow(person: person, editable: !readOnly, sample: samples[person.id],
-                                  owner: sampleOwner, playingVoiceID: $playingVoiceID, send: send)
+                        PersonRow(person: person, editable: !readOnly, send: send)
                     }
-                } footer: {
-                    if !readOnly { Text(SpeakersCopy.footnote).foregroundStyle(Color.muted) }
                 }
-            }
-            if people.isEmpty, !readOnly {
-                Section { Text(SpeakersCopy.footnote).font(.footnote).foregroundStyle(Color.muted) }
             }
             if !people.isEmpty {
                 Section {
-                    Button(SpeakersCopy.forgetEveryoneMore, role: .destructive) { send(.forgetEveryone) }
+                    Button(SettingsPhase2Copy.forgetEveryone, role: .destructive) { send(.forgetEveryone) }
                         .foregroundStyle(Color.toneError)
                         .disabled(readOnly)
                         .accessibilityIdentifier("forgetEveryone")
@@ -82,6 +70,9 @@ struct SavedVoicesView: View {
                         .foregroundStyle(Color.toneError)
                 } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
             }
+            if !readOnly {
+                Section { Text(SettingsPhase2Copy.voicesHowToAdd).font(.footnote).foregroundStyle(Color.muted) }
+            }
         }
         .accessibilityIdentifier("savedVoicesList")
         .paperListBackground()
@@ -90,16 +81,6 @@ struct SavedVoicesView: View {
         .task {
             await voices.refresh()
         }
-        .task(id: SavedVoicePlayback.Snapshot(voices: voices.savedVoices, notes: library.notes, root: library.root)) {
-            let people = voices.savedVoices, notes = library.notes, root = library.root
-            let prepared = await Task.detached { SavedVoicePlayback.samples(voices: people, notes: notes, root: root) }.value
-            guard !Task.isCancelled else { return }
-            samples = prepared
-        }
-        .onChange(of: playback.controls.sample) { _, sample in
-            if sample == nil { playingVoiceID = nil }
-        }
-        .onDisappear { playback.leave(sampleOwner); playingVoiceID = nil }
         .sheet(isPresented: $enrolling) { VoiceEnrollmentView() }
         .sheet(isPresented: presented(where: { if case .rename = $0 { true } else { false } })) {
             if case .rename(let id, let name)? = dialog {
@@ -175,20 +156,8 @@ struct SavedVoicesView: View {
 private struct PersonRow: View {
     let person: SavedVoiceSummary
     let editable: Bool
-    let sample: SavedVoicePlayback?
-    let owner: PlaybackOwner
-    @Binding var playingVoiceID: UUID?
-    @Environment(PlaybackStore.self) private var playback
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let send: (SavedVoicesEvent) -> Void
-
-    private var sampleCount: String {
-        let count = person.voice.samples.count
-        let language = DefaultLabels.appLanguage.replacingOccurrences(of: "_", with: "-")
-        let one = count == 1 || (count == 0 && (language.hasPrefix("fr") || language == "pt-BR"))
-        return (one ? Wave6Copy.savedVoicesRowSampleCountOne : Wave6Copy.savedVoicesRowSampleCountOther)
-            .replacingOccurrences(of: "{n}", with: count.formatted(.number.locale(Locale(identifier: language))))
-    }
 
     var body: some View {
         // At accessibility sizes the name, counts and status need the row's full width;
@@ -204,13 +173,8 @@ private struct PersonRow: View {
                 Text(SpeakersCopy.meta(notes: person.notes, seconds: person.confirmedSeconds))
                     .font(.caption).foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(sampleCount).font(.caption).foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
                 if person.stale {
                     Text(Wave6Copy.savedVoicesRowStale).font(.caption).foregroundStyle(Color.toneWarn)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text(Wave6Copy.savedVoicesRowStatusReady).font(.caption).foregroundStyle(Color.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -223,28 +187,14 @@ private struct PersonRow: View {
 
     private var controls: some View {
         HStack(spacing: 12) {
-            if let sample {
-                let playing = playingVoiceID == person.id && playback.owns(sample.source.noteID) && playback.controls.sample != nil
-                Button {
-                    if playing { playback.stopSample(); playingVoiceID = nil }
-                    else {
-                        playback.showImmediately(sample.source, at: sample.savedPosition, owner: owner)
-                        let started = playback.controller.playRange(sample.source.noteID, from: sample.start, to: sample.end)
-                        playingVoiceID = started ? person.id : nil
-                    }
-                } label: { Image(systemName: playing ? "stop.fill" : "play.fill").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum) }
-                .buttonStyle(.borderless)
-                .accessibilityLabel((playing ? Wave6Copy.savedVoicesRowStopSample : Wave6Copy.savedVoicesRowPlay)
-                    .replacingOccurrences(of: "{name}", with: person.name))
-            }
             Menu {
-                Button(Wave6Copy.savedVoicesRowRename) { send(.rename(person.id)) }
-                Button(Wave6Copy.savedVoicesRowForget, role: .destructive) { send(.forget(person.id)) }
+                Button(SettingsPhase2Copy.voiceRename) { send(.rename(person.id)) }
+                Button(SettingsPhase2Copy.voiceForget, role: .destructive) { send(.forget(person.id)) }
             } label: {
                 Image(systemName: "ellipsis").frame(width: HitTarget.minimum, height: HitTarget.minimum)
             }
             .disabled(!editable)
-            .accessibilityLabel(SpeakersCopy.options(person.name))
+            .accessibilityLabel(SettingsPhase2Copy.voiceOptions.replacingOccurrences(of: "{name}", with: person.name))
         }
         .fixedSize()
     }

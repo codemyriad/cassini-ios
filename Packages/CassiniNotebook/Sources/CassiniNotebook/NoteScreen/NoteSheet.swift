@@ -5,7 +5,7 @@ import Foundation
 public enum NoteSheet: Identifiable, Hashable, Sendable {
     /// Rename, starting from `draft` when one was being typed before Cassini was closed.
     case rename(draft: String?)
-    case speakers, versions, documentInfo
+    case speakers, versions, documentInfo, voicesQuestion
     /// Name this speaker, starting from `draft` when one was being typed before Cassini was closed.
     case naming(String, draft: String?)
     /// Edit passage, of the passage as it was when the editor opened.
@@ -14,6 +14,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public var id: String {
         switch self {
         case .rename: "rename"
+        case .voicesQuestion: "voicesQuestion"
         case .speakers: "speakers"
         case .versions: "versions"
         case .documentInfo: "documentInfo"
@@ -25,7 +26,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.rename(let a), .rename(let b)): a == b
-        case (.speakers, .speakers), (.versions, .versions), (.documentInfo, .documentInfo): true
+        case (.voicesQuestion, .voicesQuestion), (.speakers, .speakers), (.versions, .versions), (.documentInfo, .documentInfo): true
         case (.naming(let a, let firstDraft), .naming(let b, let secondDraft)):
             Data(a.utf8) == Data(b.utf8) && firstDraft == secondDraft
         case (.editing(let a), .editing(let b)): a == b
@@ -36,6 +37,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public func hash(into hasher: inout Hasher) {
         switch self {
         case .rename(let draft): hasher.combine(0); hasher.combine(draft)
+        case .voicesQuestion: hasher.combine(6)
         case .speakers: hasher.combine(1)
         case .versions: hasher.combine(2)
         case .documentInfo: hasher.combine(3)
@@ -44,8 +46,9 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
         }
     }
 
-    public var overlay: NoteOverlay {
+    public var overlay: NoteOverlay? {
         switch self {
+        case .voicesQuestion: nil
         case .rename: .rename
         case .speakers: .speakers
         case .versions: .versions
@@ -89,7 +92,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public var draft: String? {
         switch self {
         case .naming(_, let draft), .rename(let draft): draft
-        case .speakers, .versions, .documentInfo, .editing: nil
+        case .speakers, .versions, .documentInfo, .editing, .voicesQuestion: nil
         }
     }
 }

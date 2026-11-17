@@ -102,6 +102,7 @@ public final class NoteScreenModel {
         /// The saved voices, and whether they can be changed now.
         public var savedVoices: @MainActor () -> [SavedVoice] = { [] }
         public var voicesReadOnly: @MainActor () -> Bool = { true }
+        public var rememberDefault: @MainActor () -> Bool = { true }
 
         public init(note: @escaping @MainActor (UUID) -> Note?, job: @escaping @MainActor (UUID) -> Job?,
                     update: @escaping @MainActor (UUID, @escaping @Sendable (inout Note) -> Void) -> Void,
@@ -468,6 +469,8 @@ public final class NoteScreenModel {
         let match = draftNames.match(speakerID)
         let voices = ports.savedVoices()
         let readOnly = ports.voicesReadOnly()
+        let rememberDefault = ports.rememberDefault()
+        let remembered = draftNames.rememberChoice(speakerID)
         let language = DefaultLabels.appLanguage
         return await Task.detached(priority: .userInitiated) {
             let stats = SpeakerStats.of(words: draft.words.map { Word($0.speaker, $0.startMs, $0.endMs, $0.text) })
@@ -495,7 +498,7 @@ public final class NoteScreenModel {
                                voices: voices, voicesReadOnly: readOnly, voiceModelReady: ready,
                                mergeTargets: targets, canSample: canSample, draft: true, willHavePrint: ready,
                                colourIndex: indices[Data(speakerID.utf8)], provenance: provenance[Data(speakerID.utf8)],
-                               quote: quote)
+                               quote: quote, rememberDefault: rememberDefault, remembered: remembered)
         }.value
     }
 

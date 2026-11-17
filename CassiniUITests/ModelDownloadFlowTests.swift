@@ -22,7 +22,7 @@ final class ModelDownloadFlowTests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5))
         app.buttons["Transcribe"].tap()
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 5))
     }
 
     // ports: ModelDownloadFlowTest#notDownloadedRowOpensTheConsentAndNotNowGoesBack
@@ -30,7 +30,7 @@ final class ModelDownloadFlowTests: XCTestCase {
         let app = launchWithoutModels(parakeet: !DeviceUnderTest.appleSpeech)
         transcribeTheWalk(app)
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
-        XCTAssertTrue(part(app, "Telling speakers apart").label.hasSuffix("88 MB"))
+        XCTAssertTrue(part(app, "Telling speakers apart").label.hasSuffix("62 MB"))
         let language = app.staticTexts["speechLanguageLine"]
         if DeviceUnderTest.appleSpeech {
             XCTAssertTrue(app.staticTexts["Speech recognition"].exists, "iOS does not tell the size of Apple's assets")
@@ -45,19 +45,19 @@ final class ModelDownloadFlowTests: XCTestCase {
                           "the language's name, as Settings shows it, not its code: \(name)")
         } else {
             XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 444 MB")
-            XCTAssertTrue(text(app, containing: "one-time download of about 532\u{00A0}MB.").exists)
+            XCTAssertTrue(text(app, containing: "one-time download of 532\u{00A0}MB.").exists)
             XCTAssertFalse(language.exists, "Parakeet hears the language")
         }
 
-        app.buttons["Where the models come from · Privacy"].tap()
-        XCTAssertTrue(app.navigationBars["Source code and notices"].waitForExistence(within: 5))
-        app.navigationBars["Source code and notices"].buttons.element(boundBy: 0).tap()
+        app.buttons["modelDownloadSources"].tap()
+        XCTAssertTrue(app.navigationBars["Where the models come from"].waitForExistence(within: 5))
+        app.navigationBars["Where the models come from"].buttons.element(boundBy: 0).tap()
 
-        let notNow = app.buttons["Not now — keep the audio"]
+        let notNow = app.buttons["modelDownloadNotNow"]
         XCTAssertTrue(notNow.waitForExistence(within: 5))
         notNow.tap()
         XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 5), "back on the note, still audio only")
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForNonExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 5))
     }
 
     // ports: ModelDownloadViewModelTest#showsTheMissingPartsWithTheirSizesAndTheSpaceTheInstallNeeds (on the screen)
@@ -67,10 +67,11 @@ final class ModelDownloadFlowTests: XCTestCase {
         let app = launchWithoutModels(parakeet: true)
         transcribeTheWalk(app)
         XCTAssertEqual(part(app, "Speech recognition").label, "Speech recognition, 444 MB")
-        XCTAssertEqual(part(app, "Telling speakers apart").label, "Telling speakers apart, 88 MB")
+        XCTAssertEqual(part(app, "Telling speakers apart").label, "Telling speakers apart, 62 MB")
+        XCTAssertEqual(part(app, "Recognising saved voices").label, "Recognising saved voices, 26 MB")
         // The figure keeps its unit on its line: a no-break space.
-        XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of about 532\u{00A0}MB.").exists)
-        XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while installing.").exists)
+        XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of 532\u{00A0}MB.").exists)
+        XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while it installs.").exists)
         XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
     }
@@ -83,12 +84,22 @@ final class ModelDownloadFlowTests: XCTestCase {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
+    @MainActor func testCloseKeepsTheRecordingAndCanReopenTheOffer() {
+        let app = launchWithoutModels(parakeet: true)
+        transcribeTheWalk(app)
+        app.buttons["closeModelDownload"].tap()
+        XCTAssertTrue(app.buttons["Transcribe"].waitForExistence(within: 15))
+        XCTAssertFalse(app.staticTexts["modelDownloadTitle"].exists)
+        app.buttons["Transcribe"].tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+    }
+
     @MainActor func testDownloadAndTranscribeTranscribesTheNote() {
         let app = launchWithoutModels(parakeet: !DeviceUnderTest.appleSpeech)
         transcribeTheWalk(app)
         app.buttons["Download and transcribe"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "What if being productive")).firstMatch
             .waitForExistence(within: 15))
-        XCTAssertTrue(app.staticTexts["Transcribe on this device"].waitForNonExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 5))
     }
 }

@@ -11,18 +11,27 @@ extension View {
 
 private struct NoteSheetsAndDialogs: ViewModifier {
     let model: NoteScreenModel
+    @Environment(SettingsStore.self) private var settings
 
     private var noteID: UUID { model.noteID }
 
     func body(content: Content) -> some View {
         @Bindable var model = model
         content
-            .sheet(item: $model.sheet, content: sheet)
+            .sheet(item: Binding(get: { model.sheet }, set: { value in
+                if model.sheet == .voicesQuestion, value == nil { settings.answerVoiceSetup(enable: nil) }
+                model.sheet = value
+            }), content: sheet)
             .alert(title, isPresented: shown, presenting: model.screen.dialog, actions: actions, message: message)
     }
 
     @ViewBuilder private func sheet(_ sheet: NoteSheet) -> some View {
         switch sheet {
+        case .voicesQuestion:
+            VoicesQuestionSheet { answer in
+                settings.answerVoiceSetup(enable: answer)
+                model.sheet = nil
+            }
         case .rename(let draft): RenameNoteDialog(noteID: noteID, draft: draft) { model.sheetDraft = $0 }
         case .speakers: SpeakersView(model: model)
         case .versions: TranscriptVersionsView(model: model)
