@@ -202,6 +202,16 @@ final class CassiniUITests: XCTestCase {
         app.buttons["playButton"].tap()
         XCTAssertTrue(app.buttons["Pause"].waitForExistence(within: 3))
     }
+    @MainActor func testMicrophoneRefusedShowsNoticeWithoutDuplicateCaption() {
+        let app = launch(seed: false, arguments: ["--microphone-denied"])
+        app.buttons["recordButton"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["banner.REC_MIC_OFF"].waitForExistence(within: 5))
+        XCTAssertTrue(app.staticTexts["Microphone access is off"].exists)
+        XCTAssertTrue(app.staticTexts["Turn it on in system settings. Recording starts when you come back."].exists)
+        XCTAssertTrue(app.buttons["bannerAction.openSettings"].exists)
+        XCTAssertFalse(app.staticTexts["Cassini needs the microphone to record."].exists)
+        capture("Microphone refused")
+    }
     @MainActor func testSpeakerRenameAppliesToAllPassagesAndPersists() {
         let app = launch(); openFixture(app)
         app.openNoteSpeakers()

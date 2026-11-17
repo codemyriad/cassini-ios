@@ -215,6 +215,7 @@ extension AppEnvironment {
                   draftSpeakerSuggestion: draftSpeakerSuggestion,
                   speakersReady: arguments.contains("--speakers-ready"),
                   parakeet: arguments.contains("--parakeet"),
+                  microphoneDenied: arguments.contains("--microphone-denied"),
                   notificationsDenied: arguments.contains("--notifications-denied"),
                   heldCapture: arguments.contains("--capture-held"), region: value(after: "-AppleLocale", in: arguments),
                   speechFailure: value(after: "--speech-unavailability", in: arguments), bundledSpeech: arguments.contains("--d78"),
@@ -249,6 +250,7 @@ extension AppEnvironment {
                           modelsMissing: Bool = false, modelDownloading: Bool = false, holdModelDownload: Bool = false, draftGrowing: Bool = false,
                           draftSpeakerSuggestion: Bool = false,
                           speakersReady: Bool = false, parakeet: Bool = false,
+                          microphoneDenied: Bool = false,
                           notificationsDenied: Bool = false, heldCapture: Bool = false, region: String? = nil,
                           speechFailure: String? = nil, bundledSpeech: Bool = false, bundledCapable: Bool = false, bundledVerified: Bool = false,
                           platform: PlatformFacts = LivePlatform.facts,
@@ -291,7 +293,7 @@ extension AppEnvironment {
             transcriber: recognizer == .appleSpeech ? unavailable ?? transcriber : transcriber, analyzer: analyzer,
             capture: seed != .recording ? AVCaptureAdapter()
                 : heldCapture ? FakeCapture(levels: TestFixtures.speechLevels, heldAt: TestFixtures.heldCaptureStart) : FakeCapture(),
-            microphone: seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission(),
+            microphone: microphoneDenied ? FakeMicrophonePermission(access: .denied, answer: false) : (seed == .recording ? FakeMicrophonePermission() : AVMicrophonePermission() as any MicrophonePermission),
             liveActivity: ActivityKitAdapter(), playback: AVPlaybackAdapter(captureSeeks: true), audio: LocalAudioProcessing(),
             // A held capture also holds the free space, so its hint reads the same on every run.
             storage: heldCapture ? FakeStorage() : FileSystemStorageProbe(),
