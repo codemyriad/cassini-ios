@@ -69,24 +69,10 @@ enum SpeakersCopy {
     static func notName(_ name: String) -> String { String(localized: "Not \(name)?", table: "Speakers") }
     static var remember: String { MeetingPhase1Copy.speakerRememberTitle }
 
-    /// What remembering does: on iPhone with automatic naming on, the shared Phase 1 two-line copy
-    /// (`speakers.rememberVoice.cardBody.iphone` / `.unnamed`). While automatic naming is off (the iOS default), or on
-    /// iPad where "this iPhone" does not fit, the `Speakers` device strings reflecting whether saved voices are
-    /// included in backups (`voicesBackedUp`).
+    /// What remembering does: the `Speakers` device strings reflecting automatic naming and whether saved voices are
+    /// included in backups (`voicesBackedUp`), across both iPhone and iPad.
     static func rememberBody(_ name: String, automatic: Bool, pad: Bool = false, voicesBackedUp: Bool = true,
                              language: String? = nil, bundle: Bundle = .main) -> String {
-        if automatic && !pad {
-            if let language {
-                if name.isEmpty {
-                    return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed",
-                                                      language: language, bundle: bundle)
-                }
-                return MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone",
-                                                  language: language, bundle: bundle)
-                    .replacingOccurrences(of: "{name}", with: name)
-            }
-            return name.isEmpty ? MeetingPhase1Copy.speakerRememberUnnamed : MeetingPhase1Copy.speakerRememberBody(name)
-        }
         if let language {
             let locale = Locale(identifier: language)
             let selected = Bundle.preferredLocalizations(from: bundle.localizations,
