@@ -128,7 +128,7 @@ final class ScreenshotTests: XCTestCase {
         let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
         let privacy = app.staticTexts["heroPrivacy"]
-        XCTAssertTrue(app.scroll { privacy.exists && privacy.isHittable })
+        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll { privacy.exists && privacy.isHittable })
         capture("31-first-run-largest-text")
     }
 
