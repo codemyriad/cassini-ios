@@ -25,6 +25,7 @@ public final class NativeBudget: Sendable {
 
     /// Whether someone holds the budget now.
     public var isHeld: Bool { state.withLock { $0.held } }
+    public var isHeldBySavedAudio: Bool { state.withLock { $0.held && $0.revokePreview == nil } }
 
     /// How many are waiting for it: lets a test wait until a waiter has queued instead of sleeping.
     var waiterCount: Int { state.withLock { $0.waiters.count } }

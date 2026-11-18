@@ -4,7 +4,7 @@ import CassiniCore
 import CassiniWhistle
 
 /// In-memory drafts. The caller owns the foreground recording lifetime and may
-/// coalesce wakeups. Finish the stream after Stop, or cancel to abandon preview.
+/// coalesce wakeups. Finish the stream to obtain a settled tail, or cancel to prioritize the saved-audio job.
 public enum LiveCAFTranscription {
     public enum Event: Sendable {
         case revision(fromMs: Int64, throughMs: Int64, settledMs: Int64, words: [Word])
@@ -19,6 +19,7 @@ public enum LiveCAFTranscription {
         var windowStart: Int64 = 0
         var origin: Int64 = 0
         var settled: Int64 = 0
+        var anchor: Word?
         var window: [Float] = []
         var sinceDecode = 0
         var fir = try WhistleResampler(rate: 48_000)
@@ -34,14 +35,21 @@ public enum LiveCAFTranscription {
             let placed = words.compactMap { word -> Word? in
                 let from = min(end, start + max(0, word.startMs))
                 let to = min(end, start + max(0, word.endMs))
-                guard to >= from, from >= settled, from < end else { return nil }
+                let midpoint = from + (to - from) / 2
+                guard to >= from, midpoint >= settled, midpoint < end else { return nil }
+                if let anchor, word.text.caseInsensitiveCompare(anchor.text) == .orderedSame,
+                   abs(from - anchor.startMs) <= 120, abs(to - anchor.endMs) <= 120 {
+                    return nil
+                }
                 return Word(word.speaker, from, to, word.text)
             }
             // Advance only to the end of a whole word well inside this window.
             // A later hypothesis may move its timestamps, but cannot overwrite
             // part of the settled word at an arbitrary time cutoff.
-            let edge = placed.filter { $0.endMs <= end - contextMs }.map(\.endMs).max() ?? settled
-            let boundary = final ? end : max(settled, edge)
+            if let last = placed.last(where: { $0.endMs <= end - contextMs }), last.endMs > settled {
+                anchor = last
+            }
+            let boundary = final ? end : max(settled, anchor?.endMs ?? settled)
             events(.revision(fromMs: settled, throughMs: end, settledMs: boundary, words: placed))
             settled = boundary
             sinceDecode = 0
@@ -71,13 +79,12 @@ public enum LiveCAFTranscription {
                     try LiveCAFReader.read(url, fromFrame: frame)
                 }) else { return }
                 if allowSkip, block.availableThroughFrame - cursor > 48_000 * 8 {
-                    try await append(fir.feed([], final: true))
-                    try await publish(final: true)
                     let resume = block.availableThroughFrame - 48_000 * 2
                     events(.skipped(fromFrame: cursor, toFrame: resume))
                     cursor = resume
                     origin = Int64(resume / 48)
                     settled = origin
+                    anchor = nil
                     windowStart = 0
                     window.removeAll(keepingCapacity: true)
                     sinceDecode = 0

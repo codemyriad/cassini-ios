@@ -31,7 +31,10 @@ final class RecordingPreview: Sendable {
                         case .skipped:
                             draft.needsSavedAudio = true
                         case let .revision(from, through, settled, words):
-                            draft.words.removeAll { from <= $0.startMs && $0.startMs < through }
+                            draft.words.removeAll {
+                                let midpoint = $0.startMs + ($0.endMs - $0.startMs) / 2
+                                return from <= midpoint && midpoint < through
+                            }
                             draft.words.append(contentsOf: words)
                             draft.settledMs = max(draft.settledMs, settled)
                         }

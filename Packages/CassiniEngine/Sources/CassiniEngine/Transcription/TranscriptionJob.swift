@@ -327,7 +327,7 @@ public struct TranscriptionJob: TranscriptionJobRunning {
     /// Waits for the native budget, showing "Finishing the previous note…" while another holds it. A stop ends the
     /// wait: its request comes back and the budget is not held. Nil once the budget is held.
     private func takeBudget(_ context: Context) async -> StopRequest? {
-        if budget.isHeld { context.events(.waitingForPrevious) }
+        if budget.isHeldBySavedAudio { context.events(.waitingForPrevious) }
         let budget = budget
         let task = Task { try await budget.acquire() }
         let watch = StopWatch.start(context.stop) { _ in task.cancel() }

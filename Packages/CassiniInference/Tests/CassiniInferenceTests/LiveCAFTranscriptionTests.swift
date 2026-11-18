@@ -41,7 +41,7 @@ struct LiveCAFTranscriptionTests {
                 if audio.count <= 48_000 {
                     return [Word("", 850, 980, "one")]
                 }
-                return [Word("", 930, 1060, "one"), Word("", 1500, 1800, "two")]
+                return [Word("", 930, 1060, "one"), Word("", 940, 1140, "two")]
             }, events: { emit.yield($0) })
         }
         tick.yield()
