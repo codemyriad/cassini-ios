@@ -6,6 +6,7 @@ public enum LiveCAFReader {
     public struct Block: Sendable {
         public let firstFrame: UInt64
         public let pcm16LE: Data
+        public let availableThroughFrame: UInt64
         public var frameCount: Int { pcm16LE.count / 2 }
     }
 
@@ -47,7 +48,7 @@ public enum LiveCAFReader {
                 let count = Int(min(UInt64(limit), complete - fromFrame))
                 try file.seek(toOffset: body + 4 + fromFrame * 2)
                 guard let read = try file.read(upToCount: count * 2), read.count >= 2 else { return nil }
-                return Block(firstFrame: fromFrame, pcm16LE: Data(read.prefix(read.count / 2 * 2)))
+                return Block(firstFrame: fromFrame, pcm16LE: Data(read.prefix(read.count / 2 * 2)), availableThroughFrame: complete)
             default: break
             }
             guard length >= 0, UInt64(length) <= size - body else { return nil }

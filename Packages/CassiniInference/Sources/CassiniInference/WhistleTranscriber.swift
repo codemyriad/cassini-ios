@@ -1,4 +1,5 @@
 import Foundation
+import CassiniCore
 import CassiniEngine
 import CassiniNotebook
 import CassiniWhistle
@@ -78,6 +79,34 @@ public struct WhistleTranscriber: Transcribing {
                     throw TranscriptionError.failed(e == .invalidInput ? .audio : e == .integrity ? .modelVerify : .model)
                 }
                 throw TranscriptionError.failed(.open)
+            }
+        }
+    }
+
+    /// Opt-in foreground preview. This never publishes or modifies the CAF.
+    public func preview(url: URL, wakes: AsyncStream<Void>, events: LiveCAFTranscription.Events) async throws {
+        var candidate = acceptance()
+        candidate.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
+        let verified = candidate
+        guard verified.available else { throw TranscriptionError.failed(.model) }
+        guard let initial = availableMemory(), initial > 0,
+              UInt64(initial) >= WhistleCapability.loadHeadroom else { throw JobFailure.memory }
+        try await NativeBudget.shared.withBudget {
+            try await Self.sessions.withBudget {
+                do {
+                    try await LiveCAFTranscription.follow(url: url, wakes: wakes, decode: { samples in
+                        guard let free = availableMemory(), free > 0,
+                              UInt64(free) >= WhistleCapability.windowHeadroom else { throw JobFailure.memory }
+                        let result = try await WhistleRuntime.shared.transcribe(samples, acceptance: verified, bundle: bundle)
+                        return result.words.map {
+                            Word("", Int64(($0.start * 1000).rounded()), Int64(($0.end * 1000).rounded()), $0.word)
+                        }
+                    }, events: events)
+                } catch {
+                    await WhistleRuntime.shared.close()
+                    throw error
+                }
+                await WhistleRuntime.shared.close()
             }
         }
     }

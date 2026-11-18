@@ -157,6 +157,47 @@ public struct ParakeetTranscriber: Transcribing {
         }
     }
 
+    /// Opt-in foreground preview using the installed model and its existing verifier.
+    public func preview(url: URL, wakes: AsyncStream<Void>, events: LiveCAFTranscription.Events) async throws {
+        let cancel = CancelFlag()
+        let holder = PreviewDecoder()
+        let files = ParakeetFiles(root: models.root)
+        guard models.speechReady, files.present() else { throw TranscriptionError.failed(.model) }
+        try await NativeBudget.shared.withBudget {
+            do {
+                try await withTaskCancellationHandler {
+                    try await LiveCAFTranscription.follow(url: url, wakes: wakes, decode: { samples in
+                        try await thread.run {
+                            try cancel.check()
+                            guard ParakeetMemory.allows(availableBytes: availableMemory(), loaded: holder.decoder != nil) else {
+                                throw JobFailure.memory
+                            }
+                            if holder.decoder == nil {
+                                _ = try models.checked(cancel: cancel)
+                                holder.decoder = SpeechWordDecoder(try runtime.makeDecoder(ParakeetConfig(files)),
+                                                                  cancelled: { cancel.isSet })
+                            }
+                            let audio = PcmAudio(samples, sampleRate: Limits.asrRate)
+                            return try ParakeetDecode.transcribe(audio, decoder: holder.decoder!, detector: nil,
+                                                                  cutting: .whole).words
+                        }
+                    }, events: events)
+                } onCancel: {
+                    cancel.set()
+                }
+            } catch {
+                try await thread.run { holder.decoder = nil }
+                throw error
+            }
+            try await thread.run { holder.decoder = nil }
+        }
+    }
+
+    /// Access and release occur only in closures run on the inference thread.
+    private final class PreviewDecoder: @unchecked Sendable {
+        var decoder: SpeechWordDecoder?
+    }
+
     // MARK: - Models
 
     private func prepareModels(allowDownload: Bool,

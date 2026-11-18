@@ -63,7 +63,7 @@ let package = Package(
         .target(name: "COpusBridge", dependencies: [.product(name: "Copus", package: "swift-opus")]),
         .target(name: "CassiniAudio", dependencies: ["CassiniCore", "COpusBridge"], path: "Packages/CassiniAudio/Sources/CassiniAudio"),
         .testTarget(name: "CassiniInferenceTests", dependencies: ["CassiniAudio", "CassiniInference", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook", "CassiniCore", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Tests/CassiniInferenceTests"),
-        .target(name: "CassiniInference", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook", "CassiniWhistle", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Sources/CassiniInference"),
+        .target(name: "CassiniInference", dependencies: ["CassiniAudio", "CassiniCore", "CassiniEngine", "CassiniNotebook", "CassiniWhistle", .product(name: "libzstd", package: "zstd")], path: "Packages/CassiniInference/Sources/CassiniInference"),
         .target(name: "CZlib", path: "Sources/CZlib", publicHeadersPath: ".", linkerSettings: [.linkedLibrary("z")]),
         .target(name: "CassiniCore", dependencies: ["CZlib"]),
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"], resources: [.copy("Resources/zip")]),
