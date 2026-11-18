@@ -25,7 +25,8 @@ struct LiveCAFReaderTests {
 
         caf.append(0)
         try caf.write(to: url)
-        let tail = try #require(LiveCAFReader.read(url, fromFrame: 1))
+        let next = try LiveCAFReader.read(url, fromFrame: 1)
+        let tail = try #require(next)
         #expect(tail.firstFrame == 1)
         #expect(tail.pcm16LE == Data([2, 0]))
     }
