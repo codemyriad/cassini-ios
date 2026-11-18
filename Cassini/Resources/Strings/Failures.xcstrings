@@ -1122,7 +1122,7 @@
       }
     },
     "This meeting’s details are not supported or are damaged. Its files have been kept.": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, ios.failure.meetingDetails.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, ios.failure.meetingDetails.",
       "extractionState": "manual",
       "localizations": {
         "en": {

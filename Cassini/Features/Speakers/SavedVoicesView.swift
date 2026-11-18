@@ -2,9 +2,8 @@ import SwiftUI
 import CassiniEngine
 import CassiniNotebook
 
-/// Saved voices: the privacy line, the "can't be read" banner while the list is read-only, the people (by notes, then
-/// confirmed speech, then name) with their options, the footnote, and Forget everyone. The open dialog is kept with
-/// the scene (`SavedVoicesScreen`).
+/// Saved voices: stale notice, the people list (by notes, then speech, then name) with their options,
+/// Forget everyone, and the bottom privacy footnote. The open dialog is kept with the scene (`SavedVoicesScreen`).
 struct SavedVoicesView: View {
     @Environment(VoicesStore.self) private var voices
     @Environment(ErrorPresenter.self) private var errors
@@ -14,69 +13,19 @@ struct SavedVoicesView: View {
     @State private var forgettingAllData = false
 
     private var people: [SavedVoiceSummary] { voices.summaries }
+    private var stalePeople: [SavedVoiceSummary] { people.filter(\.stale) }
     private var readOnly: Bool { voices.isReadOnly }
+    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     private var dialog: SavedVoicesDialog? { SavedVoicesScreen(dialog: dialogKey).dialog(people: people, readOnly: readOnly) }
 
     var body: some View {
-        List {
-            Section {
-                Button(Wave6Copy.voicesEnrollAddAction) {
-                    Task {
-                        if await voices.printsReady() { enrolling = true }
-                        else { router.push(.modelDownload(noteID: nil, part: .speakers)) }
-                    }
-                }
-                .disabled(readOnly)
-            }
-            Section {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "lock").accessibilityHidden(true)
-                    Text(SettingsPhase2Copy.savedVoicesPrivacy).fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.footnote).foregroundStyle(Color.muted)
-            }
-            if readOnly {
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(SpeakersCopy.unreadableTitle).font(.subheadline.weight(.semibold))
-                        Text(SpeakersCopy.unreadableBody).font(.subheadline)
-                    }
-                    .foregroundStyle(Color.ink)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("voicesUnreadable")
-                }
-                .listRowBackground(Tone.error.background)
-            }
-            if people.isEmpty {
-                // A list that can't be read is not known to be empty.
-                if !readOnly { Section { Text(SpeakersCopy.empty).foregroundStyle(Color.muted) } }
+        Group {
+            if people.isEmpty && !readOnly {
+                emptyState
             } else {
-                Section {
-                    ForEach(people) { person in
-                        PersonRow(person: person, editable: !readOnly, send: send)
-                    }
-                }
-            }
-            if !people.isEmpty {
-                Section {
-                    Button(SettingsPhase2Copy.forgetEveryone, role: .destructive) { send(.forgetEveryone) }
-                        .foregroundStyle(Color.toneError)
-                        .disabled(readOnly)
-                        .accessibilityIdentifier("forgetEveryone")
-                }
-            } else if voices.offersForgetAllData {
-                Section {
-                    Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
-                        .foregroundStyle(Color.toneError)
-                } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
-            }
-            if !readOnly {
-                Section { Text(SettingsPhase2Copy.voicesHowToAdd).font(.footnote).foregroundStyle(Color.muted) }
+                populatedList
             }
         }
-        .accessibilityIdentifier("savedVoicesList")
-        .paperListBackground()
-        .readableListWidth()
         .navigationTitle(SpeakersCopy.voices)
         .task {
             await voices.refresh()
@@ -104,6 +53,163 @@ struct SavedVoicesView: View {
         } message: { Text(SpeakersCopy.forgetAllDataBody) }
     }
 
+    private var populatedList: some View {
+        List {
+            if readOnly {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(SpeakersCopy.unreadableTitle).font(.subheadline.weight(.semibold))
+                        Text(SpeakersCopy.unreadableBody).font(.subheadline)
+                    }
+                    .foregroundStyle(Color.ink)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("voicesUnreadable")
+                }
+                .listRowBackground(Tone.error.background)
+            }
+            if !stalePeople.isEmpty {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(SavedVoicesPhase2Copy.staleTitle(stalePeople.count))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.toneWarn)
+                        Text(SavedVoicesPhase2Copy.staleBody(staleNamesText))
+                            .font(.subheadline)
+                            .foregroundStyle(Color.ink)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("voicesStaleNotice")
+                }
+                .listRowBackground(Tone.warn.background)
+            }
+            if !people.isEmpty {
+                Section {
+                    ForEach(people) { person in
+                        PersonRow(person: person, editable: !readOnly, send: send)
+                    }
+                } header: {
+                    HStack {
+                        Text(SettingsPhase2Copy.peopleCount(people.count))
+                            .font(.footnote.weight(.semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(Color.muted)
+                        Spacer()
+                        Button {
+                            startEnrollment()
+                        } label: {
+                            Label(SavedVoicesPhase2Copy.addVoice, systemImage: "plus")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minHeight: HitTarget.minimum)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .textCase(nil)
+                        .foregroundStyle(Color.accentInk)
+                        .disabled(readOnly)
+                        .accessibilityIdentifier("addSavedVoice")
+                    }
+                } footer: {
+                    Text(SavedVoicesPhase2Copy.caption)
+                        .font(.footnote)
+                        .foregroundStyle(Color.muted)
+                }
+                Section {
+                    Button(SettingsPhase2Copy.forgetEveryone, role: .destructive) { send(.forgetEveryone) }
+                        .foregroundStyle(Color.toneError)
+                        .disabled(readOnly)
+                        .accessibilityIdentifier("forgetEveryone")
+                }
+            } else if voices.offersForgetAllData {
+                Section {
+                    Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
+                        .foregroundStyle(Color.toneError)
+                } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
+            }
+            Section {
+                privacyFootnote
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 16, trailing: 4))
+            }
+        }
+        .accessibilityIdentifier("savedVoicesList")
+        .paperListBackground()
+        .readableListWidth()
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 12) {
+                    Text(SpeakersCopy.empty)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(Color.ink)
+                        .multilineTextAlignment(.center)
+                    Text(SavedVoicesPhase2Copy.emptyBody)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.muted)
+                        .multilineTextAlignment(.center)
+                    Button(Wave6Copy.voicesEnrollAddAction) {
+                        startEnrollment()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .buttonBorderShape(.capsule)
+                    .tint(Color.accentStrong)
+                    .padding(.top, 8)
+                    .accessibilityIdentifier("addSavedVoice")
+                    if voices.offersForgetAllData {
+                        Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
+                            .font(.subheadline)
+                            .foregroundStyle(Color.toneError)
+                            .padding(.top, 8)
+                    }
+                }
+                .padding(.horizontal, 36)
+                .padding(.vertical, 48)
+                .frame(maxWidth: .infinity)
+            }
+            .defaultScrollAnchor(.center)
+            privacyFootnote
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.paper.ignoresSafeArea())
+        .accessibilityIdentifier("savedVoicesList")
+    }
+
+    private var privacyFootnote: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "lock")
+                .foregroundStyle(Color.accentInk)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pad ? SavedVoicesPhase2Copy.footnoteMadeOnIpad : SavedVoicesPhase2Copy.footnoteMadeOnIphone)
+                Text(SavedVoicesPhase2Copy.footnoteNamesOnly)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.footnote)
+        .foregroundStyle(Color.muted)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("savedVoicesPrivacyFootnote")
+    }
+
+    private var staleNamesText: String {
+        let names = stalePeople.map(\.name)
+        if names.count == 1 { return names[0] }
+        return ListFormatter.localizedString(byJoining: names)
+    }
+
+    private func startEnrollment() {
+        Task {
+            if await voices.printsReady() { enrolling = true }
+            else { router.push(.modelDownload(noteID: nil, part: .speakers)) }
+        }
+    }
+
     /// A saved voice's name as it is stored: trimmed; nil when blank.
     private static func cleanName(_ name: String) -> String? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -124,8 +230,9 @@ struct SavedVoicesView: View {
 
     private var dialogBody: String {
         switch dialog {
+        case .forget(_, let name)?: SpeakersCopy.forgetBody(name)
         case .forgetEveryone(let count)?: SpeakersCopy.forgetEveryoneBody(count)
-        default: SpeakersCopy.forgetBody
+        default: ""
         }
     }
 
@@ -152,7 +259,7 @@ struct SavedVoicesView: View {
     }
 }
 
-/// A person: avatar, name, "14 notes · 22 min confirmed speech", the stale hint, and the options menu.
+/// A person: avatar, name, "31 meetings · 4 h 12 min", the stale pill, and the options menu.
 private struct PersonRow: View {
     let person: SavedVoiceSummary
     let editable: Bool
@@ -164,7 +271,7 @@ private struct PersonRow: View {
         // keeping the avatar and both controls beside them squeezes words into fragments.
         let layout = dynamicTypeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
         layout {
             SpeakerAvatar(name: person.name, tint: SpeakerTint.named(person.colourIndex), showsPlaceholderNumber: false)
             VStack(alignment: .leading, spacing: 2) {
@@ -174,7 +281,13 @@ private struct PersonRow: View {
                     .font(.caption).foregroundStyle(Color.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if person.stale {
-                    Text(Wave6Copy.savedVoicesRowStale).font(.caption).foregroundStyle(Color.toneWarn)
+                    Text(SavedVoicesPhase2Copy.rowNeedsNaming)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.toneWarn)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Tone.warn.background, in: Capsule())
+                        .padding(.top, 3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

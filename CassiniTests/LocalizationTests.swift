@@ -175,4 +175,19 @@ import Testing
         #expect(line.contains("Codemyriad OÜ"), "\(language): \(line)")
         #expect(line.contains("{year}"), "\(language): \(line)")
     }
+
+    @Test(arguments: languages)
+    func d106ExportAndSavedVoicesStringsResolveInEveryLanguage(language: String) throws {
+        let bundle = try Self.bundle(language)
+        #expect(!ExportPhase2Copy.typeWithSize(".opus", size: "24 MB").isEmpty)
+        for key in ["export.heading", "export.otherFormats", "export.subtitles.label"] {
+            let value = bundle.localizedString(forKey: key, value: nil, table: "ExportPhase2")
+            #expect(!value.isEmpty && value != key, "\(language): \(key)")
+        }
+        #expect(!SavedVoicesPhase2Copy.staleTitle(1, language: language, bundle: bundle).isEmpty)
+        #expect(!SavedVoicesPhase2Copy.staleTitle(2, language: language, bundle: bundle).isEmpty)
+        #expect(SavedVoicesPhase2Copy.staleBody("Luca", language: language, bundle: bundle).contains("Luca"))
+        #expect(SavedVoicesPhase2Copy.forgetTitle("Luca", language: language, bundle: bundle).contains("Luca"))
+        #expect(SavedVoicesPhase2Copy.forgetBody("Luca", language: language, bundle: bundle).contains("Luca"))
+    }
 }

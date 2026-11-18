@@ -83,10 +83,12 @@ extension XCTestCase {
         XCTAssertTrue(primary.isSelected, "Cassini file is the default", file: file, line: line)
         XCTAssertTrue(app.buttons["exportChoice-markdown"].exists, file: file, line: line)
         XCTAssertFalse(app.buttons["exportChoice-json"].exists, file: file, line: line)
-        if ["plainText", "srt", "vtt"].contains(choice) {
-            app.buttons["exportMoreFormats"].tapWhenSettled(file: file, line: line)
+        XCTAssertFalse(app.buttons["exportMoreFormats"].exists, file: file, line: line)
+        let target = app.buttons["exportChoice-\(choice)"]
+        if !target.isHittable {
+            _ = app.collectionViews["exportFormats"].scroll(attempts: 4) { target.exists && target.isHittable }
         }
-        app.buttons["exportChoice-\(choice)"].tapWhenSettled(file: file, line: line)
+        target.tapWhenSettled(file: file, line: line)
         app.buttons["exportConfirm"].tapWhenSettled(file: file, line: line)
     }
 

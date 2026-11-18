@@ -45,7 +45,9 @@ class Wave5StringGenerationTests(unittest.TestCase):
             self.assertEqual(set(item['localizations']), set(generator.LANGUAGES))
             for language, localized in item['localizations'].items():
                 if key in generator.SAVED_VOICES_PLURALS:
-                    forms = entries[key]['plural'] if language == 'en' else entries[key]['l10n'][language]['plural']
+                    forms = dict(entries[key]['plural'] if language == 'en' else entries[key]['l10n'][language]['plural'])
+                    if language != 'en' and 'many' not in forms:
+                        forms['many'] = forms['other']
                     compiled = localized['variations']['plural']
                     self.assertEqual(set(compiled), set(forms))
                     for category, expected_form in forms.items():
