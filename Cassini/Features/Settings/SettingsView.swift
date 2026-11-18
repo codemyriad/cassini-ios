@@ -132,7 +132,9 @@ private struct SettingsForm: View {
                 topic(SettingsPhase2Copy.speakers, answer: settings.identifySpeakers ? SettingsPhase2Copy.on : SettingsPhase2Copy.off,
                       icon: "person.2", page: .speakers, id: "speakersRow")
                 voicesRow
-            } header: { Text(SettingsPhase2Copy.transcripts) } footer: { Text(privacy) }
+            } header: { Text(SettingsPhase2Copy.transcripts) } footer: {
+                Text(privacy).fixedSize(horizontal: false, vertical: true)
+            }
             Section {
                 topic(SettingsPhase2Copy.backup, answer: settings.cloudBackup ? SettingsPhase2Copy.icloud : SettingsPhase2Copy.off,
                       icon: "icloud", page: .backup, id: "backupRow")
@@ -143,6 +145,7 @@ private struct SettingsForm: View {
                 Text(SettingsPhase2Copy.libraryStats
                     .replacingOccurrences(of: "{meetings}", with: SettingsPhase2Copy.meetingCount(model.library.notes))
                     .replacingOccurrences(of: "{hours}", with: audioDuration))
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("libraryStats")
             }
             Section {
@@ -168,7 +171,7 @@ private struct SettingsForm: View {
                                     Text(SettingsPhase2Copy.nameVersion.replacingOccurrences(of: "{version}", with: model.version))
                                         .foregroundStyle(Color.ink)
                                     Text(SettingsPhase2Copy.aboutSubtitle).font(.subheadline).foregroundStyle(Color.muted)
-                                }
+                                }.fixedSize(horizontal: false, vertical: true)
                             }
                         } else {
                             HStack(spacing: 12) {
