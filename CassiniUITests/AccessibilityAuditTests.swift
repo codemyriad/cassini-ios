@@ -320,8 +320,9 @@ final class AccessibilityAuditTests: XCTestCase {
         for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
             let app = emptyLibrary(Self.largestText + ["-AppleLanguages", "(\(language))"])
             audit(app, screen: "first-run-largest-\(language)", .textClipped)
-            let privacy = app.staticTexts["heroPrivacy"]
-            XCTAssertTrue(app.scrollViews["libraryScroll"].scroll { privacy.exists && privacy.isHittable })
+            let privacy = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
+            XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)
+            audit(app, screen: "first-run-privacy-largest-\(language)", .textClipped)
             XCTAssertTrue(app.buttons["recordButton"].isHittable)
             XCTAssertTrue(app.buttons["importButton"].isHittable)
         }

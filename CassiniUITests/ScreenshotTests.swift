@@ -127,8 +127,7 @@ final class ScreenshotTests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
-        let privacy = app.staticTexts["heroPrivacy"]
-        XCTAssertTrue(app.scrollViews["libraryScroll"].scroll { privacy.exists && privacy.isHittable })
+        _ = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
         capture("31-first-run-largest-text")
     }
 
