@@ -35,7 +35,7 @@ struct ExportFormatSheet: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(Color.canvasClear)
                     .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 12, trailing: 20))
                 }
                 Section {

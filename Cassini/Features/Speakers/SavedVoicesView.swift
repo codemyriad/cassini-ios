@@ -128,7 +128,7 @@ struct SavedVoicesView: View {
             }
             Section {
                 privacyFootnote
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(Color.canvasClear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 16, trailing: 4))
             }
         }
