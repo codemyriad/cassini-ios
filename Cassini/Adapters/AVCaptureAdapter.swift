@@ -90,6 +90,8 @@ extension AVAudioRecorder: CaptureRecorder {}
         continuation.finish()
     }
 
+    var livePCMURL: URL? { recorder?.url }
+
     var elapsed: TimeInterval { recorder?.currentTime ?? 0 }
 
     var fileBytes: Int64 {

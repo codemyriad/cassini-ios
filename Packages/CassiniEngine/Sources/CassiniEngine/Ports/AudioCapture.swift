@@ -31,8 +31,11 @@ public struct CaptureResult: Hashable, Sendable {
     var recordedAt: Date? { get }
     var elapsed: TimeInterval { get }
     var fileBytes: Int64 { get }
+    /// Current PCM capture for an optional read-only live consumer.
+    var livePCMURL: URL? { get }
 }
 
 extension AudioCapture {
     public var recordedAt: Date? { nil }
+    public var livePCMURL: URL? { nil }
 }
