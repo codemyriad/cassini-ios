@@ -278,6 +278,24 @@ final class SettingsFlowTests: XCTestCase {
             .firstMatch.waitForExistence(within: 15))
     }
 
+    @MainActor func testDecliningSpeakerDownloadTurnsSwitchBackOff() {
+        let app = openSettings(["--models-missing"])
+        openPage(app, "speakersRow", title: "Speakers")
+        for id in ["identifySpeakersToggle", "recogniseSavedVoicesToggle"] {
+            let toggle = app.switches[id]
+            XCTAssertTrue(toggle.waitForValue("1"))
+            toggle.switches.firstMatch.tap()
+            XCTAssertTrue(toggle.waitForValue("0"))
+            toggle.switches.firstMatch.tap()
+            XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+            app.buttons["modelDownloadNotNow"].tap()
+            XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 15))
+            XCTAssertTrue(toggle.waitForValue("0"))
+        }
+        app.switches["identifySpeakersToggle"].switches.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+    }
+
     // ports: SettingsBehaviourTest#licenceRowsOpenAndBackClosesTheText
     @MainActor func testLicenceRowsOpenTheirTextAndBackClosesIt() {
         let app = openSettings()

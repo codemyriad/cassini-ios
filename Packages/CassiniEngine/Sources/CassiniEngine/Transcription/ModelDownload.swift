@@ -145,6 +145,8 @@ public struct ModelDownloadPlan: Hashable, Sendable {
     func recordConsent(for parts: [ModelPart])
     /// "Not now — keep the audio" for a plan with the speech model: no automatic transcription asks again.
     func recordDeclined()
+    /// Declining a standalone Settings download for `part` turns the corresponding speaker switch back off.
+    func recordDeclined(part: ModelPart)
     /// Puts the note in the queue again with its job's kind.
     @discardableResult func transcribe(_ noteID: UUID) async -> TranscribeOutcome
     /// Downloads `parts` on their own, without a note.
@@ -157,6 +159,7 @@ public struct ModelDownloadPlan: Hashable, Sendable {
 extension ModelDownloadPorts {
     public func plan(for noteID: UUID?) async -> ModelDownloadPlan { await plan(for: noteID, part: nil) }
     public func speechLanguage(for noteID: UUID?) async -> String? { speechLanguage() }
+    public func recordDeclined(part: ModelPart) {}
 }
 
 /// The model download screen ("Transcribe on this device"). With a note it offers "Download and transcribe" (for a
@@ -245,6 +248,7 @@ public final class ModelDownloadModel {
     public func notNow() {
         guard !busy, !closing else { return }
         if plan?.missing.contains(.speech) == true { ports.recordDeclined() }
+        if noteID == nil, let part { ports.recordDeclined(part: part) }
         close()
     }
 

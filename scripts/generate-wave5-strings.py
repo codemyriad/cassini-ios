@@ -21,10 +21,6 @@ PROPERTIES = {
     'firstRun.privacy.iphone': 'firstRunPrivacyIphone',
     'firstRun.privacy.ipad': 'firstRunPrivacyIpad',
     'firstRun.privacy.backups.ios': 'firstRunPrivacyBackups',
-    'privacy.onDevice.iphone.withBackup': 'iphonePrivacyWithBackup',
-    'privacy.onDevice.iphone.backupExcluded': 'iphonePrivacyBackupExcluded',
-    'privacy.onDevice.ipad.withBackup': 'ipadPrivacyWithBackup',
-    'privacy.onDevice.ipad.backupExcluded': 'ipadPrivacyBackupExcluded',
 }
 IDS = set(PROPERTIES)
 SAVED_VOICES_PROPERTIES = {
@@ -118,15 +114,6 @@ def _library_outputs(pin, all_entries):
             '    }',
         ]
     lines += [
-        '',
-        '    static func privacyLine(_ privacy: FirstRunPrivacy, device: FirstRunDevice) -> String {',
-        '        switch (device, privacy) {',
-        '        case (.phone, .withBackup): iphonePrivacyWithBackup',
-        '        case (.phone, .backupExcluded): iphonePrivacyBackupExcluded',
-        '        case (.pad, .withBackup): ipadPrivacyWithBackup',
-        '        case (.pad, .backupExcluded): ipadPrivacyBackupExcluded',
-        '        }',
-        '    }',
         '',
         '    static func template(_ key: String, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
         '        let locale = Locale(identifier: language)',

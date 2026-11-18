@@ -100,7 +100,8 @@ private struct SettingsForm: View {
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     private var privacy: String {
-        LibraryWave5Copy.privacyLine(settings.cloudBackup ? .withBackup : .backupExcluded, device: pad ? .pad : .phone)
+        (pad ? LibraryWave5Copy.firstRunPrivacyIpad : LibraryWave5Copy.firstRunPrivacyIphone)
+            + " " + LibraryWave5Copy.firstRunPrivacyBackups
     }
 
     var body: some View {
@@ -221,12 +222,12 @@ private struct SettingsForm: View {
             } header: { Text(SettingsPhase2Copy.forNew) } footer: { Text(SettingsPhase2Copy.keepTranscript) }
             Section {
                 Toggle(SettingsPhase2Copy.rightAway, isOn: $settings.autoTranscribe).accessibilityIdentifier("autoTranscribeToggle")
-            } header: { Text(SettingsPhase2Copy.afterRecording) } footer: { Text(SettingsPhase2Copy.rightAwaySubtitle) }
+            } header: { Text(SettingsPhase2Copy.afterRecording).padding(.top, 24) } footer: { Text(SettingsPhase2Copy.rightAwaySubtitle) }
             Section {
                 Button { router.push(.licenseText(.modelSources)) } label: {
                     SettingsAnswerRow(title: SettingsPhase2Copy.whereFrom, answer: "")
                 }
-            } header: { Text(SettingsPhase2Copy.goingOnline) } footer: { Text(SettingsPhase2Copy.online) }
+            } header: { Text(SettingsPhase2Copy.goingOnline).padding(.top, 24) } footer: { Text(SettingsPhase2Copy.online) }
             if let store = ports.speechModels, store.promotionVisible {
                 Section { ParakeetSuggestionView(store: store, placement: .settings) }
             }
@@ -242,11 +243,13 @@ private struct SettingsForm: View {
                     settings.identifySpeakers = value
                     if value { model.openModel(.speakers) }
                 })) { description(SettingsPhase2Copy.tellApart, SettingsPhase2Copy.tellApartDescription) }
+                    .toggleStyle(TopAlignedSwitchToggleStyle())
                     .accessibilityIdentifier("identifySpeakersToggle")
                 Toggle(isOn: Binding(get: { settings.recogniseSavedVoices }, set: { value in
                     settings.recogniseSavedVoices = value
                     if value { model.openModel(.voices) }
                 })) { description(SettingsPhase2Copy.recognise, SettingsPhase2Copy.recogniseDescription) }
+                    .toggleStyle(TopAlignedSwitchToggleStyle())
                     .accessibilityIdentifier("recogniseSavedVoicesToggle")
             } header: { Text(SettingsPhase2Copy.whoIsSpeaking) } footer: {
                 Text(pad ? SettingsPhase2Copy.runsOnIpad : SettingsPhase2Copy.runsOnIphone)
@@ -254,10 +257,14 @@ private struct SettingsForm: View {
             Section {
                 Toggle(isOn: Binding(get: { settings.rememberPeopleIName }, set: settings.setRememberPeopleIName)) {
                     description(SettingsPhase2Copy.rememberDefault, SettingsPhase2Copy.rememberDefaultSubtitle)
-                }.accessibilityIdentifier("rememberPeopleToggle")
+                }
+                .toggleStyle(TopAlignedSwitchToggleStyle())
+                .accessibilityIdentifier("rememberPeopleToggle")
                 Toggle(isOn: $settings.automaticallyNameVoices) {
                     description(SettingsPhase2Copy.autoName, SettingsPhase2Copy.autoNameSubtitle)
-                }.accessibilityIdentifier("autoNameVoicesToggle")
+                }
+                .toggleStyle(TopAlignedSwitchToggleStyle())
+                .accessibilityIdentifier("autoNameVoicesToggle")
                 voicesRow
             } header: { Text(SettingsPhase2Copy.savedVoices) } footer: { Text(Wave6Copy.savedVoicesPrivacyPhone) }
             // Preserve installation status and size in the second layer, including retries and pending consent.
@@ -379,15 +386,17 @@ private struct SpeechChoicesView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(title).foregroundStyle(Color.ink)
                         Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
-                        if recognizer == .whistle {
-                            Text(SettingsPhase2Copy.builtIn).font(.caption).foregroundStyle(Color.muted)
-                        } else if installed {
+                        if recognizer == .parakeet, installed {
                             if let detail = rows.first(where: { $0.part == .speech })?.size.label(locale: locale) {
                                 Text(detail).font(.caption).foregroundStyle(Color.muted)
                                     .accessibilityIdentifier("installedParakeetSize")
                             }
                             Text(ModelRowStatus.ready.label).font(.caption).foregroundStyle(Color.muted)
                         }
+                    }
+                    if recognizer == .whistle {
+                        Spacer(minLength: 8)
+                        Text(SettingsPhase2Copy.builtIn).font(.subheadline).foregroundStyle(Color.muted)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }.buttonStyle(.plain).disabled(action == .none)
@@ -410,18 +419,31 @@ private struct SpeechChoicesView: View {
     }
 }
 
+/// Aligns a Form switch to the first line of a multi-line label, keeping single-line rows on the default centred style.
+struct TopAlignedSwitchToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            configuration.label
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle(isOn: configuration.$isOn) { EmptyView() }
+                .labelsHidden()
+                .toggleStyle(.switch)
+        }
+    }
+}
+
 /// A row that opens a screen: its title, a subtitle and a chevron.
 struct SettingsRowLabel: View {
     let title: String
     let subtitle: String
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).foregroundStyle(Color.ink)
                 Text(subtitle).font(.subheadline).foregroundStyle(Color.muted)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 0)
             Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())

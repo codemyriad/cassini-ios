@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "savedVoices.howToAdd": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.howToAdd.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.howToAdd.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "savedVoices.row.meetingCount": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.meetingCount.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.meetingCount.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -188,7 +188,7 @@
       }
     },
     "savedVoices.row.meta": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.meta.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.meta.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -230,7 +230,7 @@
       }
     },
     "savedVoices.row.stale": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.stale.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.stale.",
       "extractionState": "manual",
       "localizations": {
         "en": {

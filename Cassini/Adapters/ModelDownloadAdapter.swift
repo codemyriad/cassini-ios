@@ -86,6 +86,14 @@ import CassiniNotebook
 
     func recordDeclined() { settings.recordDeclined() }
 
+    func recordDeclined(part: ModelPart) {
+        switch part {
+        case .speakers: settings.identifySpeakers = false
+        case .voices: settings.recogniseSavedVoices = false
+        case .speech: break
+        }
+    }
+
     func transcribe(_ noteID: UUID) async -> TranscribeOutcome {
         await processing.transcribe(noteID, kind: processing.state.jobs[noteID]?.kind ?? .transcribe)
     }

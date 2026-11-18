@@ -13,21 +13,11 @@ OUTPUT = Path('Cassini/Resources/Strings/Wave6.xcstrings')
 LOOKUP = Path('Cassini/Strings/Wave6Copy.swift')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 PROPERTIES = {
-    'backup.phoneOnlyCard.title.ios': 'backupPhoneOnlyCardTitleIos',
-    'backup.phoneOnlyCard.body': 'backupPhoneOnlyCardBody',
-    'backup.phoneOnlyCard.action.ios': 'backupPhoneOnlyCardActionIos',
-    'backup.phoneOnlyCard.dismiss': 'backupPhoneOnlyCardDismiss',
     'backup.phoneOnlyCard.close.a11y': 'backupPhoneOnlyCardCloseA11y',
     'backup.includeSavedVoices.title': 'backupIncludeSavedVoicesTitle',
-    'backup.includeSavedVoices.subtitle.ios': 'backupIncludeSavedVoicesSubtitleIos',
-    'backup.includeSavedVoices.subtitle.off.ios': 'backupIncludeSavedVoicesSubtitleOffIos',
     'backup.settings.heading': 'backupSettingsHeading',
-    'backup.cloud.title': 'backupCloudTitle',
-    'backup.cloud.body.on': 'backupCloudBodyOn',
-    'backup.cloud.body.off.ios': 'backupCloudBodyOffIos',
     'backup.settings.learnMore': 'backupSettingsLearnMore',
     'backup.info.title': 'backupInfoTitle',
-    'backup.info.what.heading': 'backupInfoWhatHeading',
     'backup.info.what.body': 'backupInfoWhatBody',
     'backup.info.icloud.heading': 'backupInfoIcloudHeading',
     'backup.info.icloud.body': 'backupInfoIcloudBody',

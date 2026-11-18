@@ -21,12 +21,12 @@ for key, entry in catalog.items():
             expected = source[key]['en'] if language == 'en' else source[key]['l10n'][language]['text']
         assert entry['localizations'][language]['stringUnit']['value'] == expected, (key, language)
     assert 'this phone only' not in source[original]['en'].lower(), key
-assert {'backup.phoneOnlyCard.title.ios', 'backup.phoneOnlyCard.action.ios', 'backup.cloud.body.off.ios',
-        'backup.includeSavedVoices.subtitle.off.ios', 'voices.setup.title', 'voices.setup.enable',
+assert {'backup.phoneOnlyCard.close.a11y', 'voices.setup.title', 'voices.setup.enable',
         'voices.setup.privacy.phone', 'voices.enroll.testPhrase'} <= catalog.keys()
-assert 'direct transfer' in source['backup.cloud.body.off.ios']['en']
-assert 'does not delete backups already stored' in source['backup.cloud.body.off.ios']['en']
-assert 'direct transfer' in source['backup.includeSavedVoices.subtitle.off.ios']['en']
 assert all(key not in catalog for key in ['backup.phoneOnly.body', 'backup.phoneOnlyCard.title',
-           'backup.phoneOnlyCard.action', 'backup.includeSavedVoices.subtitle.off', 'voices.setup.privacy.desktop'])
+           'backup.phoneOnlyCard.title.ios', 'backup.phoneOnlyCard.body', 'backup.phoneOnlyCard.action',
+           'backup.phoneOnlyCard.action.ios', 'backup.phoneOnlyCard.dismiss', 'backup.cloud.title',
+           'backup.cloud.body.on', 'backup.cloud.body.off.ios', 'backup.includeSavedVoices.subtitle.off',
+           'backup.includeSavedVoices.subtitle.ios', 'backup.includeSavedVoices.subtitle.off.ios',
+           'voices.setup.privacy.desktop'])
 print('Wave 6: verbatim six-language catalog, honest iOS exclusion and one-question voice setup verified')

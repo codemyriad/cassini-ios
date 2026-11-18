@@ -88,7 +88,6 @@ private struct ModelDownloadContent: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    OrbitMark(size: 56)
                     Text(pad ? SettingsPhase2Copy.offerTitleIpad : SettingsPhase2Copy.offerTitleIphone)
                         .font(.system(size: titleSize, weight: .bold)).foregroundStyle(Color.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -119,14 +118,15 @@ private struct ModelDownloadContent: View {
                             .font(.subheadline).foregroundStyle(Color.muted)
                             .accessibilityIdentifier("speechLanguageLine")
                     }
-                    Text(SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale)))
+                    spaceAndSources
                         .font(.subheadline).foregroundStyle(Color.muted)
-                    Button(action: model.openSources) {
-                        Text(SettingsPhase2Copy.whereFrom)
-                    }
-                    .font(.subheadline.weight(.medium)).tint(.accent)
-                    .disabled(model.busy).accessibilityIdentifier("modelDownloadSources")
-                    .frame(minHeight: HitTarget.minimum)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .environment(\.openURL, OpenURLAction { url in
+                            guard url.scheme == "cassini" else { return .systemAction }
+                            if !model.busy { model.openSources() }
+                            return .handled
+                        })
+                        .accessibilityIdentifier("modelDownloadSources")
                     if typeSize.isAccessibilitySize { ModelDownloadActions(model: model) }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -137,6 +137,16 @@ private struct ModelDownloadContent: View {
         }
         .padding(.horizontal, 20).padding(.bottom, 24)
         .readableWidth()
+    }
+
+    /// The space line with "Where do the files come from?" as an inline link at its end.
+    private var spaceAndSources: Text {
+        let space = SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale))
+        var link = AttributedString(SettingsPhase2Copy.whereFromLink)
+        link.link = URL(string: "cassini://model-sources")
+        link.foregroundColor = Color.accentInk
+        link.font = .subheadline.weight(.medium)
+        return Text(space + " ") + Text(link)
     }
 
     /// The language's name as the Settings picker shows it, in the app's language.
@@ -177,14 +187,12 @@ private struct ModelDownloadActions: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(model.busy).accessibilityIdentifier("modelDownloadPrimary")
-            Button(action: model.notNow) { Text(SettingsPhase2Copy.notNow) }
-                .font(.body.weight(.medium)).tint(.ink)
-                .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
-                .disabled(model.busy).accessibilityIdentifier("modelDownloadNotNow")
-            if model.withNote {
-                Text(SettingsPhase2Copy.recordingKept).font(.footnote).foregroundStyle(Color.muted)
-                    .multilineTextAlignment(.center).frame(maxWidth: .infinity)
+            Button(action: model.notNow) {
+                Text(model.withNote ? SettingsPhase2Copy.offerNotNow : SettingsPhase2Copy.notNow)
             }
+            .font(.body.weight(.medium)).tint(.ink)
+            .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
+            .disabled(model.busy).accessibilityIdentifier("modelDownloadNotNow")
         }
     }
 

@@ -14,10 +14,6 @@ import CassiniNotebook
             "firstRun.privacy.iphone",
             "firstRun.privacy.ipad",
             "firstRun.privacy.backups.ios",
-            "privacy.onDevice.iphone.withBackup",
-            "privacy.onDevice.iphone.backupExcluded",
-            "privacy.onDevice.ipad.withBackup",
-            "privacy.onDevice.ipad.backupExcluded",
         ]
         let expected: [(String, [String])] = [
             ("en", [
@@ -27,10 +23,6 @@ import CassiniNotebook
                 "Transcribed on this iPhone.",
                 "Transcribed on this iPad.",
                 "Backups follow your iCloud settings.",
-                "Transcribed on this iPhone. Never uploaded, except to your encrypted cloud backup.",
-                "Transcribed on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup.",
-                "Transcribed on this iPad. Never uploaded, except to your encrypted cloud backup.",
-                "Transcribed on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup.",
             ]),
             ("it", [
                 "Ogni parola trascritta.",
@@ -39,10 +31,6 @@ import CassiniNotebook
                 "Trascritto su questo iPhone.",
                 "Trascritto su questo iPad.",
                 "I backup seguono le impostazioni di iCloud.",
-                "Trascritto su questo iPhone. Mai caricato, tranne nel tuo backup crittografato nel cloud.",
-                "Trascritto su questo iPhone. Cassini non carica mai l’audio e lo contrassegna per escluderlo dal Backup iCloud.",
-                "Trascritto su questo iPad. Mai caricato, tranne nel tuo backup crittografato nel cloud.",
-                "Trascritto su questo iPad. Cassini non carica mai l’audio e lo contrassegna per escluderlo dal Backup iCloud.",
             ]),
             ("fr", [
                 "Chaque mot transcrit.",
@@ -51,10 +39,6 @@ import CassiniNotebook
                 "Transcrit sur cet iPhone.",
                 "Transcrit sur cet iPad.",
                 "Les sauvegardes suivent vos réglages iCloud.",
-                "Transcrit sur cet iPhone. Jamais mis en ligne, sauf dans votre sauvegarde cloud chiffrée.",
-                "Transcrit sur cet iPhone. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud.",
-                "Transcrit sur cet iPad. Jamais mis en ligne, sauf dans votre sauvegarde cloud chiffrée.",
-                "Transcrit sur cet iPad. Cassini ne met jamais l’audio en ligne et le marque pour l’exclure de la Sauvegarde iCloud.",
             ]),
             ("es", [
                 "Cada palabra transcrita.",
@@ -63,10 +47,6 @@ import CassiniNotebook
                 "Transcrito en este iPhone.",
                 "Transcrito en este iPad.",
                 "Las copias de seguridad siguen tus ajustes de iCloud.",
-                "Transcrito en este iPhone. Nunca se sube, salvo a tu copia de seguridad cifrada en la nube.",
-                "Transcrito en este iPhone. Cassini nunca sube el audio y lo marca para dejarlo fuera de Copia en iCloud.",
-                "Transcrito en este iPad. Nunca se sube, salvo a tu copia de seguridad cifrada en la nube.",
-                "Transcrito en este iPad. Cassini nunca sube el audio y lo marca para dejarlo fuera de Copia en iCloud.",
             ]),
             ("pt-BR", [
                 "Cada palavra transcrita.",
@@ -75,10 +55,6 @@ import CassiniNotebook
                 "Transcrito neste iPhone.",
                 "Transcrito neste iPad.",
                 "Os backups seguem os seus ajustes do iCloud.",
-                "Transcrito neste iPhone. Nunca é enviado, exceto para o seu backup criptografado na nuvem.",
-                "Transcrito neste iPhone. O Cassini nunca envia o áudio e o marca para ficar fora do Backup do iCloud.",
-                "Transcrito neste iPad. Nunca é enviado, exceto para o seu backup criptografado na nuvem.",
-                "Transcrito neste iPad. O Cassini nunca envia o áudio e o marca para ficar fora do Backup do iCloud.",
             ]),
             ("pt-PT", [
                 "Cada palavra transcrita.",
@@ -87,10 +63,6 @@ import CassiniNotebook
                 "Transcrito neste iPhone.",
                 "Transcrito neste iPad.",
                 "As cópias de segurança seguem as suas definições de iCloud.",
-                "Transcrito neste iPhone. Nunca é enviado, exceto para a sua cópia de segurança encriptada na nuvem.",
-                "Transcrito neste iPhone. O Cassini nunca envia o áudio e marca-o para ficar fora da Cópia em iCloud.",
-                "Transcrito neste iPad. Nunca é enviado, exceto para a sua cópia de segurança encriptada na nuvem.",
-                "Transcrito neste iPad. O Cassini nunca envia o áudio e marca-o para ficar fora da Cópia em iCloud.",
             ]),
         ]
         for (language, values) in expected {
@@ -99,21 +71,6 @@ import CassiniNotebook
             }
         }
         #expect(LibraryWave5Copy.template("firstRun.hero.title", language: "fr_CA") == "Chaque mot transcrit.")
-    }
-
-    /// PARITY Wave 6 contract §2 / D98: iOS never claims "The audio never leaves it." in any state.
-    @Test func devicePrivacyLineSelectsBackupOrExclusionCopyAndNeverClaimsNeverLeaves() {
-        let combinations: [(FirstRunDevice, FirstRunPrivacy, String)] = [
-            (.phone, .withBackup, "Transcribed on this iPhone. Never uploaded, except to your encrypted cloud backup."),
-            (.phone, .backupExcluded, "Transcribed on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup."),
-            (.pad, .withBackup, "Transcribed on this iPad. Never uploaded, except to your encrypted cloud backup."),
-            (.pad, .backupExcluded, "Transcribed on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup."),
-        ]
-        for (device, privacy, expected) in combinations {
-            let text = LibraryWave5Copy.privacyLine(privacy, device: device)
-            #expect(text == expected)
-            #expect(!text.localizedCaseInsensitiveContains("never leaves"))
-        }
     }
 
     @Test func conversationKeepsItsPausesFadeAndBoundsAtPhoneAndSidebarWidths() {
