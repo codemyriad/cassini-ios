@@ -30,7 +30,6 @@ struct LibraryView: View {
     @State private var selectedNotes: Set<UUID> = []
     @State private var archiveExport = ArchiveExportModel()
     @State private var backupNoticeHeight: CGFloat = 0
-    @State private var viewportHeight: CGFloat = 0
     @State private var exportTarget: ExportTarget?
     @State private var confirmedExport: (UUID, ExportSheetState.Choice)?
 
@@ -45,22 +44,22 @@ struct LibraryView: View {
                 .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
                              dismissed: settings.backupNoticeDismissed)
         let showsHero = content.hero != nil && !model.favoritesOnly
-        ScrollView {
-            libraryStack(content, exportable: exportable, showsHero: showsHero)
-            // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
-            .id(content.results != nil)
-            .padding(.horizontal, showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter).padding(.top, 12)
-            // The notice floats over content, but the last row can still scroll fully above it.
-            .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
-            .readableWidth()
+        GeometryReader { viewport in
+            ScrollView {
+                libraryStack(content, exportable: exportable, showsHero: showsHero,
+                             minimumHeight: max(0, viewport.size.height - 40))
+                // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
+                .id(content.results != nil)
+                .padding(.horizontal, showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter).padding(.top, 12)
+                // The notice floats over content, but the last row can still scroll fully above it.
+                .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
+                .readableWidth()
+            }
+            .accessibilityIdentifier("libraryScroll")
+            .meetingScrollEdge()
+            .scrollDismissesKeyboard(.immediately)
+            .scrollPosition($listPosition)
         }
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
-        } action: { _, height in viewportHeight = height }
-        .accessibilityIdentifier("libraryScroll")
-        .meetingScrollEdge()
-        .scrollDismissesKeyboard(.immediately)
-        .scrollPosition($listPosition)
         .overlay(alignment: .topLeading) {
             UITestInteractiveMarker(loaded: library.isLoaded && !content.loading)
             if backup.ready {
@@ -141,7 +140,8 @@ struct LibraryView: View {
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
 
-    @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>, showsHero: Bool) -> some View {
+    @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>, showsHero: Bool,
+                                           minimumHeight: CGFloat) -> some View {
         if showsHero {
             // Fill the viewport when the copy fits; at large text sizes the stack grows and scrolls.
             VStack(alignment: .leading, spacing: Spacing.row) {
@@ -150,7 +150,7 @@ struct LibraryView: View {
                 FirstRunHeroView()
             }
             .frame(maxWidth: .infinity)
-            .frame(minHeight: max(0, viewportHeight - 40), alignment: .bottom)
+            .frame(minHeight: minimumHeight, alignment: .bottom)
         } else {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
                 libraryHeader(content)
