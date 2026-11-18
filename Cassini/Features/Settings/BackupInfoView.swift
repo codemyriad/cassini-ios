@@ -197,29 +197,49 @@ struct BackupNoticeCard: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
-                Text(SettingsPhase2Copy.backupNoticeTitle).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                Button { settings.dismissBackupNotice() } label: {
-                    Image(systemName: "xmark").font(.subheadline.weight(.semibold))
-                        .frame(width: 44, height: 44).contentShape(Circle())
-                }.buttonStyle(.plain).foregroundStyle(Color.muted)
-                    .accessibilityLabel(Wave6Copy.backupPhoneOnlyCardCloseA11y)
-                    .accessibilityIdentifier("backupNoticeDismiss")
+            if typeSize.isAccessibilitySize {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
+                    Spacer()
+                    dismissButton
+                }
+                Text(SettingsPhase2Copy.backupNoticeTitle).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
+                    Text(SettingsPhase2Copy.backupNoticeTitle).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+                    dismissButton
+                }
             }
             Text(pad ? SettingsPhase2Copy.backupNoticeBodyIpad : SettingsPhase2Copy.backupNoticeBodyIphone)
                 .font(.subheadline).foregroundStyle(Color.muted)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { keepButton; leaveOutButton }
+                .fixedSize(horizontal: false, vertical: true)
+            if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) { keepButton; leaveOutButton }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { keepButton; leaveOutButton }
+                    VStack(alignment: .leading, spacing: 8) { keepButton; leaveOutButton }
+                }
             }
         }.padding(16)
+    }
+
+    private var dismissButton: some View {
+        Button { settings.dismissBackupNotice() } label: {
+            Image(systemName: "xmark").font(.subheadline.weight(.semibold))
+                .frame(width: 44, height: 44).contentShape(Circle())
+        }.buttonStyle(.plain).foregroundStyle(Color.muted)
+            .accessibilityLabel(Wave6Copy.backupPhoneOnlyCardCloseA11y)
+            .accessibilityIdentifier("backupNoticeDismiss")
     }
 
     private var keepButton: some View {
         Button { settings.dismissBackupNotice() } label: {
             Text(SettingsPhase2Copy.backupNoticeKeep).font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 44)
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color.neutralTint, in: Capsule()).foregroundStyle(Color.ink)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeKeep")
     }
@@ -232,7 +252,8 @@ struct BackupNoticeCard: View {
             }
         } label: {
             Text(SettingsPhase2Copy.backupNoticeLeaveOut).font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16).frame(maxWidth: .infinity, minHeight: 44)
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color.neutralTint, in: Capsule()).foregroundStyle(Color.ink)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeExclude")
     }
