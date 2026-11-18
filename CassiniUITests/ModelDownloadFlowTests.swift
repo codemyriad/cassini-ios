@@ -71,7 +71,7 @@ final class ModelDownloadFlowTests: XCTestCase {
         XCTAssertEqual(part(app, "Recognising saved voices").label, "Recognising saved voices, 26 MB")
         // The figure keeps its unit on its line: a no-break space.
         XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of 532\u{00A0}MB.").exists)
-        XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free while it installs.").exists)
+        XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free to install. Each file is checked before it’s used.").exists)
         XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
     }
