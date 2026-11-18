@@ -1059,7 +1059,9 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Import audio"].exists, "Record and Import stay in the bottom capture bar")
         XCTAssertFalse(app.buttons["Import"].exists, "no duplicate Import banner button")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
-        XCTAssertEqual(title.frame.minX, app.scrollViews["libraryScroll"].frame.minX + 16, accuracy: 1)
+        // iOS 18's sidebar scroll surface extends beyond the window; the gutter starts at its visible edge.
+        let viewport = app.scrollViews["libraryScroll"].frame.intersection(app.frame)
+        XCTAssertEqual(title.frame.minX, viewport.minX + 16, accuracy: 1)
         XCTAssertEqual(title.frame.minX, app.buttons["importButton"].frame.minX, accuracy: 1)
         XCTAssertGreaterThan(title.frame.minY, app.frame.midY)
         XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)
