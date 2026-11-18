@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 import CassiniEngine
@@ -6,6 +7,8 @@ import CassiniSherpa
 
 /// The host side of CassiniSherpa: `swift test` on macOS links no native runtime, so neither native object can be made.
 /// The configurations they copy are tested in CassiniEngine (`ParakeetDecoderConfigTests`, `SileroDetectorConfigTests`).
+@Suite(.serialized)
+struct CassiniSherpaTests {
 @Test func theMacBuildLinksNoNativeRuntime() {
     #if os(macOS)
     #expect(!SherpaRuntime.isLinked)
@@ -78,4 +81,27 @@ import CassiniSherpa
     #if os(macOS)
     #expect(throws: SherpaError.notLinked) { try SherpaRuntime.speakers.makeDiarizer(URL(fileURLWithPath: "/m"), nil) }
     #endif
+}
+
+@Test func sherpaEntryPointsSetTelemetryOptOutFromMissingAndZeroWithoutWhistle() throws {
+    defer { OnnxRuntimePrivacy.ensureTelemetryDisabled() }
+    let missingModel = URL(fileURLWithPath: "/nonexistent.onnx")
+    let actions: [() -> Void] = [
+        { _ = try? ParakeetDecoder(files: ParakeetFiles(directory: missingModel)) },
+        { _ = try? SileroDetector(config: SileroConfig(model: missingModel)) },
+        { _ = try? SortformerStream(model: missingModel) },
+        { _ = try? SortformerStream.turns(PcmAudio([0], sampleRate: 16_000), model: missingModel) },
+        { _ = try? VoiceprintExtractor.compute(model: missingModel, audio: PcmAudio([0], sampleRate: 16_000),
+                                               windows: ["a": [PrintWindow(0, 1)]]) {} }
+    ]
+    for action in actions {
+        for initial in [String?.none, "0"] {
+            if let initial { setenv(OnnxRuntimePrivacy.environmentKey, initial, 1) }
+            else { unsetenv(OnnxRuntimePrivacy.environmentKey) }
+            #expect(!OnnxRuntimePrivacy.isTelemetryDisabled)
+            action()
+            #expect(OnnxRuntimePrivacy.currentValue == "1")
+        }
+    }
+}
 }

@@ -15,11 +15,7 @@ public final class WhistleVAD {
               SHA256.hash(data: bytes).map({ String(format: "%02x", $0) }).joined() == Self.modelSHA256 else {
             throw WhistleError.integrity
         }
-        var environment: [String:String] = [:]
-        for (key, value) in WhistlePrivacy.required {
-            guard setenv(key, value, 1) == 0, let raw = getenv(key) else { throw WhistleError.privacy }
-            environment[key] = String(cString: raw)
-        }
+        let environment = try WhistlePrivacy.applyRequiredEnvironment()
         var error = [CChar](repeating: 0, count: 2048)
         let created = try WhistlePrivacy.enter(environment: environment) {
             model.path.withCString { cassini_vad_create($0, &error, error.count) }

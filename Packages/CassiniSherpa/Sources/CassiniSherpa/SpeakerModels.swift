@@ -68,6 +68,7 @@ public final class SortformerStream: StreamingDiarizer, @unchecked Sendable {
     /// A new diarizer, or one that resumes `restored`. Throws `SherpaError.restoreFailed` for a cache the model does
     /// not take or that is over the cap.
     public init(model: URL, restored: SortformerState? = nil) throws {
+        try SherpaRuntime.prepare()
         #if canImport(SherpaOnnxC)
         diarizer = try Self.create(SortformerConfig(model: model))
         history = TurnHistory(restored?.turns ?? [])
@@ -136,6 +137,7 @@ public final class SortformerStream: StreamingDiarizer, @unchecked Sendable {
         guard threads > 0, audio.sampleRate == 16_000 else { throw SherpaError.invalidAudio }
         guard !audio.samples.isEmpty else { throw JobFailure.audio }
         try Task.checkCancellation()
+        try SherpaRuntime.prepare()
         #if canImport(SherpaOnnxC)
         let diarizer = try create(SortformerConfig(model: model, threads: threads))
         defer { SherpaOnnxDestroyOfflineSpeakerDiarization(diarizer) }
@@ -213,6 +215,7 @@ public enum VoiceprintExtractor {
                                active: () throws -> Void) throws -> [String: Voiceprint] {
         if windows.isEmpty { return [:] }
         try active()
+        try SherpaRuntime.prepare()
         #if canImport(SherpaOnnxC)
         let config = VoiceprintConfig(model: model)
         guard fileExists(config.model) else { throw SherpaError.missingFiles }

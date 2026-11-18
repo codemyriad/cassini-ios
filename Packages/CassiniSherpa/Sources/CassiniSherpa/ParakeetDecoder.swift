@@ -30,6 +30,11 @@ public enum SherpaRuntime {
         #endif
     }
 
+    /// Ensures the shared ONNX Runtime telemetry opt-out is active before any sherpa-onnx native call.
+    public static func prepare() throws {
+        guard OnnxRuntimePrivacy.ensureTelemetryDisabled() else { throw SherpaError.createFailed }
+    }
+
     /// The native recognizer and detector for `ParakeetTranscriber`; both throw `notLinked` without the runtime.
     public static let speech = SpeechRuntime(makeDecoder: { try ParakeetDecoder(config: $0) },
                                              makeDetector: { try SileroDetector(config: $0) })
@@ -57,6 +62,7 @@ public final class ParakeetDecoder: SpeechDecoding, @unchecked Sendable {
 
     /// `debug` makes sherpa-onnx print the encoder's metadata to standard error while it loads.
     public init(config: ParakeetConfig, debug: Bool = false) throws {
+        try SherpaRuntime.prepare()
         #if canImport(SherpaOnnxC)
         guard [config.encoder, config.decoder, config.joiner, config.tokens].allSatisfy(isFile) else {
             throw SherpaError.missingFiles
@@ -129,6 +135,7 @@ public final class SileroDetector: SpeechDetecting, @unchecked Sendable {
     #endif
 
     public init(config: SileroConfig) throws {
+        try SherpaRuntime.prepare()
         #if canImport(SherpaOnnxC)
         guard isFile(config.model) else { throw SherpaError.missingFiles }
         let created = withCStrings([config.model, config.provider]) { strings -> OpaquePointer? in

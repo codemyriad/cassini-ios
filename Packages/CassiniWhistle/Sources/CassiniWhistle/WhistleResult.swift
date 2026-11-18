@@ -1,3 +1,5 @@
+import CassiniNotebook
+import Darwin
 import Foundation
 
 /// C API output. Validation happens before any word can be published by an eventual production pipeline adapter.
@@ -46,6 +48,17 @@ public enum WhistleError: Error, Equatable, Sendable {
 /// Testable admission boundary. Even an existing runtime is not entered with missing or changed flags.
 public enum WhistlePrivacy {
     public static let required = ["NEEDLE_TELEMETRY": "0", "DO_NOT_TRACK": "1", "ORT_DISABLE_TELEMETRY": "1"]
+
+    /// Sets the shared ONNX Runtime opt-out and every Whistle privacy variable before entering native code.
+    public static func applyRequiredEnvironment() throws -> [String: String] {
+        guard OnnxRuntimePrivacy.ensureTelemetryDisabled() else { throw WhistleError.privacy }
+        var environment: [String: String] = [:]
+        for (key, value) in required {
+            guard setenv(key, value, 1) == 0, let raw = getenv(key) else { throw WhistleError.privacy }
+            environment[key] = String(cString: raw)
+        }
+        return environment
+    }
 
     public static func enter<T>(environment: [String: String], _ load: () throws -> T) throws -> T {
         guard required.allSatisfy({ environment[$0.key] == $0.value }) else { throw WhistleError.privacy }
