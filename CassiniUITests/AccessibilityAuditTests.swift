@@ -38,10 +38,10 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
-        // The clipping audit redraws at other text sizes. After auditing the populated Library,
-        // its in-process replacement can retain that audit's scroll geometry and jump back to the top
-        // during the empty-Library audit. A fresh process isolates this scrollable AX5 introduction.
-        let app = launch(extra, fresh: extra.contains(Self.largestText[1]))
+        // Clipping audits redraw at other text sizes, even when launched at the default size.
+        // After auditing the populated Library, an in-process replacement can retain its audit layout
+        // (scroll position or capture-bar fit). First-run audits need an independent process.
+        let app = launch(extra, fresh: true)
         let hero = app.staticTexts["heroTitle"]
         XCTAssertTrue(hero.waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists, "No backup notice before the first saved meeting")
