@@ -42,6 +42,11 @@ final class AccessibilityAuditTests: XCTestCase {
         let hero = app.staticTexts["heroTitle"]
         XCTAssertTrue(hero.waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists, "No backup notice before the first saved meeting")
+        if extra.contains(Self.largestText[1]) {
+            // At AX5 the introduction is taller than the viewport. Expose its final paragraph before
+            // auditing: an intentionally half-visible line at the scroll edge is not truncated text.
+            _ = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
+        }
         return app
     }
 
@@ -319,8 +324,11 @@ final class AccessibilityAuditTests: XCTestCase {
         defer { XCUIApplication().terminate() }
         for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
             let app = emptyLibrary(Self.largestText + ["-AppleLanguages", "(\(language))"])
-            audit(app, screen: "first-run-largest-\(language)", .textClipped)
-            let privacy = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
+            for identifier in ["heroTitle", "heroSubtitle", "heroHowTo", "heroPrivacy"] {
+                // Every block must fit fully between the bars, even when the whole introduction cannot.
+                _ = app.scrolledLibraryElement(app.staticTexts[identifier], description: identifier)
+            }
+            let privacy = app.staticTexts["heroPrivacy"]
             XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)
             audit(app, screen: "first-run-privacy-largest-\(language)", .textClipped)
             XCTAssertTrue(app.buttons["recordButton"].isHittable)
