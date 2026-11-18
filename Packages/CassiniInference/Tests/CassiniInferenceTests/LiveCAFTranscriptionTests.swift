@@ -32,7 +32,7 @@ struct LiveCAFTranscriptionTests {
         }, events: { event in updates.withLock { $0.append(event) } })
         let final = updates.withLock { $0 }
         #expect(final.count == 1)
-        if case let .revision(start, end, settled, words) = final.first {
+        if case let .revision(start, end, settled, words)? = final.first {
             #expect(start == 0)
             #expect(end == 1000)
             #expect(settled == 1000)

@@ -158,11 +158,28 @@ import CassiniEngineTesting
         var candidates: [any Transcribing] = [apple, whistle]
         if first.recognizer == .parakeet { candidates.append(first) }
         let speech = RoutedTranscriber(legacy: legacy, candidates: candidates) { speechModels.selectedRecognizer() }
+        let previewRun: RecordingPreview.Run?
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--live-transcription-preview") {
+            previewRun = { url, wakes, events in
+                switch speechModels.selectedRecognizer() {
+                case .whistle:
+                    try await whistle.preview(url: url, wakes: wakes, events: events)
+                case .parakeet:
+                    guard let parakeet = first as? ParakeetTranscriber else { throw JobFailure.model }
+                    try await parakeet.preview(url: url, wakes: wakes, events: events)
+                default: throw JobFailure.model
+                }
+            }
+        } else { previewRun = nil }
+        #else
+        previewRun = nil
+        #endif
         var value = AppEnvironment(
             root: root,
             defaults: defaults, clock: SystemClock(), locale: .autoupdatingCurrent, timeZone: .autoupdatingCurrent,
             transcriber: speech, analyzer: speakerAnalyzer(models: models),
-            capture: AVCaptureAdapter(), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
+            capture: AVCaptureAdapter(previewRun: previewRun), microphone: AVMicrophonePermission(), liveActivity: ActivityKitAdapter(),
             playback: AVPlaybackAdapter(), audio: LocalAudioProcessing(), storage: storage,
             background: UIKitBackgroundRunner(platform: platform), notifier: UNNotifier(), platform: platform)
         value.speechModels = speechModels

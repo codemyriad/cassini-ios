@@ -49,6 +49,9 @@ extension AVAudioRecorder: CaptureRecorder {}
     let events: AsyncStream<CaptureEvent>
     private let continuation: AsyncStream<CaptureEvent>.Continuation
     private let session: CaptureSession
+    private let previewRun: RecordingPreview.Run?
+    private(set) var preview: RecordingPreview?
+    private var nextPreviewWake: UInt64 = 0
     private let makeRecorder: @MainActor (URL) throws -> any CaptureRecorder
     private(set) var recordedAt: Date?
     private var recorder: (any CaptureRecorder)?
@@ -56,9 +59,12 @@ extension AVAudioRecorder: CaptureRecorder {}
     private var observers: [NSObjectProtocol] = []
     private var isPaused = false
 
-    init(session: CaptureSession = .live, makeRecorder: @escaping @MainActor (URL) throws -> any CaptureRecorder = AVCaptureAdapter.pcmRecorder) {
+    init(session: CaptureSession = .live,
+         previewRun: RecordingPreview.Run? = nil,
+         makeRecorder: @escaping @MainActor (URL) throws -> any CaptureRecorder = AVCaptureAdapter.pcmRecorder) {
         (events, continuation) = AsyncStream.makeStream(of: CaptureEvent.self)
         self.session = session
+        self.previewRun = previewRun
         self.makeRecorder = makeRecorder
         super.init()
         let center = NotificationCenter.default
@@ -78,6 +84,9 @@ extension AVAudioRecorder: CaptureRecorder {}
                 self.continuation.yield(.mediaReset)
             }
         })
+        observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.preview?.cancel() }
+        })
         // The app is being closed: stopping writes the CAF header now, so recovery finds a clean file at next launch.
         observers.append(center.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.stopForTermination() }
@@ -85,6 +94,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     }
 
     isolated deinit {
+        preview?.cancel()
         timer?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
         continuation.finish()
@@ -116,6 +126,9 @@ extension AVAudioRecorder: CaptureRecorder {}
             // record() can spend time preparing hardware; anchor to the actual audio position after it succeeds.
             recordedAt = Date().addingTimeInterval(-max(0, capture.currentTime))
             recorder = capture; isPaused = false
+            preview?.cancel()
+            preview = previewRun.map { RecordingPreview(url: url, run: $0) }
+            nextPreviewWake = 0
             startMetering()
             return .pcm48kMono
         } catch {
@@ -153,6 +166,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     func stop() async throws -> CaptureResult {
         let duration = recorder?.currentTime ?? 0
         recorder?.stop(); timer?.invalidate(); timer = nil; recorder = nil; isPaused = false
+        preview?.finish()
         session.deactivate()
         return CaptureResult(duration: duration)
     }
@@ -163,6 +177,7 @@ extension AVAudioRecorder: CaptureRecorder {}
         recorder = nil
         timer?.invalidate(); timer = nil
         capture.stop()
+        preview?.cancel()
     }
 
     private func startMetering() {
@@ -179,6 +194,13 @@ extension AVAudioRecorder: CaptureRecorder {}
     private func tick() {
         guard let recorder, !isPaused else { return }
         recorder.updateMeters()
+        if let preview {
+            let now = DispatchTime.now().uptimeNanoseconds
+            if now >= nextPreviewWake {
+                nextPreviewWake = now + 100_000_000
+                preview.audioAvailable()
+            }
+        }
         continuation.yield(.level(max(0, min(1, pow(10, recorder.averagePower(forChannel: 0) / 35)))))
     }
 
@@ -201,6 +223,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     /// The recorder stopped without `stop()`: the capture is over, and what was written stays.
     private func reportFailure(of identity: ObjectIdentifier) {
         guard let current = recorder, ObjectIdentifier(current) == identity else { return }
+        preview?.finish()
         continuation.yield(.failed)
     }
 }
