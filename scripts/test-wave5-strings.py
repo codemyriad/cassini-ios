@@ -140,10 +140,20 @@ class Wave5StringGenerationTests(unittest.TestCase):
 
     def test_repin_rejects_placeholder_or_non_ios_entry(self):
         def add_placeholder(entries):
-            item = next(e for e in entries if e['id'] == 'firstRun.hero.subtitle')
+            item = next(e for e in entries if e['id'] == 'firstRun.hero.subtitle.iphone')
             item['l10n']['fr']['text'] = 'Rien {extra}'
         self.repin(add_placeholder)
         with self.assertRaisesRegex(ValueError, 'Placeholder drift'):
+            generator.outputs(self.root)
+
+    def test_pending_permission_copy_never_ships(self):
+        output = generator.outputs(self.root)
+        for path, content in output.items():
+            self.assertNotIn(b'permissionPrompt.', content, str(path))
+        def mark_pending(entries):
+            next(e for e in entries if e['id'] == 'firstRun.hero.subtitle.iphone')['status'] = 'pending'
+        self.repin(mark_pending)
+        with self.assertRaisesRegex(ValueError, 'Pending copy must not ship'):
             generator.outputs(self.root)
 
     def test_repin_rejects_dropping_count_in_zero_covering_one_plural(self):

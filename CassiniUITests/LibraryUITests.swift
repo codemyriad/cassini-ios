@@ -1036,7 +1036,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(search.value as? String, "tomatoe", "the search stays open")
     }
 
-    // ports: FirstRunHeroBehaviourTest#backupOnPairsTheSubtitleWithItsQualifierAndTheBackupPrivacyLine
+    // D105: first run is device-specific and independent of backup settings.
     @MainActor func testAnEmptyLibraryOffersRecordAndImport() {
         let app = launch([])
         let pad = UIDevice.current.userInterfaceIdiom == .pad
@@ -1045,13 +1045,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertEqual(title.label, "Every word written down.")
         let subtitle = app.descendants(matching: .any)["heroSubtitle"]
         XCTAssertTrue(subtitle.exists)
-        XCTAssertEqual(subtitle.label, "None of it uploaded. (except for encrypted cloud backup)")
+        XCTAssertEqual(subtitle.label, pad ? "Right here, on this iPad." : "Right here, on this iPhone.")
         let howTo = app.staticTexts["heroHowTo"]
-        XCTAssertEqual(howTo.label, "Press Record when the meeting starts and Stop when it ends. Cassini writes it all down.")
+        XCTAssertEqual(howTo.label, "Record something, or import an audio file.")
         let privacy = app.descendants(matching: .any)["heroPrivacy"]
         let expectedPrivacy = pad
-            ? "Written down on this iPad. Never uploaded, except to your encrypted cloud backup."
-            : "Written down on this iPhone. Never uploaded, except to your encrypted cloud backup."
+            ? "Transcribed on this iPad.\nBackups follow your iCloud settings."
+            : "Transcribed on this iPhone.\nBackups follow your iCloud settings."
         XCTAssertEqual(privacy.label, expectedPrivacy)
         XCTAssertFalse(app.staticTexts["No notes yet"].exists, "the Wave 5 hero replaces LIB_EMPTY")
         XCTAssertFalse(app.buttons["Starred"].exists, "the filter bar hides while the Library has no meetings")
@@ -1059,24 +1059,28 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Import audio"].exists, "Record and Import stay in the bottom capture bar")
         XCTAssertFalse(app.buttons["Import"].exists, "no duplicate Import banner button")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
+        XCTAssertEqual(title.frame.minX, app.textFields["librarySearch"].frame.minX, accuracy: 1)
+        XCTAssertEqual(title.frame.minX, app.buttons["importButton"].frame.minX, accuracy: 1)
+        XCTAssertGreaterThan(title.frame.minY, app.frame.midY)
+        XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)
         capture("Library empty")
     }
 
-    // ports: FirstRunHeroBehaviourTest#transferOnlyShowsTheProcessingLineWithoutTheQualifier
-    @MainActor func testAnEmptyLibraryWithBackupExcludedHidesQualifierAndShowsBackupExcludedPrivacyLine() {
+    // D105: excluding backup keeps the same always-true first-run copy.
+    @MainActor func testAnEmptyLibraryWithBackupExcludedKeepsTheSameFirstRunCopy() {
         let app = launch(["--backup-excluded"])
         let pad = UIDevice.current.userInterfaceIdiom == .pad
         let title = app.staticTexts["heroTitle"]
         XCTAssertTrue(title.waitForExistence(within: 15))
         XCTAssertEqual(title.label, "Every word written down.")
         let subtitle = app.descendants(matching: .any)["heroSubtitle"]
-        XCTAssertEqual(subtitle.label, "None of it uploaded.")
+        XCTAssertEqual(subtitle.label, pad ? "Right here, on this iPad." : "Right here, on this iPhone.")
         XCTAssertFalse(app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", "(except for encrypted cloud backup)")).firstMatch.exists)
         let privacy = app.descendants(matching: .any)["heroPrivacy"]
         let expectedPrivacy = pad
-            ? "Written down on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
-            : "Written down on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
+            ? "Transcribed on this iPad.\nBackups follow your iCloud settings."
+            : "Transcribed on this iPhone.\nBackups follow your iCloud settings."
         XCTAssertEqual(privacy.label, expectedPrivacy)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
     }
@@ -1084,7 +1088,7 @@ final class LibraryUITests: XCTestCase {
     @MainActor func testIPadEmptyLibraryShowsIPadHeroAndPrivacyLines() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
         testAnEmptyLibraryOffersRecordAndImport()
-        testAnEmptyLibraryWithBackupExcludedHidesQualifierAndShowsBackupExcludedPrivacyLine()
+        testAnEmptyLibraryWithBackupExcludedKeepsTheSameFirstRunCopy()
     }
 
     // ports: LibraryBehaviourTest#renameSavesTheTrimmedTitleOnlyWhenItChanged

@@ -42,6 +42,7 @@ SHOTS = {
 
     "28-first-run": ("First run", "P2FirstRun-Phones", "test28FirstRun", "empty"),
     "29-voices-question": ("Voices question", "P2Voices-Phones", "test29VoicesQuestion", "speakers"),
+    "31-first-run-largest-text": ("First run, largest text", "P2FirstRun-Phones", "test31FirstRunLargestText", "empty"),
     "30-model-download": ("Model download", "P2Download-Phones", "test30ModelDownload", "library"),
 
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),

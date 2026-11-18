@@ -16,9 +16,11 @@ SAVED_VOICES_LOOKUP = Path('Cassini/Strings/SavedVoicesPhase2Copy.swift')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 PROPERTIES = {
     'firstRun.hero.title': 'heroTitle',
-    'firstRun.hero.subtitle': 'heroSubtitle',
-    'firstRun.hero.phoneBackupQualifier': 'heroPhoneBackupQualifier',
-    'firstRun.hero.subtitlePhoneNote': 'heroSubtitlePhoneNote',
+    'firstRun.hero.subtitle.iphone': 'heroSubtitleIphone',
+    'firstRun.hero.subtitle.ipad': 'heroSubtitleIpad',
+    'firstRun.privacy.iphone': 'firstRunPrivacyIphone',
+    'firstRun.privacy.ipad': 'firstRunPrivacyIpad',
+    'firstRun.privacy.backups.ios': 'firstRunPrivacyBackups',
     'privacy.onDevice.iphone.withBackup': 'iphonePrivacyWithBackup',
     'privacy.onDevice.iphone.backupExcluded': 'iphonePrivacyBackupExcluded',
     'privacy.onDevice.ipad.withBackup': 'ipadPrivacyWithBackup',
@@ -80,6 +82,8 @@ def _library_outputs(pin, all_entries):
         raise ValueError('Missing or duplicate Wave 5 library string IDs')
     strings = {}
     for entry in sorted(selected, key=lambda item: item['id']):
+        if entry.get('status') == 'pending':
+            raise ValueError(f'Pending copy must not ship: {entry["id"]}')
         if 'ios' not in entry.get('platforms', []):
             raise ValueError(f'Entry is not declared for iOS: {entry["id"]}')
         locales = {}
@@ -104,7 +108,7 @@ def _library_outputs(pin, all_entries):
         'import Foundation',
         'import CassiniNotebook',
         '',
-        '/// Shared Wave 5 first-run hero and backup-gated privacy copy, resolved using the current app language.',
+        '/// D105 first-run hero and D98 Settings privacy copy, resolved using the current app language.',
         'enum LibraryWave5Copy {',
     ]
     for key, name in sorted(PROPERTIES.items()):

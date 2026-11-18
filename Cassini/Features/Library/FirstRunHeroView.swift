@@ -2,30 +2,33 @@ import SwiftUI
 import UIKit
 import CassiniNotebook
 
-/// Hero metrics. The phone headline size (`32`) is decided (`L-27`); gaps and wave dimensions are drawn values kept as
-/// named constants (`COMPONENTS.md` §8).
+/// D105 / L-70–71: normal letter spacing, a 44-point conversation wave and one shared 16-point edge.
 enum FirstRunHeroMetrics {
-    static let headlineSize: CGFloat = 32
-    static let top: CGFloat = 20
+    static let headlineSize: CGFloat = 28
     static let subtitleTop: CGFloat = 4
-    static let qualifierTop: CGFloat = 6
-    static let waveTop: CGFloat = 24
-    static let waveHeight: CGFloat = 40
-    static let howToTop: CGFloat = 20
-    static let privacyTop: CGFloat = 10
+    static let waveHeight: CGFloat = 44
+    static let sectionSpacing: CGFloat = 18
     static let shieldSpacing: CGFloat = 6
+    static let gutter: CGFloat = 16
 }
 
-/// The wave component on phones (`L-27`, `W5.2`, `COMPONENTS.md` §8): square `4 pt` teal (`accent`) bars, `4 pt` apart,
-/// fading toward the trailing edge (mirrored in RTL).
+/// The four phrases and three pauses drawn in P2FirstRun-Phones (17 November).
+/// Resampling the whole conversation preserves the pauses on a narrow iPad sidebar or a wide window.
 enum HeroWaveMetrics {
-    static let bar: CGFloat = 4
-    static let gap: CGFloat = 4
+    static let bar: CGFloat = 3
+    static let gap: CGFloat = 3
     static let levels: [CGFloat] = [
-        0.30, 0.55, 0.80, 0.45, 1.00, 0.65, 0.35, 0.70, 0.90, 0.50,
-        0.25, 0.60, 0.85, 0.40, 0.75, 0.30, 0.55, 0.95, 0.45, 0.20,
+        8, 26, 15, 28, 26, 28, 31, 18, 23, 16, 9, 14, 27, 14, 9, 7, 7, 7, 12,
+        12, 18, 15, 16, 16, 20, 19, 18, 24, 20, 15, 24, 24, 19, 11, 7,
+        27, 32, 27, 16, 14, 20, 16, 30, 38, 24, 34, 16, 7, 7, 7,
+        11, 12, 12, 12, 11, 7, 7, 7, 7,
     ]
-    static let endAlpha: CGFloat = 0
+    static let opacities: [Double] = [
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.87, 0.79, 0.78, 0.82, 0.92,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.86, 0.79,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.96, 0.82, 0.76, 0.76,
+        0.82, 0.84, 0.79, 0.74, 0.69, 0.64, 0.60, 0.55, 0.50,
+    ]
 
     struct Bar: Equatable {
         let rect: CGRect
@@ -33,100 +36,76 @@ enum HeroWaveMetrics {
     }
 
     static func bars(width: CGFloat, height: CGFloat, rightToLeft: Bool = false) -> [Bar] {
-        let step = bar + gap
-        let count = Int((width + gap) / step)
-        guard count > 0, height > 0 else { return [] }
+        guard width.isFinite, height.isFinite, width >= bar, height > 0 else { return [] }
+        let count = Int((width + gap) / (bar + gap))
         return (0..<count).map { index in
             let fraction = count == 1 ? 0 : CGFloat(index) / CGFloat(count - 1)
-            let alpha = Double(1 - (1 - endAlpha) * fraction)
-            let barHeight = max(height * levels[index % levels.count], bar)
-            let x = rightToLeft ? width - bar - CGFloat(index) * step : CGFloat(index) * step
-            return Bar(rect: CGRect(x: x, y: (height - barHeight) / 2, width: bar, height: barHeight), alpha: alpha)
+            let sample = Int((fraction * CGFloat(levels.count - 1)).rounded())
+            let barHeight = min(height, max(height * levels[sample] / 44, bar))
+            let offset = fraction * (width - bar)
+            let x = rightToLeft ? width - bar - offset : offset
+            return Bar(rect: CGRect(x: x, y: (height - barHeight) / 2, width: bar, height: barHeight),
+                       alpha: opacities[sample])
         }
     }
 }
 
-/// The Wave 5 first-run hero on an empty Library (`L-27`, `D-974`, `D98`): the headline pair, decorative wave, how-to
-/// line, and backup-gated device-specific privacy line. Record and Import stay in the bottom `CaptureBar`.
+/// D105 first run has the same copy with backup on or off. Settings retains its full D98 privacy variants.
 struct FirstRunHeroView: View {
-    let hero: FirstRunHero
     var device: FirstRunDevice = UIDevice.current.userInterfaceIdiom == .pad ? .pad : .phone
     @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = FirstRunHeroMetrics.headlineSize
+    @ScaledMetric(relativeTo: .callout) private var howToSize: CGFloat = 16
 
     var body: some View {
-        let privacyText = LibraryWave5Copy.privacyLine(hero.privacy, device: device)
-        VStack(alignment: .leading, spacing: 0) {
-            Text(LibraryWave5Copy.heroTitle)
-                .font(.system(size: headlineSize, weight: .bold))
-                .foregroundStyle(Color.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("heroTitle")
-
-            if hero.cloudBackup {
-                VStack(alignment: .leading, spacing: FirstRunHeroMetrics.qualifierTop) {
-                    Text(LibraryWave5Copy.heroSubtitle)
-                        .font(.system(size: headlineSize, weight: .bold))
-                        .foregroundStyle(Color.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(LibraryWave5Copy.heroPhoneBackupQualifier)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, FirstRunHeroMetrics.subtitleTop)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(LibraryWave5Copy.heroSubtitlePhoneNote)
-                .accessibilityAddTraits(.isStaticText)
-                .accessibilityIdentifier("heroSubtitle")
-            } else {
-                Text(LibraryWave5Copy.heroSubtitle)
-                    .font(.system(size: headlineSize, weight: .bold))
-                    .foregroundStyle(Color.faint)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, FirstRunHeroMetrics.subtitleTop)
-                    .accessibilityIdentifier("heroSubtitle")
-            }
-
+        let privacyText = device == .pad ? LibraryWave5Copy.firstRunPrivacyIpad : LibraryWave5Copy.firstRunPrivacyIphone
+        VStack(alignment: .leading, spacing: FirstRunHeroMetrics.sectionSpacing) {
             HeroWave()
-                .frame(maxWidth: .infinity)
                 .frame(height: FirstRunHeroMetrics.waveHeight)
-                .padding(.top, FirstRunHeroMetrics.waveTop)
                 .accessibilityHidden(true)
 
-            if let howTo = BannerCopy.body(.libEmpty, BannerArgs()) {
-                Text(howTo)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, FirstRunHeroMetrics.howToTop)
-                    .accessibilityIdentifier("heroHowTo")
+            VStack(alignment: .leading, spacing: FirstRunHeroMetrics.subtitleTop) {
+                Text(LibraryWave5Copy.heroTitle)
+                    .foregroundStyle(Color.ink)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("heroTitle")
+                Text(device == .pad ? LibraryWave5Copy.heroSubtitleIpad : LibraryWave5Copy.heroSubtitleIphone)
+                    .foregroundStyle(Color.faint)
+                    .accessibilityIdentifier("heroSubtitle")
             }
+            .font(.system(size: headlineSize, weight: .bold))
+            .fixedSize(horizontal: false, vertical: true)
+
+            Text(SettingsPhase2Copy.firstRunHowTo)
+                .font(.system(size: howToSize))
+                .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("heroHowTo")
 
             HStack(alignment: .firstTextBaseline, spacing: FirstRunHeroMetrics.shieldSpacing) {
                 Image(systemName: "shield")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Color.accent)
                     .accessibilityHidden(true)
-                Text(privacyText)
-                    .font(.footnote)
-                    .foregroundStyle(Color.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(privacyText)
+                    Text(LibraryWave5Copy.firstRunPrivacyBackups)
+                }
+                .font(.footnote)
+                .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, FirstRunHeroMetrics.privacyTop)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(privacyText)
+            .accessibilityLabel(privacyText + "\n" + LibraryWave5Copy.firstRunPrivacyBackups)
             .accessibilityAddTraits(.isStaticText)
             .accessibilityIdentifier("heroPrivacy")
         }
-        .padding(.vertical, FirstRunHeroMetrics.top)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("firstRunHero")
     }
 }
 
-/// Decorative wave of square `4 pt` `accent` bars fading toward the trailing edge.
+/// Decorative neutral-grey conversation, mirrored in RTL; red stays reserved for recording.
 struct HeroWave: View {
     @Environment(\.layoutDirection) private var layoutDirection
     @Environment(\.colorScheme) private var colorScheme
@@ -136,7 +115,8 @@ struct HeroWave: View {
         let rtl = layoutDirection == .rightToLeft
         Canvas { context, size in
             for bar in HeroWaveMetrics.bars(width: size.width, height: size.height, rightToLeft: rtl) {
-                context.fill(Path(bar.rect), with: .color(Color.accent.opacity(bar.alpha)))
+                context.fill(Path(roundedRect: bar.rect, cornerRadius: HeroWaveMetrics.bar / 2),
+                             with: .color(Color.faint.opacity(bar.alpha)))
             }
         }
         .accessibilityHidden(true)

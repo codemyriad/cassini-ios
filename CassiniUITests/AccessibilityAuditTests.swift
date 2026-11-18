@@ -314,6 +314,24 @@ final class AccessibilityAuditTests: XCTestCase {
         }
     }
 
+    /// D105: a bottom-aligned hero must still grow and scroll at AX5 in every shipped language.
+    @MainActor func testFirstRunWrapsAtLargestTextSize() {
+        defer { XCUIApplication().terminate() }
+        for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
+            let app = emptyLibrary(Self.largestText + ["-AppleLanguages", "(\(language))"])
+            audit(app, screen: "first-run-largest-\(language)", .textClipped)
+            let privacy = app.staticTexts["heroPrivacy"]
+            XCTAssertTrue(app.scroll { privacy.exists && privacy.isHittable })
+            XCTAssertTrue(app.buttons["recordButton"].isHittable)
+            XCTAssertTrue(app.buttons["importButton"].isHittable)
+        }
+    }
+
+    @MainActor func testIPadFirstRunWrapsAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
+        testFirstRunWrapsAtLargestTextSize()
+    }
+
     // MARK: Long languages
 
     /// French and both Portuguese variants at the default text size: no text is cut on any of the seven screens.

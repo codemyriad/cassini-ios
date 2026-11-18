@@ -630,3 +630,12 @@ Its displayed speaker models are separate rows while installation and consent re
 Apple does not publish speech-asset download sizes, so that path retains the approved size-free body and estimated
 installation space. Standalone downloads retain **Download**, and speakers-only jobs retain **Download and identify
 speakers**: neither starts a transcription. These are platform constraints/existing iOS extras to the phone board.
+
+### Phase 2 first run (D105)
+
+The empty Library places its grey conversation wave and hero above Import audio and Record, on the search bar’s
+16-point edge. The 28-point hero and the two privacy lines wrap and scroll at larger text sizes. Like Android,
+first run has the same copy with backups on or off. iOS names this iPhone or iPad and says backups follow your
+iCloud settings; Settings still uses the full D98 backup or exclusion wording. The process is called “transcribe”,
+while “Every word written down.” remains the hero. Shared strings are pinned to cassini-ux #55,
+`277c65423909ec6f696836eeefede6d4ac5e4c84`. Pending L-68 permission prompts are not adopted.
