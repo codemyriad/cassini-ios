@@ -1,6 +1,7 @@
 import SwiftUI
 import UserNotifications
 import CassiniEngine
+import CassiniNotebook
 
 @main struct CassiniApp: App {
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
@@ -55,6 +56,7 @@ import CassiniEngine
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        OnnxRuntimePrivacy.ensureTelemetryDisabled()
         #if DEBUG
         // UI tests wait for every push, sheet and alert to finish moving; without UIKit animations they appear at once.
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") { UIView.setAnimationsEnabled(false) }

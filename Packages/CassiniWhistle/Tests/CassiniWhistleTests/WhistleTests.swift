@@ -1,7 +1,10 @@
+import Darwin
 import Foundation
 import Testing
+@testable import CassiniNotebook
 @testable import CassiniWhistle
 
+@Suite(.serialized)
 struct WhistleTests {
     private let accepted = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                               pipelineAccepted: true, deviceAccepted: true)
@@ -79,6 +82,17 @@ struct WhistleTests {
         // Desktop's 15 s cut is rounded up to its 512-sample VAD frame, yielding 240128 samples.
         #expect(try WhistleResult.parse(data("0", "1"), samples: 240_128).words.count == 1)
         #expect(throws: WhistleError.invalidInput) { try WhistleResult.parse(data("0", "1"), samples: 240_129) }
+    }
+
+    @Test func applyRequiredEnvironmentCoversMissingAndZeroTelemetry() throws {
+        defer { OnnxRuntimePrivacy.ensureTelemetryDisabled() }
+        for initial in [String?.none, "0"] {
+            if let initial { setenv("ORT_DISABLE_TELEMETRY", initial, 1) }
+            else { unsetenv("ORT_DISABLE_TELEMETRY") }
+            let applied = try WhistlePrivacy.applyRequiredEnvironment()
+            #expect(applied == WhistlePrivacy.required)
+            #expect(OnnxRuntimePrivacy.currentValue == "1")
+        }
     }
 
     @Test func unacceptedDeviceCannotEnterNativeCode() async {

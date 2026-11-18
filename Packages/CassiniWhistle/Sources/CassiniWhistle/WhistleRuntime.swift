@@ -1,3 +1,4 @@
+import CassiniNotebook
 import CryptoKit
 import Darwin
 import Foundation
@@ -95,12 +96,7 @@ public actor WhistleRuntime {
     }
 
     private func privacyEnvironment() throws -> [String: String] {
-        var environment: [String: String] = [:]
-        for (key, value) in WhistlePrivacy.required {
-            guard setenv(key, value, 1) == 0, let raw = getenv(key) else { throw WhistleError.privacy }
-            environment[key] = String(cString: raw)
-        }
-        return environment
+        try WhistlePrivacy.applyRequiredEnvironment()
     }
 
     private func open(bundle: Bundle) throws {
@@ -180,6 +176,7 @@ public actor WhistleRuntime {
     public func prepare(acceptance: WhistleCapability, bundle: Bundle = .main) throws {
         guard acceptance.available else { throw WhistleError.unavailable }
         try Task.checkCancellation()
+        _ = try privacyEnvironment()
         try open(bundle: bundle)
     }
 
