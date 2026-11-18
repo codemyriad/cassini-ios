@@ -14,19 +14,23 @@ final class RecordingPreview: Sendable {
         var needsSavedAudio = false
     }
 
-    private let state: Mutex<Snapshot>
+    private final class Draft: Sendable {
+        let state = Mutex(Snapshot())
+    }
+
+    private let draft: Draft
     private let wake: AsyncStream<Void>.Continuation
     let task: Task<Void, Never>
 
     init(url: URL, run: @escaping Run) {
         let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         wake = continuation
-        let state = Mutex(Snapshot())
-        self.state = state
+        let draft = Draft()
+        self.draft = draft
         task = Task.detached(priority: .utility) {
             do {
                 try await run(url, stream) { event in
-                    state.withLock { draft in
+                    draft.state.withLock { draft in
                         switch event {
                         case .skipped:
                             draft.needsSavedAudio = true
@@ -41,12 +45,12 @@ final class RecordingPreview: Sendable {
                     }
                 }
             } catch {
-                state.withLock { $0.needsSavedAudio = true }
+                draft.state.withLock { $0.needsSavedAudio = true }
             }
         }
     }
 
-    var snapshot: Snapshot { state.withLock { $0 } }
+    var snapshot: Snapshot { draft.state.withLock { $0 } }
     func audioAvailable() { wake.yield() }
     func cancel() { task.cancel(); wake.finish() }
 }
