@@ -15,6 +15,7 @@ public final class NativeBudget: Sendable {
 
     private struct State {
         var held = false
+        var revokePreview: (@Sendable () -> Void)?
         var waiters: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
     }
 
@@ -35,6 +36,33 @@ public final class NativeBudget: Sendable {
         return try await body()
     }
 
+    /// Acquire only when idle. A saved-audio request cancels the preview and
+    /// then receives the slot after the current native operation has unwound.
+    public func withPreviewBudget<Value: Sendable>(
+        _ body: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let (revocations, revoke) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        try Task.checkCancellation()
+        let accepted = state.withLock { state in
+            guard !state.held else { return false }
+            state.held = true
+            state.revokePreview = { revoke.yield() }
+            return true
+        }
+        guard accepted else { throw CancellationError() }
+        defer { revoke.finish(); release() }
+        return try await withThrowingTaskGroup(of: Value.self) { group in
+            group.addTask(operation: body)
+            group.addTask {
+                for await _ in revocations { break }
+                throw CancellationError()
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else { throw CancellationError() }
+            return result
+        }
+    }
+
     /// Takes the budget once it is free, after everyone who asked before. A cancelled task stops waiting with
     /// `CancellationError`; one that is cancelled already does not take a free budget. Pair with `release`.
     public func acquire() async throws {
@@ -43,16 +71,17 @@ public final class NativeBudget: Sendable {
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 enum Start { case taken, waiting, cancelled }
-                let start = state.withLock { state -> Start in
+                let (start, revoke) = state.withLock { state -> (Start, (@Sendable () -> Void)?) in
                     if !state.held {
                         state.held = true
-                        return .taken
+                        return (.taken, nil)
                     }
                     // A cancel that came before the wait was set up finds no waiter to end.
-                    if Task.isCancelled { return .cancelled }
+                    if Task.isCancelled { return (.cancelled, nil) }
                     state.waiters.append((id, continuation))
-                    return .waiting
+                    return (.waiting, state.revokePreview)
                 }
+                revoke?()
                 switch start {
                 case .taken: continuation.resume()
                 case .cancelled: continuation.resume(throwing: CancellationError())
@@ -71,6 +100,7 @@ public final class NativeBudget: Sendable {
     /// Gives the budget back: to the first waiter, or free.
     public func release() {
         let next = state.withLock { state -> CheckedContinuation<Void, any Error>? in
+            state.revokePreview = nil
             guard !state.waiters.isEmpty else {
                 state.held = false
                 return nil

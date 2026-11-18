@@ -67,6 +67,24 @@ import CassiniNotebook
         #expect(!budget.isHeld)
     }
 
+    @Test func savedAudioPreemptsAnIdlePreview() async throws {
+        let budget = NativeBudget()
+        let (opened, ready) = AsyncStream<Void>.makeStream()
+        let (input, _) = AsyncStream<Void>.makeStream()
+        let preview = Task {
+            try await budget.withPreviewBudget {
+                ready.yield()
+                for await _ in input {}
+                try Task.checkCancellation()
+            }
+        }
+        var start = opened.makeAsyncIterator()
+        _ = await start.next()
+        try await budget.withBudget { #expect(budget.isHeld) }
+        await #expect(throws: CancellationError.self) { try await preview.value }
+        #expect(!budget.isHeld)
+    }
+
     // ports: NativeBudgetTest#waitersAreServedOneAtATime
     @Test func waitersAreServedOneAtATime() async throws {
         let budget = NativeBudget()

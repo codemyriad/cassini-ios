@@ -34,10 +34,14 @@ public enum LiveCAFTranscription {
             let placed = words.compactMap { word -> Word? in
                 let from = min(end, start + max(0, word.startMs))
                 let to = min(end, start + max(0, word.endMs))
-                guard from + (to - from) / 2 >= settled, to >= from else { return nil }
+                guard to >= from, from >= settled, from < end else { return nil }
                 return Word(word.speaker, from, to, word.text)
             }
-            let boundary = final ? end : max(settled, end - contextMs)
+            // Advance only to the end of a whole word well inside this window.
+            // A later hypothesis may move its timestamps, but cannot overwrite
+            // part of the settled word at an arbitrary time cutoff.
+            let edge = placed.filter { $0.endMs <= end - contextMs }.map(\.endMs).max() ?? settled
+            let boundary = final ? end : max(settled, edge)
             events(.revision(fromMs: settled, throughMs: end, settledMs: boundary, words: placed))
             settled = boundary
             sinceDecode = 0

@@ -3,7 +3,8 @@ import Synchronization
 import CassiniCore
 import CassiniInference
 
-/// A recording's optional, in-memory draft. A view can query the latest snapshot without owning decode.
+/// A recording's optional in-memory draft. Stop, backgrounding or a saved-audio
+/// job may end this preview for the rest of the recording.
 final class RecordingPreview: Sendable {
     typealias Run = @Sendable (URL, AsyncStream<Void>, LiveCAFTranscription.Events) async throws -> Void
 
@@ -30,10 +31,7 @@ final class RecordingPreview: Sendable {
                         case .skipped:
                             draft.needsSavedAudio = true
                         case let .revision(from, through, settled, words):
-                            draft.words.removeAll { word in
-                                let midpoint = word.startMs + (word.endMs - word.startMs) / 2
-                                return from <= midpoint && midpoint <= through
-                            }
+                            draft.words.removeAll { from <= $0.startMs && $0.startMs < through }
                             draft.words.append(contentsOf: words)
                             draft.settledMs = max(draft.settledMs, settled)
                         }
@@ -47,6 +45,5 @@ final class RecordingPreview: Sendable {
 
     var snapshot: Snapshot { state.withLock { $0 } }
     func audioAvailable() { wake.yield() }
-    func finish() { wake.finish() }
     func cancel() { task.cancel(); wake.finish() }
 }

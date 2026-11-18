@@ -166,7 +166,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     func stop() async throws -> CaptureResult {
         let duration = recorder?.currentTime ?? 0
         recorder?.stop(); timer?.invalidate(); timer = nil; recorder = nil; isPaused = false
-        preview?.finish()
+        preview?.cancel()
         session.deactivate()
         return CaptureResult(duration: duration)
     }
@@ -223,7 +223,7 @@ extension AVAudioRecorder: CaptureRecorder {}
     /// The recorder stopped without `stop()`: the capture is over, and what was written stays.
     private func reportFailure(of identity: ObjectIdentifier) {
         guard let current = recorder, ObjectIdentifier(current) == identity else { return }
-        preview?.finish()
+        preview?.cancel()
         continuation.yield(.failed)
     }
 }

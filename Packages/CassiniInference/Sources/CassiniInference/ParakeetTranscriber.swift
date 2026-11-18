@@ -158,12 +158,12 @@ public struct ParakeetTranscriber: Transcribing {
     }
 
     /// Opt-in foreground preview using the installed model and its existing verifier.
-    public func preview(url: URL, wakes: AsyncStream<Void>, events: LiveCAFTranscription.Events) async throws {
+    public func preview(url: URL, wakes: AsyncStream<Void>, events: @escaping LiveCAFTranscription.Events) async throws {
         let cancel = CancelFlag()
         let holder = PreviewDecoder()
         let files = ParakeetFiles(root: models.root)
         guard models.speechReady, files.present() else { throw TranscriptionError.failed(.model) }
-        try await NativeBudget.shared.withBudget {
+        try await NativeBudget.shared.withPreviewBudget {
             do {
                 try await withTaskCancellationHandler {
                     try await LiveCAFTranscription.follow(url: url, wakes: wakes, decode: { samples in

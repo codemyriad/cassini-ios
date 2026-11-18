@@ -84,14 +84,14 @@ public struct WhistleTranscriber: Transcribing {
     }
 
     /// Opt-in foreground preview. This never publishes or modifies the CAF.
-    public func preview(url: URL, wakes: AsyncStream<Void>, events: LiveCAFTranscription.Events) async throws {
+    public func preview(url: URL, wakes: AsyncStream<Void>, events: @escaping LiveCAFTranscription.Events) async throws {
         var candidate = acceptance()
         candidate.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
         let verified = candidate
         guard verified.available else { throw TranscriptionError.failed(.model) }
         guard let initial = availableMemory(), initial > 0,
               UInt64(initial) >= WhistleCapability.loadHeadroom else { throw JobFailure.memory }
-        try await NativeBudget.shared.withBudget {
+        try await NativeBudget.shared.withPreviewBudget {
             try await Self.sessions.withBudget {
                 do {
                     try await LiveCAFTranscription.follow(url: url, wakes: wakes, decode: { samples in
