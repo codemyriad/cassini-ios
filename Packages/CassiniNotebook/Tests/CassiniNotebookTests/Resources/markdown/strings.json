@@ -27,7 +27,7 @@
           "text": "La transcripción como archivo de texto, con hablantes y marcas de tiempo."
         },
         "pt-BR": {
-          "text": "A transcrição como arquivo de texto, com locutores e horários."
+          "text": "A transcrição como arquivo de texto, com locutores e tempos."
         },
         "pt-PT": {
           "text": "A transcrição como ficheiro de texto, com oradores e tempos."
@@ -262,7 +262,7 @@
           "text": "meno di 1 min"
         },
         "fr": {
-          "text": "moins d’1 min"
+          "text": "moins de 1 min"
         },
         "es": {
           "text": "menos de 1 min"

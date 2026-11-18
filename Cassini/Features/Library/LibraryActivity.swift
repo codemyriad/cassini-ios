@@ -105,6 +105,7 @@ struct ProgressBannerCard: View {
 struct CaptureBar: View {
     @Environment(RecordingStore.self) private var recording
     let unavailable: Bool
+    var gutter: CGFloat = Spacing.gutter
     let importAudio: () -> Void
 
     var body: some View {
@@ -115,7 +116,7 @@ struct CaptureBar: View {
         .disabled(unavailable)
         // Pinned over the list, the bar stops growing at AX1 and shows the Large Content Viewer instead.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
-        .padding(.horizontal, Spacing.gutter).padding(.vertical, 14)
+        .padding(.horizontal, gutter).padding(.vertical, 14)
         .readableWidth()
         // Opaque, so its buttons keep their contrast over the list scrolling under it.
         .background(Color.paper)

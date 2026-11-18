@@ -107,3 +107,14 @@ The global catalog and generated Phase 2 subsets retain the current main-branch 
 
 D-1052 pins the native FLAC import contract (v2026-11-14.3) to the same immutable source as the complete
 shared catalog above. Native FLAC is validated before import and again before decoding or transcription.
+
+D-1101 / D105 advances the complete shared catalogs to cassini-ux
+`277c65423909ec6f696836eeefede6d4ac5e4c84` (#55), SHA-256
+`a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b`.
+All existing generated subsets are regenerated. LibraryWave5 now selects the iPhone/iPad hero subtitles,
+first-run privacy sentences and iCloud settings line; SettingsPhase2 selects `firstRun.howTo.phone`.
+The superseded subtitle and qualifier leave the compiled app. Settings retains all four D98 privacy variants,
+with “Transcribed” replacing “Written down”. The native string audit finds no process wording using “write down”.
+Only implemented IDs are compiled: pending `permissionPrompt.*` / L-68 on D-1095 stays out of the app,
+and Info.plist and InfoPlist.xcstrings are unchanged. The status/format/library bundle is re-vendored as a whole;
+the coordinated import policy is verified byte-identical and the Markdown selection keeps its source receipt.

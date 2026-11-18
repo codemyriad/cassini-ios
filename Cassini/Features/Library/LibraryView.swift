@@ -43,19 +43,23 @@ struct LibraryView: View {
             && BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
                 .showsNotice(notes: library.notes, loaded: library.isLoaded, ready: backup.ready,
                              dismissed: settings.backupNoticeDismissed)
-        ScrollView {
-            libraryStack(content, exportable: exportable)
-            // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
-            .id(content.results != nil)
-            .padding(.horizontal, Spacing.gutter).padding(.top, 12)
-            // The notice floats over content, but the last row can still scroll fully above it.
-            .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
-            .readableWidth()
+        let showsHero = content.hero != nil && !model.favoritesOnly
+        GeometryReader { viewport in
+            ScrollView {
+                libraryStack(content, exportable: exportable, showsHero: showsHero,
+                             minimumHeight: max(0, viewport.size.height - 40))
+                // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
+                .id(content.results != nil)
+                .padding(.horizontal, showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter).padding(.top, 12)
+                // The notice floats over content, but the last row can still scroll fully above it.
+                .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
+                .readableWidth()
+            }
+            .accessibilityIdentifier("libraryScroll")
+            .meetingScrollEdge()
+            .scrollDismissesKeyboard(.immediately)
+            .scrollPosition($listPosition)
         }
-        .accessibilityIdentifier("libraryScroll")
-        .meetingScrollEdge()
-        .scrollDismissesKeyboard(.immediately)
-        .scrollPosition($listPosition)
         .overlay(alignment: .topLeading) {
             UITestInteractiveMarker(loaded: library.isLoaded && !content.loading)
             if backup.ready {
@@ -79,7 +83,8 @@ struct LibraryView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            CaptureBar(unavailable: content.emptyState == .unavailable) { importing = true }
+            CaptureBar(unavailable: content.emptyState == .unavailable,
+                       gutter: showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter) { importing = true }
         }
         .librarySearchBar { searchHeader }
         .navigationTitle(MeetingPhase1Copy.allMeetings)
@@ -135,10 +140,22 @@ struct LibraryView: View {
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
 
-    private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
-        LazyVStack(alignment: .leading, spacing: Spacing.row) {
-            libraryHeader(content)
-            libraryRows(content, exportable: exportable)
+    @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>, showsHero: Bool,
+                                           minimumHeight: CGFloat) -> some View {
+        if showsHero {
+            // Fill the viewport when the copy fits; at large text sizes the stack grows and scrolls.
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                libraryHeader(content)
+                Spacer(minLength: 0)
+                FirstRunHeroView()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: minimumHeight, alignment: .bottom)
+        } else {
+            LazyVStack(alignment: .leading, spacing: Spacing.row) {
+                libraryHeader(content)
+                libraryRows(content, exportable: exportable)
+            }
         }
     }
 
@@ -157,7 +174,6 @@ struct LibraryView: View {
 
     @ViewBuilder private func libraryRows(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
         if !content.loading || content.emptyState == .unavailable {
-            if let hero = content.hero, !model.favoritesOnly { FirstRunHeroView(hero: hero) }
             // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
             if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
             // LazyVStack can retain a covered row body for an unchanged UUID even after the

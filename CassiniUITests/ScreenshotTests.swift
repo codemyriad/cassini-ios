@@ -72,7 +72,8 @@ final class ScreenshotTests: XCTestCase {
     }
 
     @MainActor func test05Settings() throws {
-        let app = try launchPhone(["--seed", "library"])
+        XCUIDevice.shared.orientation = .portrait
+        let app = launch(["--seed", "library"])
         app.buttons["settingsButton"].tap()
         XCTAssertTrue(app.buttons["transcriptionRow"].waitForExistence(within: 5), "Settings shows")
         XCTAssertTrue(app.waitForSettingsPage("map"),
@@ -116,9 +117,18 @@ final class ScreenshotTests: XCTestCase {
     }
 
     @MainActor func test28FirstRun() throws {
-        let app = try launchPhone([])
+        XCUIDevice.shared.orientation = .portrait
+        let app = launch([])
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
         capture("28-first-run")
+    }
+
+    @MainActor func test31FirstRunLargestText() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
+        _ = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
+        capture("31-first-run-largest-text")
     }
 
     @MainActor func test29VoicesQuestion() throws {

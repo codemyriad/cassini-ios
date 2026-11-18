@@ -1,4 +1,4 @@
-// Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit.
+// Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit.
 import Foundation
 import CassiniNotebook
 
@@ -128,7 +128,7 @@ enum SettingsPhase2Copy {
         String(localized: "common.speakers", table: "SettingsPhase2")
     }
     static var firstRunHowTo: String {
-        String(localized: "firstRun.howTo", table: "SettingsPhase2")
+        String(localized: "firstRun.howTo.phone", table: "SettingsPhase2")
     }
     static func meetingCount(_ count: Int) -> String {
         String(localized: "library.meetingCount", defaultValue: "\(count) meetings", table: "SettingsPhase2")

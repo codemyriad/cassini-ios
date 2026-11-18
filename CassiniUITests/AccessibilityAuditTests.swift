@@ -22,12 +22,12 @@ final class AccessibilityAuditTests: XCTestCase {
     /// The largest Dynamic Type size (AX5).
     private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
 
-    @MainActor private func launch(_ arguments: [String]) -> XCUIApplication {
+    @MainActor private func launch(_ arguments: [String], fresh: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
         // Same-system-argument screens use the existing isolated graph reset. Each group ends its process;
         // recording also ends it before the next screen, so its paused policy task cannot survive the reset.
-        app.launchAndWait()
+        app.launchAndWait(fresh: fresh)
         return app
     }
 
@@ -38,10 +38,18 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
-        let app = launch(extra)
+        // Clipping audits redraw at other text sizes, even when launched at the default size.
+        // After auditing the populated Library, an in-process replacement can retain its audit layout
+        // (scroll position or capture-bar fit). First-run audits need an independent process.
+        let app = launch(extra, fresh: true)
         let hero = app.staticTexts["heroTitle"]
         XCTAssertTrue(hero.waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists, "No backup notice before the first saved meeting")
+        if extra.contains(Self.largestText[1]) {
+            // At AX5 the introduction is taller than the viewport. Expose its final paragraph before
+            // auditing: an intentionally half-visible line at the scroll edge is not truncated text.
+            _ = app.scrolledLibraryElement(app.staticTexts["heroPrivacy"], description: "first-run privacy")
+        }
         return app
     }
 
@@ -312,6 +320,28 @@ final class AccessibilityAuditTests: XCTestCase {
             let app = open(Self.largestText)
             audit(app, screen: "largest-\(name)", .textClipped)
         }
+    }
+
+    /// D105: a bottom-aligned hero must still grow and scroll at AX5 in every shipped language.
+    @MainActor func testFirstRunWrapsAtLargestTextSize() {
+        defer { XCUIApplication().terminate() }
+        for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
+            let app = emptyLibrary(Self.largestText + ["-AppleLanguages", "(\(language))"])
+            for identifier in ["heroTitle", "heroSubtitle", "heroHowTo", "heroPrivacy"] {
+                // Every block must fit fully between the bars, even when the whole introduction cannot.
+                _ = app.scrolledLibraryElement(app.staticTexts[identifier], description: identifier)
+            }
+            let privacy = app.staticTexts["heroPrivacy"]
+            XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)
+            audit(app, screen: "first-run-privacy-largest-\(language)", .textClipped)
+            XCTAssertTrue(app.buttons["recordButton"].isHittable)
+            XCTAssertTrue(app.buttons["importButton"].isHittable)
+        }
+    }
+
+    @MainActor func testIPadFirstRunWrapsAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "the Library sidebar")
+        testFirstRunWrapsAtLargestTextSize()
     }
 
     // MARK: Long languages

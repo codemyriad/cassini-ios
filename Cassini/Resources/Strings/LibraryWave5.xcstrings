@@ -1,134 +1,92 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "firstRun.hero.phoneBackupQualifier": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.phoneBackupQualifier.",
+    "firstRun.hero.subtitle.ipad": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.hero.subtitle.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "(except for encrypted cloud backup)"
+            "value": "Right here, on this iPad."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "(tranne per il backup crittografato nel cloud)"
+            "value": "Proprio qui, su questo iPad."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "(sauf pour la sauvegarde cloud chiffrée)"
+            "value": "Ici même, sur cet iPad."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "(salvo para la copia de seguridad cifrada en la nube)"
+            "value": "Aquí mismo, en este iPad."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "(exceto para o backup criptografado na nuvem)"
+            "value": "Aqui mesmo, neste iPad."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "(exceto para a cópia de segurança encriptada na nuvem)"
+            "value": "Aqui mesmo, neste iPad."
           }
         }
       }
     },
-    "firstRun.hero.subtitle": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.subtitle.",
+    "firstRun.hero.subtitle.iphone": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.hero.subtitle.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "None of it uploaded."
+            "value": "Right here, on this iPhone."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nulla viene caricato."
+            "value": "Proprio qui, su questo iPhone."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rien n’est mis en ligne."
+            "value": "Ici même, sur cet iPhone."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No se sube nada."
+            "value": "Aquí mismo, en este iPhone."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nada é enviado."
+            "value": "Aqui mesmo, neste iPhone."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nada é enviado."
-          }
-        }
-      }
-    },
-    "firstRun.hero.subtitlePhoneNote": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.subtitlePhoneNote.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "None of it uploaded. (except for encrypted cloud backup)"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nulla viene caricato. (tranne per il backup crittografato nel cloud)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rien n’est mis en ligne. (sauf pour la sauvegarde cloud chiffrée)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No se sube nada. (salvo para la copia de seguridad cifrada en la nube)"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nada é enviado. (exceto para o backup criptografado na nuvem)"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nada é enviado. (exceto para a cópia de segurança encriptada na nuvem)"
+            "value": "Aqui mesmo, neste iPhone."
           }
         }
       }
     },
     "firstRun.hero.title": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, firstRun.hero.title.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.hero.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -169,14 +127,140 @@
         }
       }
     },
-    "privacy.onDevice.ipad.backupExcluded": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.ipad.backupExcluded.",
+    "firstRun.privacy.backups.ios": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.privacy.backups.ios.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Written down on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
+            "value": "Backups follow your iCloud settings."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I backup seguono le impostazioni di iCloud."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les sauvegardes suivent vos réglages iCloud."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las copias de seguridad siguen tus ajustes de iCloud."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os backups seguem os seus ajustes do iCloud."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As cópias de segurança seguem as suas definições de iCloud."
+          }
+        }
+      }
+    },
+    "firstRun.privacy.ipad": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.privacy.ipad.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribed on this iPad."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritto su questo iPad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrit sur cet iPad."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito en este iPad."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito neste iPad."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito neste iPad."
+          }
+        }
+      }
+    },
+    "firstRun.privacy.iphone": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.privacy.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribed on this iPhone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritto su questo iPhone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrit sur cet iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito en este iPhone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito neste iPhone."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrito neste iPhone."
+          }
+        }
+      }
+    },
+    "privacy.onDevice.ipad.backupExcluded": {
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, privacy.onDevice.ipad.backupExcluded.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribed on this iPad. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
           }
         },
         "it": {
@@ -212,13 +296,13 @@
       }
     },
     "privacy.onDevice.ipad.withBackup": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.ipad.withBackup.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, privacy.onDevice.ipad.withBackup.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Written down on this iPad. Never uploaded, except to your encrypted cloud backup."
+            "value": "Transcribed on this iPad. Never uploaded, except to your encrypted cloud backup."
           }
         },
         "it": {
@@ -254,13 +338,13 @@
       }
     },
     "privacy.onDevice.iphone.backupExcluded": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.iphone.backupExcluded.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, privacy.onDevice.iphone.backupExcluded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Written down on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
+            "value": "Transcribed on this iPhone. Cassini never uploads the audio and marks it to be left out of iCloud Backup."
           }
         },
         "it": {
@@ -296,13 +380,13 @@
       }
     },
     "privacy.onDevice.iphone.withBackup": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, privacy.onDevice.iphone.withBackup.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, privacy.onDevice.iphone.withBackup.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Written down on this iPhone. Never uploaded, except to your encrypted cloud backup."
+            "value": "Transcribed on this iPhone. Never uploaded, except to your encrypted cloud backup."
           }
         },
         "it": {

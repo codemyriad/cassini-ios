@@ -1,20 +1,26 @@
-// Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0; do not edit.
+// Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84; do not edit.
 import Foundation
 import CassiniNotebook
 
-/// Shared Wave 5 first-run hero and backup-gated privacy copy, resolved using the current app language.
+/// D105 first-run hero and D98 Settings privacy copy, resolved using the current app language.
 enum LibraryWave5Copy {
-    static var heroPhoneBackupQualifier: String {
-        String(localized: "firstRun.hero.phoneBackupQualifier", table: "LibraryWave5")
+    static var heroSubtitleIpad: String {
+        String(localized: "firstRun.hero.subtitle.ipad", table: "LibraryWave5")
     }
-    static var heroSubtitle: String {
-        String(localized: "firstRun.hero.subtitle", table: "LibraryWave5")
-    }
-    static var heroSubtitlePhoneNote: String {
-        String(localized: "firstRun.hero.subtitlePhoneNote", table: "LibraryWave5")
+    static var heroSubtitleIphone: String {
+        String(localized: "firstRun.hero.subtitle.iphone", table: "LibraryWave5")
     }
     static var heroTitle: String {
         String(localized: "firstRun.hero.title", table: "LibraryWave5")
+    }
+    static var firstRunPrivacyBackups: String {
+        String(localized: "firstRun.privacy.backups.ios", table: "LibraryWave5")
+    }
+    static var firstRunPrivacyIpad: String {
+        String(localized: "firstRun.privacy.ipad", table: "LibraryWave5")
+    }
+    static var firstRunPrivacyIphone: String {
+        String(localized: "firstRun.privacy.iphone", table: "LibraryWave5")
     }
     static var ipadPrivacyBackupExcluded: String {
         String(localized: "privacy.onDevice.ipad.backupExcluded", table: "LibraryWave5")
@@ -44,14 +50,18 @@ enum LibraryWave5Copy {
             forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
         let localized = bundle.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
         switch key {
-        case "firstRun.hero.phoneBackupQualifier":
-            return String(localized: "firstRun.hero.phoneBackupQualifier", table: "LibraryWave5", bundle: localized, locale: locale)
-        case "firstRun.hero.subtitle":
-            return String(localized: "firstRun.hero.subtitle", table: "LibraryWave5", bundle: localized, locale: locale)
-        case "firstRun.hero.subtitlePhoneNote":
-            return String(localized: "firstRun.hero.subtitlePhoneNote", table: "LibraryWave5", bundle: localized, locale: locale)
+        case "firstRun.hero.subtitle.ipad":
+            return String(localized: "firstRun.hero.subtitle.ipad", table: "LibraryWave5", bundle: localized, locale: locale)
+        case "firstRun.hero.subtitle.iphone":
+            return String(localized: "firstRun.hero.subtitle.iphone", table: "LibraryWave5", bundle: localized, locale: locale)
         case "firstRun.hero.title":
             return String(localized: "firstRun.hero.title", table: "LibraryWave5", bundle: localized, locale: locale)
+        case "firstRun.privacy.backups.ios":
+            return String(localized: "firstRun.privacy.backups.ios", table: "LibraryWave5", bundle: localized, locale: locale)
+        case "firstRun.privacy.ipad":
+            return String(localized: "firstRun.privacy.ipad", table: "LibraryWave5", bundle: localized, locale: locale)
+        case "firstRun.privacy.iphone":
+            return String(localized: "firstRun.privacy.iphone", table: "LibraryWave5", bundle: localized, locale: locale)
         case "privacy.onDevice.ipad.backupExcluded":
             return String(localized: "privacy.onDevice.ipad.backupExcluded", table: "LibraryWave5", bundle: localized, locale: locale)
         case "privacy.onDevice.ipad.withBackup":

@@ -16,7 +16,7 @@
     },
     "strings.json": {
       "source": "strings/strings.json",
-      "source_sha256": "37be394321da842424ad25402c864ee1221db87821972dede85eaf916b4ce260",
+      "source_sha256": "a735381a6c7cbe8b1d4bd57cc4ac811d99939036b2e457b120fe19cdb7a7bc4b",
       "selection": [
         "export.markdown.description",
         "export.markdown.label",
@@ -29,8 +29,8 @@
         "library.untitled",
         "meeting.turn.over"
       ],
-      "sha256": "4b5f04b5a7a1e918afbf97b6706b8f7bd0c7a3c441c9fcb5eb14c305f68b0cbb",
-      "source_commit": "dd06a62dc881034fed417b000f47004e577a3fb0"
+      "sha256": "9dfad64a974db9290ab1c5799bf50a4774f867e281a3d90e01f376d088268d7c",
+      "source_commit": "277c65423909ec6f696836eeefede6d4ac5e4c84"
     }
   }
 }

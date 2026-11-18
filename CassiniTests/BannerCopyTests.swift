@@ -66,7 +66,7 @@ private let english: [BannerKind: (String, String?, [String])] = [
                         "The model server no longer offers this version of the model. Update Cassini to download it.", []),
     .dlRecordNow: ("Record now, transcribe later", "Transcription needs a one-time download. Audio is safe meanwhile.",
                    ["Download"]),
-    .libEmpty: ("No notes yet", "Press Record when the meeting starts and Stop when it ends. Cassini writes it all down.", ["Record", "Import"]),
+    .libEmpty: ("No notes yet", "Record something, or import an audio file.", ["Record", "Import"]),
     .libNoMatch: ("Nothing matches “fattura”", "Try another word or title.", []),
     .importing: ("Importing call.m4a…", nil, []),
     .importTooLarge: ("File too large", "Choose a file under 4 GB.", ["Choose another"]),

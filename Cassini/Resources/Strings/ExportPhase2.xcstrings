@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "export.audioOnly.note": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.audioOnly.note.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.audioOnly.note.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "export.cassiniFile.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.cassiniFile.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.cassiniFile.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "export.cassiniFile.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.cassiniFile.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.cassiniFile.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "export.exportButton": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.exportButton.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.exportButton.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "export.formatGroup.a11y": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.formatGroup.a11y.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.formatGroup.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -212,7 +212,7 @@
       }
     },
     "export.markdown.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.markdown.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.markdown.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "export.markdown.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.markdown.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.markdown.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -296,7 +296,7 @@
       }
     },
     "export.moreFormats": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.moreFormats.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.moreFormats.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -338,7 +338,7 @@
       }
     },
     "export.originalAudio.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.originalAudio.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.originalAudio.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -380,7 +380,7 @@
       }
     },
     "export.originalAudio.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.originalAudio.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.originalAudio.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -422,7 +422,7 @@
       }
     },
     "export.plainText.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.plainText.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.plainText.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
       }
     },
     "export.plainText.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.plainText.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.plainText.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -506,7 +506,7 @@
       }
     },
     "export.srt.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.srt.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.srt.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -548,7 +548,7 @@
       }
     },
     "export.srt.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.srt.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.srt.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -590,7 +590,7 @@
       }
     },
     "export.title": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.title.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -632,7 +632,7 @@
       }
     },
     "export.vtt.description": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.vtt.description.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.vtt.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -674,7 +674,7 @@
       }
     },
     "export.vtt.label": {
-      "comment": "Generated from cassini-ux dd06a62dc881034fed417b000f47004e577a3fb0, export.vtt.label.",
+      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, export.vtt.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
