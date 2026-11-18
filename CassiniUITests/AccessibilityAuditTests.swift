@@ -22,12 +22,12 @@ final class AccessibilityAuditTests: XCTestCase {
     /// The largest Dynamic Type size (AX5).
     private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
 
-    @MainActor private func launch(_ arguments: [String]) -> XCUIApplication {
+    @MainActor private func launch(_ arguments: [String], fresh: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
         // Same-system-argument screens use the existing isolated graph reset. Each group ends its process;
         // recording also ends it before the next screen, so its paused policy task cannot survive the reset.
-        app.launchAndWait()
+        app.launchAndWait(fresh: fresh)
         return app
     }
 
@@ -38,7 +38,10 @@ final class AccessibilityAuditTests: XCTestCase {
     }
 
     @MainActor private func emptyLibrary(_ extra: [String] = []) -> XCUIApplication {
-        let app = launch(extra)
+        // The clipping audit redraws at other text sizes. After auditing the populated Library,
+        // its in-process replacement can retain that audit's scroll geometry and jump back to the top
+        // during the empty-Library audit. A fresh process isolates this scrollable AX5 introduction.
+        let app = launch(extra, fresh: extra.contains(Self.largestText[1]))
         let hero = app.staticTexts["heroTitle"]
         XCTAssertTrue(hero.waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists, "No backup notice before the first saved meeting")
