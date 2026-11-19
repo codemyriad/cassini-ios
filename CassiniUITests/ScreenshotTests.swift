@@ -226,9 +226,11 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Share and more"].tap()
         app.buttons["exportOpen"].tapWhenSettled()
         XCTAssertTrue(app.buttons["exportConfirm"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["exportChoice-markdown"].waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["exportMoreFormats"].exists)
-        XCTAssertTrue(app.buttons["exportChoice-vtt"].exists)
         captureExportMenu("10-note-export", app)
+        let vtt = app.buttons["exportChoice-vtt"]
+        XCTAssertTrue(app.collectionViews["exportFormats"].scroll(attempts: 4) { vtt.exists })
     }
 
     @MainActor func test11LibraryExport() throws {

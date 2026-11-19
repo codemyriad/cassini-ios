@@ -121,6 +121,8 @@ enum TestFixtures {
             main.refreshSpeakerLabels()
         case .voices:
             notes = try seedSavedVoices(root: store.root, main: &main, now: now)
+        case .staleVoices:
+            notes = try seedSavedVoices(root: store.root, main: &main, now: now, staleGiulia: true)
         case .brandSpeakers:
             // Six decided speaker slots plus the unnamed stone role, through real note/speaker views.
             let names = [DefaultLabels.placeholder(1), "Alex Morgan", "Sam Rivera", "Taylor Brooks", "Jordan Reed",
@@ -161,7 +163,7 @@ enum TestFixtures {
             failed.duration = fixtureDuration; failed.language = "en-US"; failed.waveform = waveform
             failed.status = .failed; failed.failure = .audio
             notes.append(failed)
-        case .importedProvenance, .library, .recording, .voices, .speakers, .oneSpeaker:
+        case .importedProvenance, .library, .recording, .voices, .staleVoices, .speakers, .oneSpeaker:
             break
         case .search, .reading:
             // Whistle transcribed the review after Parakeet Ultra could not get its memory: its note says so.
@@ -318,7 +320,7 @@ enum TestFixtures {
 
     /// Three saved voices, each confirmed in the notes it was named in: Alex Moreau and Sam Rivera in `main`, which
     /// takes their full names, and Alex Moreau and Giulia Conti in the design review this returns.
-    private static func seedSavedVoices(root: URL, main: inout Note, now: Date) throws -> [Note] {
+    private static func seedSavedVoices(root: URL, main: inout Note, now: Date, staleGiulia: Bool = false) throws -> [Note] {
         let library = try VoiceLibrary(root: root)
         var review = Note(id: reviewID, title: "Notes from the design review", createdAt: now.addingTimeInterval(-9 * 86_400),
                           audioFilename: "audio.wav")
@@ -328,7 +330,10 @@ enum TestFixtures {
             .init(text: "And we revisit the colours next week.", start: 12, end: 24, speakerID: "alex"),
         ]
         let alexHere = voicePrint("alex", [1, 0, 0], seconds: 96), samHere = voicePrint("sam", [0, 1, 0], seconds: 74)
-        let alexThere = voicePrint("alex", [1, 0, 0], seconds: 41), giulia = voicePrint("giulia", [0, 0, 1], seconds: 88)
+        let alexThere = voicePrint("alex", [1, 0, 0], seconds: 41)
+        let giulia = staleGiulia
+            ? SpeakerPrint(speakerID: "giulia", model: "legacy-voiceprint-model", vector: [0, 0, 1], speechSeconds: 88)
+            : voicePrint("giulia", [0, 0, 1], seconds: 88)
         try library.savePrints([alexHere, samHere], noteID: fixtureID)
         try library.savePrints([giulia, alexThere], noteID: reviewID)
         let voices = [

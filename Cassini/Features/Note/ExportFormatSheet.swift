@@ -12,6 +12,7 @@ struct ExportFormatSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.calendar) private var calendar
     @Environment(\.clock) private var clock
+    @Environment(\.locale) private var locale
     @Environment(LibraryStore.self) private var library
 
     private var state: ExportSheetState { ExportSheetState(note: note, jobPending: jobPending) }
@@ -76,7 +77,9 @@ struct ExportFormatSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .task(id: note.id) {
-            cassiniBytes = await Self.fileBytes(at: library.audioURL(note))
+            let note = self.note
+            let audioURL = library.audioURL(note)
+            cassiniBytes = await Self.estimateCassiniBytes(note: note, audioURL: audioURL)
         }
     }
 
@@ -88,10 +91,8 @@ struct ExportFormatSheet: View {
         return [subtitle, speakerText].compactMap { $0 }.joined(separator: " · ")
     }
 
-    @concurrent private static func fileBytes(at url: URL?) async -> Int64? {
-        url.flatMap { url in
-            (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber
-        }?.int64Value
+    @concurrent private static func estimateCassiniBytes(note: Note, audioURL: URL?) async -> Int64? {
+        ExportSizeEstimate.cassiniBytes(note: note, audioURL: audioURL)
     }
 
     private func row(_ choice: ExportSheetState.Choice) -> some View {
@@ -126,7 +127,7 @@ struct ExportFormatSheet: View {
         switch choice {
         case .cassiniFile:
             if let cassiniBytes, cassiniBytes > 0 {
-                return ExportPhase2Copy.typeWithSize(".opus", size: cassiniBytes.formatted(.byteCount(style: .file)))
+                return ExportPhase2Copy.typeWithSize(".opus", size: SizeCopy.text(cassiniBytes, locale: locale))
             }
             return ".opus"
         case .markdown: return ".md"
