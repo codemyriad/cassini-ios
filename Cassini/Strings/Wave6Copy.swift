@@ -4,21 +4,6 @@ import CassiniNotebook
 
 /// Shared Wave 6 iOS backup and saved-voice copy, resolved using the current app language.
 enum Wave6Copy {
-    static var backupCloudBodyOffIos: String {
-        String(localized: "backup.cloud.body.off.ios", table: "Wave6")
-    }
-    static var backupCloudBodyOn: String {
-        String(localized: "backup.cloud.body.on", table: "Wave6")
-    }
-    static var backupCloudTitle: String {
-        String(localized: "backup.cloud.title", table: "Wave6")
-    }
-    static var backupIncludeSavedVoicesSubtitleIos: String {
-        String(localized: "backup.includeSavedVoices.subtitle.ios", table: "Wave6")
-    }
-    static var backupIncludeSavedVoicesSubtitleOffIos: String {
-        String(localized: "backup.includeSavedVoices.subtitle.off.ios", table: "Wave6")
-    }
     static var backupIncludeSavedVoicesTitle: String {
         String(localized: "backup.includeSavedVoices.title", table: "Wave6")
     }
@@ -43,23 +28,8 @@ enum Wave6Copy {
     static var backupInfoWhatBody: String {
         String(localized: "backup.info.what.body", table: "Wave6")
     }
-    static var backupInfoWhatHeading: String {
-        String(localized: "backup.info.what.heading", table: "Wave6")
-    }
-    static var backupPhoneOnlyCardActionIos: String {
-        String(localized: "backup.phoneOnlyCard.action.ios", table: "Wave6")
-    }
-    static var backupPhoneOnlyCardBody: String {
-        String(localized: "backup.phoneOnlyCard.body", table: "Wave6")
-    }
     static var backupPhoneOnlyCardCloseA11y: String {
         String(localized: "backup.phoneOnlyCard.close.a11y", table: "Wave6")
-    }
-    static var backupPhoneOnlyCardDismiss: String {
-        String(localized: "backup.phoneOnlyCard.dismiss", table: "Wave6")
-    }
-    static var backupPhoneOnlyCardTitleIos: String {
-        String(localized: "backup.phoneOnlyCard.title.ios", table: "Wave6")
     }
     static var backupSettingsHeading: String {
         String(localized: "backup.settings.heading", table: "Wave6")
@@ -158,16 +128,6 @@ enum Wave6Copy {
             forPreferences: [language.replacingOccurrences(of: "_", with: "-")]).first ?? "en"
         let localized = bundle.path(forResource: selected, ofType: "lproj").flatMap(Bundle.init(path:)) ?? bundle
         switch key {
-        case "backup.cloud.body.off.ios":
-            return String(localized: "backup.cloud.body.off.ios", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.cloud.body.on":
-            return String(localized: "backup.cloud.body.on", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.cloud.title":
-            return String(localized: "backup.cloud.title", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.includeSavedVoices.subtitle.ios":
-            return String(localized: "backup.includeSavedVoices.subtitle.ios", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.includeSavedVoices.subtitle.off.ios":
-            return String(localized: "backup.includeSavedVoices.subtitle.off.ios", table: "Wave6", bundle: localized, locale: locale)
         case "backup.includeSavedVoices.title":
             return String(localized: "backup.includeSavedVoices.title", table: "Wave6", bundle: localized, locale: locale)
         case "backup.info.icloud.body":
@@ -184,18 +144,8 @@ enum Wave6Copy {
             return String(localized: "backup.info.title", table: "Wave6", bundle: localized, locale: locale)
         case "backup.info.what.body":
             return String(localized: "backup.info.what.body", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.info.what.heading":
-            return String(localized: "backup.info.what.heading", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.phoneOnlyCard.action.ios":
-            return String(localized: "backup.phoneOnlyCard.action.ios", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.phoneOnlyCard.body":
-            return String(localized: "backup.phoneOnlyCard.body", table: "Wave6", bundle: localized, locale: locale)
         case "backup.phoneOnlyCard.close.a11y":
             return String(localized: "backup.phoneOnlyCard.close.a11y", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.phoneOnlyCard.dismiss":
-            return String(localized: "backup.phoneOnlyCard.dismiss", table: "Wave6", bundle: localized, locale: locale)
-        case "backup.phoneOnlyCard.title.ios":
-            return String(localized: "backup.phoneOnlyCard.title.ios", table: "Wave6", bundle: localized, locale: locale)
         case "backup.settings.heading":
             return String(localized: "backup.settings.heading", table: "Wave6", bundle: localized, locale: locale)
         case "backup.settings.learnMore":

@@ -21,7 +21,7 @@ struct ModelRowView: View {
 
     @ViewBuilder private func content(chevron: Bool) -> some View {
         if #available(iOS 26.0, *) {
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 partLabel
                 Spacer(minLength: 8)
                 statusLabel(chevron: chevron)

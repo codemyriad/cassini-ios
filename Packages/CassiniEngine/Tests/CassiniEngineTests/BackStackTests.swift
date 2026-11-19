@@ -57,6 +57,10 @@ import CassiniNotebook
             #expect(try JSONDecoder().decode(Route.self, from: data) == route)
             #expect(route != .modelDownload(noteID: nil))
         }
+        let fromSwitch = Route.modelDownload(noteID: nil, part: .speakers, fromSwitch: true)
+        let data = try JSONEncoder().encode(fromSwitch)
+        #expect(try JSONDecoder().decode(Route.self, from: data) == fromSwitch)
+        #expect(fromSwitch != .modelDownload(noteID: nil, part: .speakers))
     }
 
 }

@@ -106,10 +106,11 @@ import CassiniNotebook
     }
 
     /// A Not downloaded row opens the model download screen with no note; so does a Failed row, whose Download
-    /// starts the download again. Other rows do nothing.
-    public func openModel(_ part: ModelPart) {
+    /// starts the download again. Other rows do nothing. Pass `fromSwitch: true` only when opened by flipping a
+    /// speaker toggle on, so "Not now" reverts that switch.
+    public func openModel(_ part: ModelPart, fromSwitch: Bool = false) {
         guard models.first(where: { $0.part == part })?.status.opensModelDownload == true else { return }
-        onEffect(.open(.modelDownload(noteID: nil, part: part)))
+        onEffect(.open(.modelDownload(noteID: nil, part: part, fromSwitch: fromSwitch ? true : nil)))
     }
 
     public func openVoices() { onEffect(.open(.savedVoices)) }

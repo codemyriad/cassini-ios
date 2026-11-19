@@ -49,7 +49,10 @@ final class ModelDownloadFlowTests: XCTestCase {
             XCTAssertFalse(language.exists, "Parakeet hears the language")
         }
 
-        app.buttons["modelDownloadSources"].tap()
+        let sources = app.buttons["modelDownloadSources"]
+        XCTAssertTrue(sources.waitForExistence(within: 5))
+        XCTAssertTrue(sources.label.contains("Where do the files come from?"), sources.label)
+        sources.tap()
         XCTAssertTrue(app.navigationBars["Where the models come from"].waitForExistence(within: 5))
         app.navigationBars["Where the models come from"].buttons.element(boundBy: 0).tap()
 
@@ -71,7 +74,10 @@ final class ModelDownloadFlowTests: XCTestCase {
         XCTAssertEqual(part(app, "Recognising saved voices").label, "Recognising saved voices, 26 MB")
         // The figure keeps its unit on its line: a no-break space.
         XCTAssertTrue(text(app, containing: "Cassini needs a one-time download of 532\u{00A0}MB.").exists)
-        XCTAssertTrue(text(app, containing: "Needs about 1.2 GB free to install. Each file is checked before it’s used.").exists)
+        let sources = app.buttons["modelDownloadSources"]
+        XCTAssertTrue(sources.exists)
+        XCTAssertTrue(sources.label.contains("Needs about 1.2 GB free to install. Each file is checked before it’s used."), sources.label)
+        XCTAssertTrue(sources.label.contains("Where do the files come from?"), sources.label)
         XCTAssertFalse(app.staticTexts["speechLanguageLine"].exists, "Parakeet hears the language")
         XCTAssertTrue(app.buttons["Download and transcribe"].exists)
     }

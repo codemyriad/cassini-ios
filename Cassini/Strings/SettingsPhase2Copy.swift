@@ -49,6 +49,12 @@ enum SettingsPhase2Copy {
     static var backupCassiniNever: String {
         String(localized: "backup.info.cassiniNever", table: "SettingsPhase2")
     }
+    static var backupIncludedHeading: String {
+        String(localized: "backup.info.included.heading", table: "SettingsPhase2")
+    }
+    static var backupIncludedLead: String {
+        String(localized: "backup.info.included.iosLead", table: "SettingsPhase2")
+    }
     static var backupRowMeetings: String {
         String(localized: "backup.info.row.meetings", table: "SettingsPhase2")
     }
@@ -71,10 +77,10 @@ enum SettingsPhase2Copy {
         String(localized: "backup.info.row.settings.detail", table: "SettingsPhase2")
     }
     static var backupIncluded: String {
-        String(localized: "backup.info.status.backedUp", table: "SettingsPhase2")
+        String(localized: "backup.info.status.included", table: "SettingsPhase2")
     }
     static var backupExcluded: String {
-        String(localized: "backup.info.status.notBackedUp", table: "SettingsPhase2")
+        String(localized: "backup.info.status.notIncluded", table: "SettingsPhase2")
     }
     static var backupWhoComputer: String {
         String(localized: "backup.info.who.computer", table: "SettingsPhase2")
@@ -100,23 +106,38 @@ enum SettingsPhase2Copy {
     static var backupMeetingsSubtitle: String {
         String(localized: "backup.meetings.switch.subtitle", table: "SettingsPhase2")
     }
+    static var backupMoreDetailRow: String {
+        String(localized: "backup.moreDetail.row", table: "SettingsPhase2")
+    }
+    static var backupNoticeBodyIpad: String {
+        String(localized: "backup.notice.body.ipad", table: "SettingsPhase2")
+    }
+    static var backupNoticeBodyIphone: String {
+        String(localized: "backup.notice.body.iphone", table: "SettingsPhase2")
+    }
+    static var backupNoticeKeep: String {
+        String(localized: "backup.notice.keep", table: "SettingsPhase2")
+    }
+    static var backupNoticeLeaveOut: String {
+        String(localized: "backup.notice.leaveOut", table: "SettingsPhase2")
+    }
+    static var backupNoticeTitle: String {
+        String(localized: "backup.notice.title", table: "SettingsPhase2")
+    }
     static var ownCopy: String {
         String(localized: "backup.ownCopy.heading", table: "SettingsPhase2")
     }
     static var zipSubtitle: String {
         String(localized: "backup.ownCopy.zip.subtitle", table: "SettingsPhase2")
     }
-    static var backupAnswer: String {
-        String(localized: "backup.page.answer.icloud", table: "SettingsPhase2")
-    }
-    static var backupAnswerBody: String {
-        String(localized: "backup.page.answer.icloud.body", table: "SettingsPhase2")
-    }
     static var backupVoices: String {
         String(localized: "backup.savedVoices.switch", table: "SettingsPhase2")
     }
-    static var backupVoicesWhy: String {
-        String(localized: "backup.savedVoices.switch.why", table: "SettingsPhase2")
+    static var backupVoicesDescriptionIpad: String {
+        String(localized: "backup.savedVoices.switch.description.ipad", table: "SettingsPhase2")
+    }
+    static var backupVoicesDescriptionIphone: String {
+        String(localized: "backup.savedVoices.switch.description.iphone", table: "SettingsPhase2")
     }
     static var notNow: String {
         String(localized: "common.notNow", table: "SettingsPhase2")
@@ -151,6 +172,9 @@ enum SettingsPhase2Copy {
     static var offerDownload: String {
         String(localized: "models.offer.download", table: "SettingsPhase2")
     }
+    static var offerNotNow: String {
+        String(localized: "models.offer.notNow", table: "SettingsPhase2")
+    }
     static var offerRecognise: String {
         String(localized: "models.offer.part.recognise", table: "SettingsPhase2")
     }
@@ -159,9 +183,6 @@ enum SettingsPhase2Copy {
     }
     static var offerTellApart: String {
         String(localized: "models.offer.part.tellApart", table: "SettingsPhase2")
-    }
-    static var recordingKept: String {
-        String(localized: "models.offer.recordingKept", table: "SettingsPhase2")
     }
     static var offerSpace: String {
         String(localized: "models.offer.spaceNeeded", table: "SettingsPhase2")
@@ -172,14 +193,14 @@ enum SettingsPhase2Copy {
     static var offerTitleIphone: String {
         String(localized: "models.offer.title.iphone", table: "SettingsPhase2")
     }
+    static var whereFromLink: String {
+        String(localized: "models.offer.whereFrom.link", table: "SettingsPhase2")
+    }
     static var parakeetDescription: String {
         String(localized: "models.parakeetUltra.description.short", table: "SettingsPhase2")
     }
     static var parakeet: String {
         String(localized: "models.parakeetUltra.name", table: "SettingsPhase2")
-    }
-    static var recogniseDescription: String {
-        String(localized: "models.recogniseVoices.description.short", table: "SettingsPhase2")
     }
     static var recognise: String {
         String(localized: "models.recogniseVoices.name", table: "SettingsPhase2")
@@ -226,12 +247,6 @@ enum SettingsPhase2Copy {
     static var off: String {
         String(localized: "settings.answer.off", table: "SettingsPhase2")
     }
-    static var autoName: String {
-        String(localized: "settings.ios.speakers.autoName", table: "SettingsPhase2")
-    }
-    static var autoNameSubtitle: String {
-        String(localized: "settings.ios.speakers.autoName.subtitle", table: "SettingsPhase2")
-    }
     static var moreDetail: String {
         String(localized: "settings.moreDetail", table: "SettingsPhase2")
     }
@@ -261,6 +276,15 @@ enum SettingsPhase2Copy {
     }
     static var libraryStats: String {
         String(localized: "settings.phone.libraryStats", table: "SettingsPhase2")
+    }
+    static var autoName: String {
+        String(localized: "settings.phone.speakers.autoName", table: "SettingsPhase2")
+    }
+    static var autoNameSubtitle: String {
+        String(localized: "settings.phone.speakers.autoName.subtitle", table: "SettingsPhase2")
+    }
+    static var recogniseDescription: String {
+        String(localized: "settings.phone.speakers.recognise.subtitle", table: "SettingsPhase2")
     }
     static var runsOnIpad: String {
         String(localized: "settings.phone.speakers.runsOnDevice.ipad", table: "SettingsPhase2")

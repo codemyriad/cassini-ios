@@ -15,6 +15,7 @@ import CassiniNotebook
         var notificationsAsked = false
         var consents: [[ModelPart]] = []
         var declines = 0
+        var declinedParts: [ModelPart] = []
         var transcribed: [UUID] = []
         var downloads: [[ModelPart]] = []
         var language: String? = "it-IT"
@@ -32,6 +33,7 @@ import CassiniNotebook
         func usableBytes() async -> Int64 { await beforeStorage?(); return usable }
         func recordConsent(for parts: [ModelPart]) { consents.append(parts) }
         func recordDeclined() { declines += 1 }
+        func recordDeclined(part: ModelPart) { declinedParts.append(part) }
         func transcribe(_ noteID: UUID) async -> TranscribeOutcome { transcribed.append(noteID); return .queued(changed: true) }
         func downloadModels(_ parts: [ModelPart]) { downloads.append(parts) }
         func askNotificationsOnce() async { await beforeNotifications?(); if askNotifications { notificationsAsked = true } }
@@ -277,6 +279,31 @@ import CassiniNotebook
         // A transcription's plan still says "Download and transcribe".
         ports.plan = Self.fresh
         #expect(await self.model(effects: Effects()).identifiesSpeakers == false)
+    }
+
+    @Test func notNowForAStandaloneSpeakerPartRecordsTheDeclinedPartOnlyWhenOpenedFromASwitch() async {
+        ports.plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
+                                            identifySpeakers: true, speakersInstallBytes: 54_000_000,
+                                            requestedPart: .speakers)
+        for part in [ModelPart.speakers, .voices] {
+            let effects = Effects()
+            let model = ModelDownloadModel(noteID: nil, ports: ports, part: part)
+            model.onEffect = { effects.list.append($0) }
+            await model.load()
+            model.notNow()
+            #expect(effects.list == [.close])
+        }
+        #expect(ports.declinedParts.isEmpty, "opening from a Settings row or Saved voices must not flip the switch off")
+
+        for part in [ModelPart.speakers, .voices] {
+            let effects = Effects()
+            let model = ModelDownloadModel(noteID: nil, ports: ports, part: part, declineTurnsOff: true)
+            model.onEffect = { effects.list.append($0) }
+            await model.load()
+            model.notNow()
+            #expect(effects.list == [.close])
+        }
+        #expect(ports.declinedParts == [.speakers, .voices])
     }
 
     // ports: ModelDownloadViewModelTest#closeOnlyPopsAndSourcesOpenLicenses

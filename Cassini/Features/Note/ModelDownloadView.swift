@@ -7,6 +7,7 @@ struct ModelDownloadView: View {
     let noteID: UUID?
     var part: ModelPart? = nil
     var parakeetOnly = false
+    var declineTurnsOff = false
     @Environment(\.dismiss) private var dismiss
     @State private var presented = false
     @State private var didPresent = false
@@ -21,7 +22,7 @@ struct ModelDownloadView: View {
                 presented = true
             }
             .fullScreenCover(isPresented: $presented, onDismiss: { dismiss() }) {
-                ModelDownloadModal(noteID: noteID, part: part, parakeetOnly: parakeetOnly)
+                ModelDownloadModal(noteID: noteID, part: part, parakeetOnly: parakeetOnly, declineTurnsOff: declineTurnsOff)
             }
     }
 }
@@ -30,6 +31,7 @@ private struct ModelDownloadModal: View {
     let noteID: UUID?
     let part: ModelPart?
     let parakeetOnly: Bool
+    let declineTurnsOff: Bool
     @Environment(ProcessingStore.self) private var processing
     @Environment(\.modelRoot) private var modelRoot
     @Environment(\.dismiss) private var dismiss
@@ -62,7 +64,7 @@ private struct ModelDownloadModal: View {
         .task {
             guard model == nil else { return }
             guard let ports = parakeetOnly ? processing.parakeetDownload : processing.modelDownload else { dismiss(); return }
-            let model = ModelDownloadModel(noteID: noteID, ports: ports, part: part)
+            let model = ModelDownloadModel(noteID: noteID, ports: ports, part: part, declineTurnsOff: declineTurnsOff)
             model.onEffect = { effect in
                 switch effect {
                 case .close: dismiss()
@@ -88,7 +90,6 @@ private struct ModelDownloadContent: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    OrbitMark(size: 56)
                     Text(pad ? SettingsPhase2Copy.offerTitleIpad : SettingsPhase2Copy.offerTitleIphone)
                         .font(.system(size: titleSize, weight: .bold)).foregroundStyle(Color.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -119,14 +120,17 @@ private struct ModelDownloadContent: View {
                             .font(.subheadline).foregroundStyle(Color.muted)
                             .accessibilityIdentifier("speechLanguageLine")
                     }
-                    Text(SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale)))
-                        .font(.subheadline).foregroundStyle(Color.muted)
                     Button(action: model.openSources) {
-                        Text(SettingsPhase2Copy.whereFrom)
+                        spaceAndSources
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: HitTarget.minimum, alignment: .topLeading)
+                            .contentShape(Rectangle())
                     }
-                    .font(.subheadline.weight(.medium)).tint(.accent)
-                    .disabled(model.busy).accessibilityIdentifier("modelDownloadSources")
-                    .frame(minHeight: HitTarget.minimum)
+                    .buttonStyle(.plain)
+                    .disabled(model.busy)
+                    .accessibilityIdentifier("modelDownloadSources")
                     if typeSize.isAccessibilitySize { ModelDownloadActions(model: model) }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -137,6 +141,17 @@ private struct ModelDownloadContent: View {
         }
         .padding(.horizontal, 20).padding(.bottom, 24)
         .readableWidth()
+    }
+
+    /// The space line with "Where do the files come from?" styled as an inline link at its end.
+    private var spaceAndSources: Text {
+        let space = SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale))
+        var result = AttributedString(space + " ")
+        var link = AttributedString(SettingsPhase2Copy.whereFromLink)
+        link.foregroundColor = Color.accentInk
+        link.font = .subheadline.weight(.medium)
+        result += link
+        return Text(result)
     }
 
     /// The language's name as the Settings picker shows it, in the app's language.
@@ -177,14 +192,12 @@ private struct ModelDownloadActions: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(model.busy).accessibilityIdentifier("modelDownloadPrimary")
-            Button(action: model.notNow) { Text(SettingsPhase2Copy.notNow) }
-                .font(.body.weight(.medium)).tint(.ink)
-                .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
-                .disabled(model.busy).accessibilityIdentifier("modelDownloadNotNow")
-            if model.withNote {
-                Text(SettingsPhase2Copy.recordingKept).font(.footnote).foregroundStyle(Color.muted)
-                    .multilineTextAlignment(.center).frame(maxWidth: .infinity)
+            Button(action: model.notNow) {
+                Text(model.withNote ? SettingsPhase2Copy.offerNotNow : SettingsPhase2Copy.notNow)
             }
+            .font(.body.weight(.medium)).tint(.ink)
+            .frame(maxWidth: .infinity, minHeight: HitTarget.minimum)
+            .disabled(model.busy).accessibilityIdentifier("modelDownloadNotNow")
         }
     }
 

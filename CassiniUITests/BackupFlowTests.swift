@@ -109,25 +109,26 @@ final class BackupFlowTests: XCTestCase {
         for id in ["backupStatusMeetings", "backupStatusSettings", "backupStatusVoices", "backupStatusModels"] {
             let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
             reveal(row, in: app)
-            XCTAssertTrue(row.label.contains(id == "backupStatusModels" ? "Marked to be left out" : "Included when iCloud Backup is on"), row.label)
+            XCTAssertTrue(row.label.contains(id == "backupStatusModels" ? "Not included" : "Included"), row.label)
         }
     }
 
-    @MainActor func testReadersLinkOpensTheReadershipSection() {
+    @MainActor func testDetailLinkShowsReadershipSection() {
         let app = launch()
         openBackup(app)
-        let readers = app.buttons["backupReadersRow"]
-        reveal(readers, in: app); readers.tap()
+        let info = app.buttons["backupInfoRow"]
+        reveal(info, in: app); info.tap()
         let heading = app.staticTexts["iCloud Backup"]
         XCTAssertTrue(heading.waitForExistence(within: 15))
-        XCTAssertTrue(heading.isHittable, "The topic link opens its section without another scroll")
+        reveal(heading, in: app)
+        XCTAssertTrue(heading.isHittable)
     }
 
     @MainActor func testVoiceChoiceDoesNotExcludeMeetings() {
         let app = launch()
         openBackup(app)
         let control = app.switches["includeSavedVoicesToggle"]
-        control.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        control.switches.firstMatch.tap()
         XCTAssertTrue(control.waitForValue("0"))
         XCTAssertEqual(app.switches["cloudBackupToggle"].value as? String, "1")
         let info = app.buttons["backupInfoRow"]
@@ -136,7 +137,7 @@ final class BackupFlowTests: XCTestCase {
         for id in ["backupStatusMeetings", "backupStatusVoices"] {
             let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
             reveal(row, in: app)
-            XCTAssertTrue(row.label.contains(id == "backupStatusMeetings" ? "Included when iCloud Backup is on" : "Marked to be left out"), row.label)
+            XCTAssertTrue(row.label.contains(id == "backupStatusMeetings" ? "Included" : "Not included"), row.label)
         }
         app.terminate()
         app.launchArguments.removeAll { $0 == "--reset-test-data" }
@@ -148,18 +149,16 @@ final class BackupFlowTests: XCTestCase {
         let app = launch()
         openBackup(app)
         let control = app.switches["cloudBackupToggle"]
-        // A composite Toggle's AX frame includes its multiline label. Tap the native switch at its trailing edge.
-        control.coordinate(withNormalizedOffset: CGVector(dx: 0.94, dy: 0.5)).tap()
+        control.switches.firstMatch.tap()
         XCTAssertTrue(app.switches["cloudBackupToggle"].waitForValue("0"))
         XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
-        XCTAssertEqual(app.staticTexts["backupAnswer"].label, "Marked to be left out")
         let info = app.buttons["backupInfoRow"]
         reveal(info, in: app); info.tap()
         XCTAssertTrue(app.navigationBars["In more detail"].waitForExistence(within: 15))
         for id in ["backupStatusMeetings", "backupStatusVoices"] {
             let row = app.descendants(matching: .any).matching(identifier: id).firstMatch
             reveal(row, in: app)
-            XCTAssertTrue(row.label.contains("Marked to be left out"), row.label)
+            XCTAssertTrue(row.label.contains("Not included"), row.label)
         }
         app.terminate()
         app.launchArguments.removeAll { $0 == "--reset-test-data" }
@@ -194,8 +193,9 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertEqual(app.switches["includeSavedVoicesToggle"].value as? String, "1")
     }
 
-    @MainActor func testExportSurvivesBothDetailLinksAndSharesAfterReturning() {
-        for id in ["backupInfoRow", "backupReadersRow"] {
+    @MainActor func testExportSurvivesDetailLinkAndSharesAfterReturning() {
+        do {
+            let id = "backupInfoRow"
             let app = launch(["--seed", "library", "--hold-archive-export"])
             openBackup(app)
             let export = app.buttons["backupExportZIP"]

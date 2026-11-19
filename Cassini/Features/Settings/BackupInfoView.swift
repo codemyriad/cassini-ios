@@ -9,40 +9,26 @@ struct BackupSection: View {
     @Environment(LibraryStore.self) private var library
     @Environment(ExportStore.self) private var exports
     @Bindable var archiveExport: ArchiveExportModel
-
-    private var presentation: BackupPresentation {
-        .init(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
-    }
+    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
         Section {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(settings.cloudBackup ? SettingsPhase2Copy.backupAnswer : SettingsPhase2Copy.backupExcluded)
-                        .font(.headline).accessibilityIdentifier("backupAnswer")
-                    Text(settings.cloudBackup ? SettingsPhase2Copy.backupAnswerBody : Wave6Copy.backupCloudBodyOffIos)
-                        .font(.subheadline).foregroundStyle(Color.muted)
-                }
-            }.padding(.vertical, 6)
-        }.listRowBackground(Color.accentTint)
-        Section {
             Toggle(isOn: Binding(get: { settings.cloudBackup }, set: { change(cloud: $0) })) {
                 backupLabel(SettingsPhase2Copy.backupMeetings, subtitle: SettingsPhase2Copy.backupMeetingsSubtitle)
-            }.accessibilityIdentifier("cloudBackupToggle")
+            }
+            .toggleStyle(TopAlignedSwitchToggleStyle())
+            .accessibilityIdentifier("cloudBackupToggle")
             Toggle(isOn: Binding(get: { settings.includeSavedVoicesInBackups }, set: { change(voices: $0) })) {
-                backupLabel(SettingsPhase2Copy.backupVoices, subtitle: SettingsPhase2Copy.backupVoicesWhy)
-            }.accessibilityIdentifier("includeSavedVoicesToggle")
-        } footer: {
-            Text(presentation.voicesIncluded
-                 ? Wave6Copy.backupIncludeSavedVoicesSubtitleIos : Wave6Copy.backupIncludeSavedVoicesSubtitleOffIos)
+                backupLabel(SettingsPhase2Copy.backupVoices,
+                            subtitle: pad ? SettingsPhase2Copy.backupVoicesDescriptionIpad : SettingsPhase2Copy.backupVoicesDescriptionIphone)
+            }
+            .toggleStyle(TopAlignedSwitchToggleStyle())
+            .accessibilityIdentifier("includeSavedVoicesToggle")
         }
         .disabled(backup.updating || !backup.ready)
         Section {
-            NavigationLink(Wave6Copy.backupInfoWhatHeading) { BackupInfoView() }
+            NavigationLink(SettingsPhase2Copy.backupMoreDetailRow) { BackupInfoView() }
                 .accessibilityIdentifier("backupInfoRow")
-            NavigationLink(SettingsPhase2Copy.backupWho) { BackupInfoView(topic: .readers) }
-                .accessibilityIdentifier("backupReadersRow")
         } header: { Text(SettingsPhase2Copy.moreDetail) }
         Section {
             Button {
@@ -86,9 +72,13 @@ struct BackupInfoView: View {
         let presentation = BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 32) {
                     VStack(alignment: .leading, spacing: 8) {
-                        detailHeading(Wave6Copy.backupInfoWhatHeading)
+                        detailHeading(SettingsPhase2Copy.backupIncludedHeading)
+                        Text(SettingsPhase2Copy.backupIncludedLead)
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 16)
                         VStack(spacing: 0) {
                             inclusion(SettingsPhase2Copy.backupRowMeetings, detail: SettingsPhase2Copy.backupRowMeetingsDetail,
                                       included: presentation.meetingsIncluded, id: "backupStatusMeetings")
@@ -103,16 +93,14 @@ struct BackupInfoView: View {
                                       included: false, id: "backupStatusModels")
                         }.background(Color.card, in: RoundedRectangle(cornerRadius: 22))
                     }.id(Topic.contents)
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 14) {
                         detailHeading(SettingsPhase2Copy.backupWho)
-                        VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 16) {
                             explanation(Wave6Copy.backupInfoIcloudHeading, detail: SettingsPhase2Copy.backupWhoIcloud)
-                            detailDivider
                             explanation(SettingsPhase2Copy.backupWhoComputer, detail: SettingsPhase2Copy.backupWhoComputerDetail)
-                            detailDivider
                             explanation(SettingsPhase2Copy.backupWhoZip, detail: SettingsPhase2Copy.backupWhoZipDetail)
                                 .accessibilityIdentifier("backupZipReader")
-                        }.background(Color.card, in: RoundedRectangle(cornerRadius: 22))
+                        }.padding(.horizontal, 16)
                         Text(SettingsPhase2Copy.backupCassiniNever).font(.footnote).foregroundStyle(Color.muted)
                             .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 16)
                     }.id(Topic.readers)
@@ -132,11 +120,11 @@ struct BackupInfoView: View {
     }
 
     private func explanation(_ title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).foregroundStyle(Color.ink)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.body.weight(.semibold)).foregroundStyle(Color.ink)
             Text(detail).font(.subheadline).foregroundStyle(Color.muted)
         }.fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16).padding(.vertical, 15)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func detailHeading(_ title: String) -> some View {
@@ -205,32 +193,54 @@ struct BackupNoticeCard: View {
         .accessibilityIdentifier("backupNotice")
     }
 
+    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
-                Text(Wave6Copy.backupPhoneOnlyCardTitleIos).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                Button { settings.dismissBackupNotice() } label: {
-                    Image(systemName: "xmark").font(.subheadline.weight(.semibold))
-                        .frame(width: 44, height: 44).contentShape(Circle())
-                }.buttonStyle(.plain).foregroundStyle(Color.muted)
-                    .accessibilityLabel(Wave6Copy.backupPhoneOnlyCardCloseA11y)
-                    .accessibilityIdentifier("backupNoticeDismiss")
+            if typeSize.isAccessibilitySize {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
+                    Spacer()
+                    dismissButton
+                }
+                Text(SettingsPhase2Copy.backupNoticeTitle).font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "icloud").font(.title2).foregroundStyle(Color.accentInk).accessibilityHidden(true)
+                    Text(SettingsPhase2Copy.backupNoticeTitle).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+                    dismissButton
+                }
             }
-            Text(Wave6Copy.backupPhoneOnlyCardBody).font(.subheadline).foregroundStyle(Color.muted)
-                .padding(.leading, typeSize.isAccessibilitySize ? 0 : 36)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { keepButton; leaveOutButton }.fixedSize(horizontal: true, vertical: false)
+            Text(pad ? SettingsPhase2Copy.backupNoticeBodyIpad : SettingsPhase2Copy.backupNoticeBodyIphone)
+                .font(.subheadline).foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) { keepButton; leaveOutButton }
-            }.padding(.leading, typeSize.isAccessibilitySize ? 0 : 36)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { keepButton; leaveOutButton }
+                    VStack(alignment: .leading, spacing: 8) { keepButton; leaveOutButton }
+                }
+            }
         }.padding(16)
+    }
+
+    private var dismissButton: some View {
+        Button { settings.dismissBackupNotice() } label: {
+            Image(systemName: "xmark").font(.subheadline.weight(.semibold))
+                .frame(width: 44, height: 44).contentShape(Circle())
+        }.buttonStyle(.plain).foregroundStyle(Color.muted)
+            .accessibilityLabel(Wave6Copy.backupPhoneOnlyCardCloseA11y)
+            .accessibilityIdentifier("backupNoticeDismiss")
     }
 
     private var keepButton: some View {
         Button { settings.dismissBackupNotice() } label: {
-            Text(Wave6Copy.backupPhoneOnlyCardDismiss).font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16).frame(minHeight: 44)
-                .background(Color.accentStrong, in: Capsule()).foregroundStyle(Color.onAccent)
+            Text(SettingsPhase2Copy.backupNoticeKeep).font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.neutralTint, in: Capsule()).foregroundStyle(Color.ink)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeKeep")
     }
 
@@ -241,8 +251,9 @@ struct BackupNoticeCard: View {
                 catch { errors.present(error.localizedDescription) }
             }
         } label: {
-            Text(Wave6Copy.backupPhoneOnlyCardActionIos).font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 16).frame(minHeight: 44)
+            Text(SettingsPhase2Copy.backupNoticeLeaveOut).font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16).padding(.vertical, 8).frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color.neutralTint, in: Capsule()).foregroundStyle(Color.ink)
         }.buttonStyle(.plain).accessibilityIdentifier("backupNoticeExclude")
     }

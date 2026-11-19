@@ -631,6 +631,90 @@
         }
       }
     },
+    "backup.info.included.heading": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.included.heading.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What’s included"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa è incluso"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui est inclus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qué se incluye"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que está incluído"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que está incluído"
+          }
+        }
+      }
+    },
+    "backup.info.included.iosLead": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.included.iosLead.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When iCloud Backup is on:"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando il backup di iCloud è attivo:"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand la sauvegarde iCloud est activée :"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando la copia de seguridad de iCloud está activada:"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando o Backup do iCloud estiver ativado:"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando a cópia de segurança do iCloud estiver ativada:"
+          }
+        }
+      }
+    },
     "backup.info.row.meetings": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.meetings.",
       "extractionState": "manual",
@@ -925,86 +1009,86 @@
         }
       }
     },
-    "backup.info.status.backedUp": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.backedUp.",
+    "backup.info.status.included": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.included.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Included when iCloud Backup is on"
+            "value": "Included"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Incluso se il Backup iCloud è attivo"
+            "value": "Incluso"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inclus si la Sauvegarde iCloud est activée"
+            "value": "Inclus"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se incluyen si la Copia en iCloud está activada"
+            "value": "Incluido"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Incluído se o Backup do iCloud estiver ativado"
+            "value": "Incluído"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Incluído se a Cópia em iCloud estiver ativada"
+            "value": "Incluído"
           }
         }
       }
     },
-    "backup.info.status.notBackedUp": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.notBackedUp.",
+    "backup.info.status.notIncluded": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.notIncluded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marked to be left out"
+            "value": "Not included"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Contrassegnato per essere escluso"
+            "value": "Non incluso"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marqué pour être exclu"
+            "value": "Non inclus"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Se marcan para quedar fuera"
+            "value": "No incluido"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marcado para ficar de fora"
+            "value": "Não incluído"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Marcado para ficar de fora"
+            "value": "Não incluído"
           }
         }
       }
@@ -1345,6 +1429,258 @@
         }
       }
     },
+    "backup.moreDetail.row": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.moreDetail.row.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What’s included and who can read it"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa è incluso e chi può leggerlo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui est inclus et qui peut le lire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qué se incluye y quién puede leerlo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que está incluído e quem pode ler"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que está incluído e quem pode ler"
+          }
+        }
+      }
+    },
+    "backup.notice.body.ipad": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.notice.body.ipad.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If iCloud Backup is on, your meetings and saved voices go into it, so a new iPad gets them back."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se il backup di iCloud è attivo, le riunioni e le voci salvate ci finiscono dentro, così un nuovo iPad le recupera."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si la sauvegarde iCloud est activée, vos réunions et voix mémorisées y sont incluses, et un nouvel iPad les récupère."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si la copia de seguridad de iCloud está activada, tus reuniones y voces guardadas van en ella, y un iPad nuevo las recupera."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se o Backup do iCloud estiver ativado, suas reuniões e vozes salvas vão para ele, e um iPad novo as recupera."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se a cópia de segurança do iCloud estiver ativada, as reuniões e vozes guardadas vão para ela, e um iPad novo recupera-as."
+          }
+        }
+      }
+    },
+    "backup.notice.body.iphone": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.notice.body.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If iCloud Backup is on, your meetings and saved voices go into it, so a new iPhone gets them back."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se il backup di iCloud è attivo, le riunioni e le voci salvate ci finiscono dentro, così un nuovo iPhone le recupera."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si la sauvegarde iCloud est activée, vos réunions et voix mémorisées y sont incluses, et un nouvel iPhone les récupère."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si la copia de seguridad de iCloud está activada, tus reuniones y voces guardadas van en ella, y un iPhone nuevo las recupera."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se o Backup do iCloud estiver ativado, suas reuniões e vozes salvas vão para ele, e um iPhone novo as recupera."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se a cópia de segurança do iCloud estiver ativada, as reuniões e vozes guardadas vão para ela, e um iPhone novo recupera-as."
+          }
+        }
+      }
+    },
+    "backup.notice.keep": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.notice.keep.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep in backup"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni nel backup"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder dans la sauvegarde"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantener en la copia"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manter no backup"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manter na cópia de segurança"
+          }
+        }
+      }
+    },
+    "backup.notice.leaveOut": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.notice.leaveOut.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave out"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escludi"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exclure"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Excluir"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deixar de fora"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deixar de fora"
+          }
+        }
+      }
+    },
+    "backup.notice.title": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.notice.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meetings in your backups"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riunioni nei tuoi backup"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réunions dans vos sauvegardes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reuniones en tus copias de seguridad"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reuniões nos seus backups"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reuniões nas suas cópias de segurança"
+          }
+        }
+      }
+    },
     "backup.ownCopy.heading": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.ownCopy.heading.",
       "extractionState": "manual",
@@ -1429,90 +1765,6 @@
         }
       }
     },
-    "backup.page.answer.icloud": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.page.answer.icloud.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your meetings are included in iCloud Backup"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le tue riunioni sono incluse nel Backup iCloud"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vos réunions sont incluses dans la Sauvegarde iCloud"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tus reuniones se incluyen en la Copia en iCloud"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Suas reuniões estão incluídas no Backup do iCloud"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As suas reuniões estão incluídas na Cópia em iCloud"
-          }
-        }
-      }
-    },
-    "backup.page.answer.icloud.body": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.page.answer.icloud.body.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When iCloud Backup is on in iOS Settings, they come back if this iPhone is lost or replaced."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se il Backup iCloud è attivo nelle Impostazioni di iOS, le ritrovi quando questo iPhone viene perso o sostituito."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Si la Sauvegarde iCloud est activée dans les Réglages d’iOS, elles reviennent si cet iPhone est perdu ou remplacé."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Si la Copia en iCloud está activada en los Ajustes de iOS, vuelven si pierdes o cambias este iPhone."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se o Backup do iCloud estiver ativado nos Ajustes do iOS, elas voltam caso este iPhone seja perdido ou substituído."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se a Cópia em iCloud estiver ativada nas Definições do iOS, voltam caso este iPhone seja perdido ou substituído."
-          }
-        }
-      }
-    },
     "backup.savedVoices.switch": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.",
       "extractionState": "manual",
@@ -1555,44 +1807,86 @@
         }
       }
     },
-    "backup.savedVoices.switch.why": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.why.",
+    "backup.savedVoices.switch.description.ipad": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.description.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A voice belongs to someone else, so this is its own choice."
+            "value": "Voiceprints of people you’ve named, so a new or restored iPad keeps recognising them. A voice belongs to someone else, so this is its own choice."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Una voce appartiene a un’altra persona, quindi è una scelta a parte."
+            "value": "Le impronte vocali delle persone a cui hai dato un nome, così un iPad nuovo o ripristinato continua a riconoscerle. Una voce appartiene a qualcun altro, quindi è una scelta a parte."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Une voix appartient à quelqu’un d’autre, c’est donc un choix à part."
+            "value": "Les empreintes vocales des personnes que vous avez nommées, pour qu’un iPad neuf ou restauré continue à les reconnaître. Une voix appartient à quelqu’un d’autre, c’est donc un choix à part."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Una voz pertenece a otra persona, así que es una decisión aparte."
+            "value": "Las huellas de voz de las personas a las que has puesto nombre, para que un iPad nuevo o restaurado las siga reconociendo. Una voz es de otra persona, así que es una decisión aparte."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uma voz pertence a outra pessoa, então é uma escolha à parte."
+            "value": "As impressões de voz das pessoas que você nomeou, para que um iPad novo ou restaurado continue a reconhecê-las. Uma voz pertence a outra pessoa, então esta é uma escolha à parte."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uma voz pertence a outra pessoa, por isso é uma escolha à parte."
+            "value": "As impressões de voz das pessoas a quem deu nome, para que um iPad novo ou restaurado continue a reconhecê-las. Uma voz pertence a outra pessoa, por isso esta é uma escolha à parte."
+          }
+        }
+      }
+    },
+    "backup.savedVoices.switch.description.iphone": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.description.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voiceprints of people you’ve named, so a new or restored iPhone keeps recognising them. A voice belongs to someone else, so this is its own choice."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impronte vocali delle persone a cui hai dato un nome, così un iPhone nuovo o ripristinato continua a riconoscerle. Una voce appartiene a qualcun altro, quindi è una scelta a parte."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les empreintes vocales des personnes que vous avez nommées, pour qu’un iPhone neuf ou restauré continue à les reconnaître. Une voix appartient à quelqu’un d’autre, c’est donc un choix à part."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las huellas de voz de las personas a las que has puesto nombre, para que un iPhone nuevo o restaurado las siga reconociendo. Una voz es de otra persona, así que es una decisión aparte."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz das pessoas que você nomeou, para que um iPhone novo ou restaurado continue a reconhecê-las. Uma voz pertence a outra pessoa, então esta é uma escolha à parte."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz das pessoas a quem deu nome, para que um iPhone novo ou restaurado continue a reconhecê-las. Uma voz pertence a outra pessoa, por isso esta é uma escolha à parte."
           }
         }
       }
@@ -2161,6 +2455,48 @@
         }
       }
     },
+    "models.offer.notNow": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.notNow.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now — keep the audio"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora — tieni l’audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas maintenant — garder l’audio"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no — conservar el audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não — manter o áudio"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agora não — manter o áudio"
+          }
+        }
+      }
+    },
     "models.offer.part.recognise": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.part.recognise.",
       "extractionState": "manual",
@@ -2283,48 +2619,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Distinção de oradores"
-          }
-        }
-      }
-    },
-    "models.offer.recordingKept": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.recordingKept.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Your recording is kept either way."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La registrazione viene conservata in ogni caso."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Votre enregistrement est conservé dans tous les cas."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tu grabación se conserva en cualquier caso."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sua gravação é mantida de qualquer forma."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A sua gravação é mantida de qualquer forma."
           }
         }
       }
@@ -2455,6 +2749,48 @@
         }
       }
     },
+    "models.offer.whereFrom.link": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.whereFrom.link.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where do the files come from?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da dove arrivano i file?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D’où viennent les fichiers ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿De dónde vienen los archivos?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os arquivos?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "De onde vêm os ficheiros?"
+          }
+        }
+      }
+    },
     "models.parakeetUltra.description.short": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.parakeetUltra.description.short.",
       "extractionState": "manual",
@@ -2535,48 +2871,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parakeet Ultra"
-          }
-        }
-      }
-    },
-    "models.recogniseVoices.description.short": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.recogniseVoices.description.short.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Names people you saved as soon as they speak."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dà il nome alle persone salvate appena parlano."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomme les personnes mémorisées dès qu’elles parlent."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pone nombre a las personas guardadas en cuanto hablan."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dá nome às pessoas que você salvou assim que elas falam."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dá nome às pessoas que guardou assim que falam."
           }
         }
       }
@@ -3313,90 +3607,6 @@
         }
       }
     },
-    "settings.ios.speakers.autoName": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.ios.speakers.autoName.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name strong matches automatically"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Assegna automaticamente il nome alle corrispondenze affidabili"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nommer automatiquement les correspondances sûres"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Poner nombre automáticamente a las coincidencias claras"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nomear automaticamente quando houver alta confiança"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dar nome automaticamente às correspondências fortes"
-          }
-        }
-      }
-    },
-    "settings.ios.speakers.autoName.subtitle": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.ios.speakers.autoName.subtitle.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Matches can be wrong, so this is off until you choose."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le corrispondenze possono essere sbagliate, quindi è disattivato finché non scegli tu."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Une correspondance peut être fausse : cette option reste donc désactivée tant que vous ne l’activez pas."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Las coincidencias pueden fallar, así que está desactivado hasta que tú lo elijas."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As correspondências podem estar erradas, então fica desativado até você escolher."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "As correspondências podem estar erradas, por isso fica desativado até escolher."
-          }
-        }
-      }
-    },
     "settings.moreDetail": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.moreDetail.",
       "extractionState": "manual",
@@ -3915,6 +4125,132 @@
           "stringUnit": {
             "state": "translated",
             "value": "{meetings}, {hours} de áudio."
+          }
+        }
+      }
+    },
+    "settings.phone.speakers.autoName": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.autoName.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name people automatically"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna i nomi automaticamente"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nommer les personnes automatiquement"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Poner nombres automáticamente"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomear pessoas automaticamente"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dar nome às pessoas automaticamente"
+          }
+        }
+      }
+    },
+    "settings.phone.speakers.autoName.subtitle": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.autoName.subtitle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only when Cassini is sure. Matches can be wrong, so this is off by default."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo quando Cassini è sicuro. Le corrispondenze possono essere sbagliate, quindi è disattivato per impostazione predefinita."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seulement quand Cassini est sûr. Les correspondances peuvent être fausses, c’est donc désactivé par défaut."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo cuando Cassini está seguro. Las coincidencias pueden fallar, así que está desactivado de forma predeterminada."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só quando o Cassini tem certeza. As correspondências podem estar erradas, por isso vem desativado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só quando o Cassini tem a certeza. As correspondências podem estar erradas, por isso vem desativado."
+          }
+        }
+      }
+    },
+    "settings.phone.speakers.recognise.subtitle": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.recognise.subtitle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names people you’ve saved."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dà il nome alle persone che hai salvato."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomme les personnes que vous avez mémorisées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pone nombre a las personas que has guardado."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dá nome às pessoas que você salvou."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dá nome às pessoas que guardou."
           }
         }
       }

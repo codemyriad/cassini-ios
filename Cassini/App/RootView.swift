@@ -105,7 +105,8 @@ private struct RouteDestination: View {
         case .savedVoices: SavedVoicesView()
         case .trash: TrashView()
         case .licenses: LicensesView(models: modelRoot)
-        case .modelDownload(let noteID, let part): ModelDownloadView(noteID: noteID, part: part).id(route)
+        case .modelDownload(let noteID, let part, let fromSwitch):
+            ModelDownloadView(noteID: noteID, part: part, declineTurnsOff: fromSwitch == true).id(route)
         case .parakeetDownload: ModelDownloadView(noteID: nil, parakeetOnly: true)
         }
     }

@@ -32,7 +32,9 @@ final class SettingsFlowTests: XCTestCase {
     }
 
     @MainActor private func downloadAndAssertRequests(_ app: XCUIApplication, group: String) {
-        app.buttons["Download"].tap()
+        let download = app.buttons["modelDownloadPrimary"]
+        XCTAssertTrue(download.waitForExistence(within: 15))
+        download.tapWhenSettled()
         let requested = app.staticTexts["uiTestState-modelInstallRequested"]
         XCTAssertTrue(requested.waitForExistence(within: 15), "No installer received a request")
         let completed = app.staticTexts["uiTestState-modelInstallCompleted"]
@@ -92,8 +94,9 @@ final class SettingsFlowTests: XCTestCase {
         let download = app.buttons["downloadParakeet"]
         XCTAssertTrue(download.waitForEnabled(within: 15))
         download.tap()
-        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
-        app.buttons["Download"].tap()
+        let primary = app.buttons["modelDownloadPrimary"]
+        XCTAssertTrue(primary.waitForExistence(within: 15))
+        primary.tapWhenSettled()
         assertProgressAndCancel(app, page: "transcription", title: "Transcription", checkChoice: true)
     }
 
@@ -103,8 +106,9 @@ final class SettingsFlowTests: XCTestCase {
         let selected = row(app, startingWith: "Telling speakers apart")
         reveal(selected, in: app)
         selected.tap()
-        XCTAssertTrue(app.buttons["Download"].waitForExistence(within: 15))
-        app.buttons["Download"].tap()
+        let download = app.buttons["modelDownloadPrimary"]
+        XCTAssertTrue(download.waitForExistence(within: 15))
+        download.tapWhenSettled()
         assertProgressAndCancel(app, page: "speakers", title: "Speakers", checkChoice: false)
     }
 
@@ -276,6 +280,44 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Cassini for iOS keeps"))
             .firstMatch.waitForExistence(within: 15))
+    }
+
+    @MainActor func testDecliningSpeakerDownloadTurnsSwitchBackOff() {
+        let app = openSettings(["--models-missing"])
+        openPage(app, "speakersRow", title: "Speakers")
+        for id in ["identifySpeakersToggle", "recogniseSavedVoicesToggle"] {
+            let toggle = app.switches[id]
+            XCTAssertTrue(toggle.waitForValue("1"))
+            toggle.switches.firstMatch.tap()
+            XCTAssertTrue(toggle.waitForValue("0"))
+            toggle.switches.firstMatch.tap()
+            XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+            app.buttons["modelDownloadNotNow"].tap()
+            XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 15))
+            XCTAssertTrue(toggle.waitForValue("0"))
+        }
+        app.switches["identifySpeakersToggle"].switches.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+    }
+
+    @MainActor func testDecliningDownloadFromSavedVoicesLeavesIdentifySpeakersOn() {
+        let app = openSettings(["--models-missing"])
+        let savedVoices = app.buttons["savedVoicesRow"]
+        reveal(savedVoices, in: app)
+        savedVoices.tap()
+        let addVoice = app.buttons["addSavedVoice"]
+        XCTAssertTrue(addVoice.waitForExistence(within: 15))
+        addVoice.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+        let notNow = app.buttons["modelDownloadNotNow"]
+        XCTAssertTrue(notNow.waitForExistence(within: 5))
+        notNow.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 15))
+        XCTAssertTrue(addVoice.waitForExistence(within: 15))
+        app.navigationBars["Saved voices"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
+        openPage(app, "speakersRow", title: "Speakers")
+        XCTAssertTrue(app.switches["identifySpeakersToggle"].waitForValue("1"))
     }
 
     // ports: SettingsBehaviourTest#licenceRowsOpenAndBackClosesTheText
