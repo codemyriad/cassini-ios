@@ -170,6 +170,7 @@ struct SavedVoicesView: View {
                 .frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(.center)
+            .accessibilityIdentifier("savedVoicesList")
             privacyFootnote
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
@@ -177,7 +178,6 @@ struct SavedVoicesView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.paper.ignoresSafeArea())
-        .accessibilityIdentifier("savedVoicesList")
     }
 
     private var privacyFootnote: some View {

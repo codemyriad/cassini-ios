@@ -36,8 +36,10 @@ final class SavedVoicesFlowTests: XCTestCase {
         let app = openSavedVoices(seed: "staleVoices")
         let notice = app.descendants(matching: .any)["voicesStaleNotice"]
         XCTAssertTrue(notice.waitForExistence(within: 15))
-        XCTAssertTrue(notice.label.contains("1 voice needs naming again"), notice.label)
+        XCTAssertTrue(notice.label.contains("3 voices need naming again"), notice.label)
+        XCTAssertTrue(notice.label.contains("Alex Moreau"), notice.label)
         XCTAssertTrue(notice.label.contains("Giulia Conti"), notice.label)
+        XCTAssertTrue(notice.label.contains("Sam Rivera"), notice.label)
 
         let list = app.collectionViews["savedVoicesList"]
         let staleRow = app.descendants(matching: .any)
