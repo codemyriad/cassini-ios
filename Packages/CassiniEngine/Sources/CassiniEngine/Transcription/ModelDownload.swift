@@ -183,6 +183,8 @@ public final class ModelDownloadModel {
     public let noteID: UUID?
     /// A standalone Settings row's requested part; note jobs retain their own pinned plan.
     public let part: ModelPart?
+    /// True only when opened by turning on a speaker switch in Settings, so "Not now" turns that switch back off.
+    public let declineTurnsOff: Bool
     /// Nil until it is read, and when nothing is missing (the screen is never shown without parts).
     public private(set) var plan: ModelDownloadPlan?
     /// The primary button shows its spinner.
@@ -199,9 +201,10 @@ public final class ModelDownloadModel {
     @ObservationIgnored public var onEffect: (Effect) -> Void = { _ in }
     @ObservationIgnored private var closing = false
 
-    public init(noteID: UUID?, ports: any ModelDownloadPorts, part: ModelPart? = nil) {
+    public init(noteID: UUID?, ports: any ModelDownloadPorts, part: ModelPart? = nil, declineTurnsOff: Bool = false) {
         self.noteID = noteID
         self.part = noteID == nil ? part : nil
+        self.declineTurnsOff = noteID == nil && part != nil && declineTurnsOff
         self.ports = ports
     }
 
@@ -248,7 +251,7 @@ public final class ModelDownloadModel {
     public func notNow() {
         guard !busy, !closing else { return }
         if plan?.missing.contains(.speech) == true { ports.recordDeclined() }
-        if noteID == nil, let part { ports.recordDeclined(part: part) }
+        if declineTurnsOff, noteID == nil, let part { ports.recordDeclined(part: part) }
         close()
     }
 

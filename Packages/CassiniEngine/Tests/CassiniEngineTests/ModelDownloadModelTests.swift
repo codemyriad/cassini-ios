@@ -281,13 +281,23 @@ import CassiniNotebook
         #expect(await self.model(effects: Effects()).identifiesSpeakers == false)
     }
 
-    @Test func notNowForAStandaloneSpeakerPartRecordsTheDeclinedPart() async {
+    @Test func notNowForAStandaloneSpeakerPartRecordsTheDeclinedPartOnlyWhenOpenedFromASwitch() async {
         ports.plan = ModelDownloadPlan.plan(speech: .notDownloaded, speakers: .notDownloaded, forNote: false,
                                             identifySpeakers: true, speakersInstallBytes: 54_000_000,
                                             requestedPart: .speakers)
         for part in [ModelPart.speakers, .voices] {
             let effects = Effects()
             let model = ModelDownloadModel(noteID: nil, ports: ports, part: part)
+            model.onEffect = { effects.list.append($0) }
+            await model.load()
+            model.notNow()
+            #expect(effects.list == [.close])
+        }
+        #expect(ports.declinedParts.isEmpty, "opening from a Settings row or Saved voices must not flip the switch off")
+
+        for part in [ModelPart.speakers, .voices] {
+            let effects = Effects()
+            let model = ModelDownloadModel(noteID: nil, ports: ports, part: part, declineTurnsOff: true)
             model.onEffect = { effects.list.append($0) }
             await model.load()
             model.notNow()

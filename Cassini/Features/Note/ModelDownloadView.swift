@@ -7,6 +7,7 @@ struct ModelDownloadView: View {
     let noteID: UUID?
     var part: ModelPart? = nil
     var parakeetOnly = false
+    var declineTurnsOff = false
     @Environment(\.dismiss) private var dismiss
     @State private var presented = false
     @State private var didPresent = false
@@ -21,7 +22,7 @@ struct ModelDownloadView: View {
                 presented = true
             }
             .fullScreenCover(isPresented: $presented, onDismiss: { dismiss() }) {
-                ModelDownloadModal(noteID: noteID, part: part, parakeetOnly: parakeetOnly)
+                ModelDownloadModal(noteID: noteID, part: part, parakeetOnly: parakeetOnly, declineTurnsOff: declineTurnsOff)
             }
     }
 }
@@ -30,6 +31,7 @@ private struct ModelDownloadModal: View {
     let noteID: UUID?
     let part: ModelPart?
     let parakeetOnly: Bool
+    let declineTurnsOff: Bool
     @Environment(ProcessingStore.self) private var processing
     @Environment(\.modelRoot) private var modelRoot
     @Environment(\.dismiss) private var dismiss
@@ -62,7 +64,7 @@ private struct ModelDownloadModal: View {
         .task {
             guard model == nil else { return }
             guard let ports = parakeetOnly ? processing.parakeetDownload : processing.modelDownload else { dismiss(); return }
-            let model = ModelDownloadModel(noteID: noteID, ports: ports, part: part)
+            let model = ModelDownloadModel(noteID: noteID, ports: ports, part: part, declineTurnsOff: declineTurnsOff)
             model.onEffect = { effect in
                 switch effect {
                 case .close: dismiss()

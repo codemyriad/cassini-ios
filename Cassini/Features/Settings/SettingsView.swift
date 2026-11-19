@@ -244,13 +244,13 @@ private struct SettingsForm: View {
             Section {
                 Toggle(isOn: Binding(get: { settings.identifySpeakers }, set: { value in
                     settings.identifySpeakers = value
-                    if value { model.openModel(.speakers) }
+                    if value { model.openModel(.speakers, fromSwitch: true) }
                 })) { description(SettingsPhase2Copy.tellApart, SettingsPhase2Copy.tellApartDescription) }
                     .toggleStyle(TopAlignedSwitchToggleStyle())
                     .accessibilityIdentifier("identifySpeakersToggle")
                 Toggle(isOn: Binding(get: { settings.recogniseSavedVoices }, set: { value in
                     settings.recogniseSavedVoices = value
-                    if value { model.openModel(.voices) }
+                    if value { model.openModel(.voices, fromSwitch: true) }
                 })) { description(SettingsPhase2Copy.recognise, SettingsPhase2Copy.recogniseDescription) }
                     .toggleStyle(TopAlignedSwitchToggleStyle())
                     .accessibilityIdentifier("recogniseSavedVoicesToggle")

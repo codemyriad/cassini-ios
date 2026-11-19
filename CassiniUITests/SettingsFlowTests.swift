@@ -300,6 +300,26 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
     }
 
+    @MainActor func testDecliningDownloadFromSavedVoicesLeavesIdentifySpeakersOn() {
+        let app = openSettings(["--models-missing"])
+        let savedVoices = app.buttons["savedVoicesRow"]
+        reveal(savedVoices, in: app)
+        savedVoices.tap()
+        let addVoice = app.buttons["Add a voice…"]
+        XCTAssertTrue(addVoice.waitForExistence(within: 15))
+        addVoice.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))
+        let notNow = app.buttons["modelDownloadNotNow"]
+        XCTAssertTrue(notNow.waitForExistence(within: 5))
+        notNow.tap()
+        XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForNonExistence(within: 15))
+        XCTAssertTrue(addVoice.waitForExistence(within: 15))
+        app.navigationBars["Saved voices"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
+        openPage(app, "speakersRow", title: "Speakers")
+        XCTAssertTrue(app.switches["identifySpeakersToggle"].waitForValue("1"))
+    }
+
     // ports: SettingsBehaviourTest#licenceRowsOpenAndBackClosesTheText
     @MainActor func testLicenceRowsOpenTheirTextAndBackClosesIt() {
         let app = openSettings()

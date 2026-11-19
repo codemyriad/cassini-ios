@@ -36,7 +36,7 @@ import CassiniNotebook
             var route: Route?
             settings.onEffect = { if case .open(let opened) = $0 { route = opened } }
             settings.openModel(part)
-            guard case .modelDownload(let noteID, let selected) = try XCTUnwrap(route) else {
+            guard case .modelDownload(let noteID, let selected, _) = try XCTUnwrap(route) else {
                 XCTFail("Settings did not open the model download"); continue
             }
             let ports = try XCTUnwrap(test.graph.processing.modelDownload)
