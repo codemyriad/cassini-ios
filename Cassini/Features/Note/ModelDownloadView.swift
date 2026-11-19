@@ -118,15 +118,17 @@ private struct ModelDownloadContent: View {
                             .font(.subheadline).foregroundStyle(Color.muted)
                             .accessibilityIdentifier("speechLanguageLine")
                     }
-                    spaceAndSources
-                        .font(.subheadline).foregroundStyle(Color.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .environment(\.openURL, OpenURLAction { url in
-                            guard url.scheme == "cassini" else { return .systemAction }
-                            if !model.busy { model.openSources() }
-                            return .handled
-                        })
-                        .accessibilityIdentifier("modelDownloadSources")
+                    Button(action: model.openSources) {
+                        spaceAndSources
+                            .font(.subheadline).foregroundStyle(Color.muted)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: HitTarget.minimum, alignment: .topLeading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.busy)
+                    .accessibilityIdentifier("modelDownloadSources")
                     if typeSize.isAccessibilitySize { ModelDownloadActions(model: model) }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -139,14 +141,15 @@ private struct ModelDownloadContent: View {
         .readableWidth()
     }
 
-    /// The space line with "Where do the files come from?" as an inline link at its end.
+    /// The space line with "Where do the files come from?" styled as an inline link at its end.
     private var spaceAndSources: Text {
         let space = SettingsPhase2Copy.offerSpace.replacingOccurrences(of: "{size}", with: SizeCopy.text(plan.requiredFreeBytes, locale: locale))
+        var result = AttributedString(space + " ")
         var link = AttributedString(SettingsPhase2Copy.whereFromLink)
-        link.link = URL(string: "cassini://model-sources")
         link.foregroundColor = Color.accentInk
         link.font = .subheadline.weight(.medium)
-        return Text(space + " ") + Text(link)
+        result += link
+        return Text(result)
     }
 
     /// The language's name as the Settings picker shows it, in the app's language.
