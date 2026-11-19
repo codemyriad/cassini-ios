@@ -26,8 +26,21 @@ IDS = set(PROPERTIES)
 SAVED_VOICES_PROPERTIES = {
     'savedVoices.howToAdd': 'howToAdd',
     'savedVoices.row.stale': 'stale',
+    'savedVoices.footnote.madeOn.iphone': 'footnoteMadeOnIphone',
+    'savedVoices.footnote.madeOn.ipad': 'footnoteMadeOnIpad',
+    'savedVoices.footnote.namesOnly': 'footnoteNamesOnly',
+    'savedVoices.addVoice': 'addVoice',
+    'savedVoices.stale.body': 'staleBodyTemplate',
+    'savedVoices.row.needsNaming': 'rowNeedsNaming',
+    'savedVoices.caption': 'caption',
+    'savedVoices.empty': 'empty',
+    'savedVoices.empty.body': 'emptyBody',
+    'confirm.deleteVoiceProfile.title': 'forgetTitleTemplate',
+    'confirm.deleteVoiceProfile.primary': 'forgetPrimary',
+    'confirm.deleteVoiceProfile.body': 'forgetBodyTemplate',
 }
-SAVED_VOICES_PLURALS = {'savedVoices.row.meetingCount'}
+SAVED_VOICES_PLURALS = {'savedVoices.row.meetingCount', 'savedVoices.stale.title'}
+SAVED_VOICES_NAMED = {'savedVoices.stale.body', 'confirm.deleteVoiceProfile.title', 'confirm.deleteVoiceProfile.body'}
 SAVED_VOICES_META = 'savedVoices.row.meta'
 SAVED_VOICES_IDS = set(SAVED_VOICES_PROPERTIES) | SAVED_VOICES_PLURALS | {SAVED_VOICES_META}
 
@@ -35,7 +48,6 @@ SAVED_VOICES_IDS = set(SAVED_VOICES_PROPERTIES) | SAVED_VOICES_PLURALS | {SAVED_
 # Keep existing native lookup keys stable while deriving all Phase 2 values from the shared catalog.
 PHASE2_TABLES = {
     'Speakers': {
-        'Cassini stops recognising this voice. Names already in your meetings stay.': 'android.savedVoices.forget.body',
         'Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.': 'android.savedVoices.forgetEveryone.body',
         'Deletes the voiceprints of every meeting. Names already in your meetings stay.': 'ios.savedVoices.forgetAllData.body',
         # D98 backup-aware Remember copy is maintained in Speakers.xcstrings directly until cassini-ux updates
@@ -153,7 +165,8 @@ def _saved_voices_outputs(pin, all_entries):
             placeholders = set(re.findall(r'\{\w+\}', value)) if isinstance(value, str) else None
             expected = (
                 {'{n}'} if entry['id'] in SAVED_VOICES_PLURALS
-                else ({'{meetingCount}', '{confirmedSpeech}'} if entry['id'] == SAVED_VOICES_META else set())
+                else ({'{meetingCount}', '{confirmedSpeech}'} if entry['id'] == SAVED_VOICES_META
+                else ({'{name}'} if entry['id'] in SAVED_VOICES_NAMED else set()))
             )
             if not isinstance(value, str) or not value.strip() or placeholders != expected or '%' in value:
                 raise ValueError(f'Placeholder drift: {entry["id"]} {language}')
@@ -169,6 +182,8 @@ def _saved_voices_outputs(pin, all_entries):
                     if not found and (category != 'one' or not form.startswith('1 ') or language in ('fr', 'pt-BR')):
                         raise ValueError(f'Plural form loses its count: {entry["id"]} {language}/{category}')
                     variations[category] = {'stringUnit': {'state': 'translated', 'value': form.replace('{n}', '%lld')}}
+                if language != 'en' and 'many' not in variations:
+                    variations['many'] = variations['other']
                 locales[language] = {'variations': {'plural': variations}}
             else:
                 if forms:
@@ -199,6 +214,22 @@ def _saved_voices_outputs(pin, all_entries):
         '',
         '    static func meetingCount(_ count: Int, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
         '        template("savedVoices.row.meetingCount", count: count, language: language, bundle: bundle)',
+        '    }',
+        '',
+        '    static func staleTitle(_ count: Int, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
+        '        template("savedVoices.stale.title", count: count, language: language, bundle: bundle)',
+        '    }',
+        '',
+        '    static func staleBody(_ name: String, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
+        '        template("savedVoices.stale.body", language: language, bundle: bundle).replacingOccurrences(of: "{name}", with: name)',
+        '    }',
+        '',
+        '    static func forgetTitle(_ name: String, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
+        '        template("confirm.deleteVoiceProfile.title", language: language, bundle: bundle).replacingOccurrences(of: "{name}", with: name)',
+        '    }',
+        '',
+        '    static func forgetBody(_ name: String, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',
+        '        template("confirm.deleteVoiceProfile.body", language: language, bundle: bundle).replacingOccurrences(of: "{name}", with: name)',
         '    }',
         '',
         '    static func meta(meetings: Int, confirmedSpeech: String, language: String = DefaultLabels.appLanguage, bundle: Bundle = .main) -> String {',

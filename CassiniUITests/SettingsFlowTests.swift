@@ -305,7 +305,7 @@ final class SettingsFlowTests: XCTestCase {
         let savedVoices = app.buttons["savedVoicesRow"]
         reveal(savedVoices, in: app)
         savedVoices.tap()
-        let addVoice = app.buttons["Add a voice…"]
+        let addVoice = app.buttons["addSavedVoice"]
         XCTAssertTrue(addVoice.waitForExistence(within: 15))
         addVoice.tap()
         XCTAssertTrue(app.staticTexts["modelDownloadTitle"].waitForExistence(within: 15))

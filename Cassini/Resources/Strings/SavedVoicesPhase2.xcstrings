@@ -1,6 +1,426 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "confirm.deleteVoiceProfile.body": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, confirm.deleteVoiceProfile.body.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini will no longer recognise {name} in new meetings. Names already in transcripts stay."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini non riconoscerà più {name} nelle nuove riunioni. I nomi già presenti nelle trascrizioni restano."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ne reconnaîtra plus {name} dans les nouvelles réunions. Les noms déjà présents dans les transcriptions sont conservés."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cassini ya no reconocerá a {name} en las reuniones nuevas. Los nombres que ya están en las transcripciones se mantienen."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini não vai mais reconhecer {name} em novas reuniões. Os nomes que já estão nas transcrições são mantidos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Cassini deixa de reconhecer {name} em novas reuniões. Os nomes que já estão nas transcrições mantêm-se."
+          }
+        }
+      }
+    },
+    "confirm.deleteVoiceProfile.primary": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, confirm.deleteVoiceProfile.primary.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimentica"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Olvidar"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer"
+          }
+        }
+      }
+    },
+    "confirm.deleteVoiceProfile.title": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, confirm.deleteVoiceProfile.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget {name}’s voice?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimenticare la voce di {name}?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier la voix de {name} ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Olvidar la voz de {name}?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer a voz de {name}?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esquecer a voz de {name}?"
+          }
+        }
+      }
+    },
+    "savedVoices.addVoice": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.addVoice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a voice"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi una voce"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter une voix"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir una voz"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar uma voz"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar uma voz"
+          }
+        }
+      }
+    },
+    "savedVoices.caption": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.caption.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To add someone, name a speaker in a meeting and keep “Remember this voice” on."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per aggiungere qualcuno, dai un nome a una persona in una riunione e lascia attivo “Ricorda questa voce”."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour ajouter quelqu’un, nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para añadir a alguien, pon nombre a un hablante en una reunión y deja activado «Recordar esta voz»."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para adicionar alguém, nomeie um falante em uma reunião e deixe “Lembrar esta voz” ativado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para adicionar alguém, dê nome a um orador numa reunião e deixe “Memorizar esta voz” ativado."
+          }
+        }
+      }
+    },
+    "savedVoices.empty": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.empty.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No saved voices yet"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna voce salvata"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune voix mémorisée pour l’instant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay voces guardadas"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma voz salva ainda"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda não há vozes guardadas"
+          }
+        }
+      }
+    },
+    "savedVoices.empty.body": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.empty.body.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name a speaker in a meeting and keep “Remember this voice” on. Next time, Cassini names them for you."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dai un nome a una persona in una riunione e lascia attivo “Ricorda questa voce”. La prossima volta, Cassini le darà il nome per te."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nommez un intervenant dans une réunion et laissez « Mémoriser cette voix » activé. La prochaine fois, Cassini le nommera pour vous."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pon nombre a un hablante en una reunión y deja activado «Recordar esta voz». La próxima vez, Cassini le pondrá el nombre por ti."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomeie um falante em uma reunião e deixe “Lembrar esta voz” ativado. Da próxima vez, o Cassini o nomeia para você."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dê nome a um orador numa reunião e deixe “Memorizar esta voz” ativado. Da próxima vez, o Cassini dá-lhe o nome por si."
+          }
+        }
+      }
+    },
+    "savedVoices.footnote.madeOn.ipad": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.footnote.madeOn.ipad.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voiceprints are made on this iPad."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impronte vocali vengono create su questo iPad."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les empreintes vocales sont créées sur cet iPad."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las huellas de voz se crean en este iPad."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste iPad."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste iPad."
+          }
+        }
+      }
+    },
+    "savedVoices.footnote.madeOn.iphone": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.footnote.madeOn.iphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voiceprints are made on this iPhone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le impronte vocali vengono create su questo iPhone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les empreintes vocales sont créées sur cet iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las huellas de voz se crean en este iPhone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste iPhone."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As impressões de voz são criadas neste iPhone."
+          }
+        }
+      }
+    },
+    "savedVoices.footnote.namesOnly": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.footnote.namesOnly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exports and shares include names only."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esportazioni e condivisioni includono solo i nomi."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les exports et partages n’incluent que les noms."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las exportaciones y lo que compartes solo incluyen los nombres."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportações e compartilhamentos incluem só os nomes."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As exportações e partilhas incluem só os nomes."
+          }
+        }
+      }
+    },
     "savedVoices.howToAdd": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.howToAdd.",
       "extractionState": "manual",
@@ -229,6 +649,48 @@
         }
       }
     },
+    "savedVoices.row.needsNaming": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.needsNaming.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs naming again"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da nominare di nuovo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À renommer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Necesita un nombre de nuevo"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa ser nomeada de novo"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa de ser nomeada de novo"
+          }
+        }
+      }
+    },
     "savedVoices.row.stale": {
       "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.stale.",
       "extractionState": "manual",
@@ -267,6 +729,192 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dê novamente nome a esta pessoa numa reunião para que continue a ser reconhecida."
+          }
+        }
+      }
+    },
+    "savedVoices.stale.body": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.stale.body.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice recognition was updated, and voices saved before the update can’t be recognised. Name {name} in a meeting to save their voice again."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il riconoscimento vocale è stato aggiornato e le voci salvate prima dell’aggiornamento non possono essere riconosciute. Dai un nome a {name} in una riunione per salvare di nuovo la sua voce."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La reconnaissance vocale a été mise à jour, et les voix mémorisées avant la mise à jour ne peuvent plus être reconnues. Nommez {name} dans une réunion pour mémoriser à nouveau sa voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El reconocimiento de voz se ha actualizado y las voces guardadas antes de la actualización no se pueden reconocer. Pon nombre a {name} en una reunión para volver a guardar su voz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O reconhecimento de voz foi atualizado, e as vozes salvas antes da atualização não podem ser reconhecidas. Nomeie {name} em uma reunião para salvar a voz de novo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O reconhecimento de voz foi atualizado, e as vozes guardadas antes da atualização não podem ser reconhecidas. Dê nome a {name} numa reunião para guardar a voz de novo."
+          }
+        }
+      }
+    },
+    "savedVoices.stale.title": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.stale.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "1 voice needs naming again"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voices need naming again"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "1 voce da nominare di nuovo"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voci da nominare di nuovo"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voci da nominare di nuovo"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voix à renommer"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voix à renommer"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voix à renommer"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voces necesitan un nombre de nuevo"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "1 voz necesita un nombre de nuevo"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voces necesitan un nombre de nuevo"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vozes precisam ser nomeadas de novo"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voz precisa ser nomeada de novo"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vozes precisam ser nomeadas de novo"
+                }
+              }
+            }
+          }
+        },
+        "pt-PT": {
+          "variations": {
+            "plural": {
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vozes precisam de ser nomeadas de novo"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld voz precisa de ser nomeada de novo"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld vozes precisam de ser nomeadas de novo"
+                }
+              }
+            }
           }
         }
       }

@@ -43,44 +43,44 @@
         }
       }
     },
-    "export.cassiniFile.description": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.cassiniFile.description.",
+    "export.cassiniFile.description.short": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.cassiniFile.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Audio with the transcript inside. Plays in any audio player."
+            "value": "Audio and transcript in one file"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Audio con la trascrizione dentro. Si riproduce in qualsiasi lettore audio."
+            "value": "Audio e trascrizione in un unico file"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’audio avec la transcription intégrée. Se lit dans n’importe quel lecteur audio."
+            "value": "Audio et transcription dans un seul fichier"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Audio con la transcripción dentro. Se reproduce en cualquier reproductor de audio."
+            "value": "Audio y transcripción en un solo archivo"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Áudio com a transcrição incluída. Toca em qualquer reprodutor de áudio."
+            "value": "Áudio e transcrição em um só arquivo"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Áudio com a transcrição incluída. Reproduz-se em qualquer leitor de áudio."
+            "value": "Áudio e transcrição num só ficheiro"
           }
         }
       }
@@ -211,44 +211,86 @@
         }
       }
     },
-    "export.markdown.description": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.markdown.description.",
+    "export.heading": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The transcript as a text file, with speakers and times."
+            "value": "Export"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La trascrizione come file di testo, con voci e tempi."
+            "value": "Esporta"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcription en fichier texte, avec les intervenants et les horodatages."
+            "value": "Exporter"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcripción como archivo de texto, con hablantes y marcas de tiempo."
+            "value": "Exportar"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição como arquivo de texto, com locutores e tempos."
+            "value": "Exportar"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição como ficheiro de texto, com oradores e tempos."
+            "value": "Exportar"
+          }
+        }
+      }
+    },
+    "export.markdown.description.short": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.markdown.description.short.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript with speakers and times"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione con persone e orari"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription avec intervenants et horaires"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcripción con hablantes y tiempos"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição com falantes e tempos"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcrição com oradores e tempos"
           }
         }
       }
@@ -291,48 +333,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Markdown"
-          }
-        }
-      }
-    },
-    "export.moreFormats": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.moreFormats.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "More formats"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Altri formati"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Autres formats"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Más formatos"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mais formatos"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mais formatos"
           }
         }
       }
@@ -421,44 +421,86 @@
         }
       }
     },
-    "export.plainText.description": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.plainText.description.",
+    "export.otherFormats": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.otherFormats.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The transcript without formatting, for any app."
+            "value": "Other formats"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La trascrizione senza formattazione, per qualsiasi app."
+            "value": "Altri formati"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcription sans mise en forme, pour n’importe quelle application."
+            "value": "Autres formats"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La transcripción sin formato, para cualquier aplicación."
+            "value": "Otros formatos"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição sem formatação, para qualquer aplicativo."
+            "value": "Outros formatos"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "A transcrição sem formatação, para qualquer aplicação."
+            "value": "Outros formatos"
+          }
+        }
+      }
+    },
+    "export.plainText.description.short": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.plainText.description.short.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript only, no formatting"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo trascrizione, senza formattazione"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription seule, sans mise en forme"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo la transcripción, sin formato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só a transcrição, sem formatação"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só a transcrição, sem formatação"
           }
         }
       }
@@ -505,212 +547,170 @@
         }
       }
     },
-    "export.srt.description": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.srt.description.",
+    "export.srt.description.short": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.srt.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtitles with times, for video players and editors."
+            "value": "For video players and editors"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sottotitoli con i tempi, per lettori ed editor video."
+            "value": "Per lettori ed editor video"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sous-titres minutés, pour les lecteurs et éditeurs vidéo."
+            "value": "Pour les lecteurs et éditeurs vidéo"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtítulos con tiempos, para reproductores y editores de video."
+            "value": "Para reproductores y editores de vídeo"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas com tempos, para players e editores de vídeo."
+            "value": "Para players e editores de vídeo"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas com tempos, para leitores e editores de vídeo."
+            "value": "Para leitores e editores de vídeo"
           }
         }
       }
     },
-    "export.srt.label": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.srt.label.",
+    "export.subtitles.label": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.subtitles.label.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtitles (SRT)"
+            "value": "Subtitles"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sottotitoli (SRT)"
+            "value": "Sottotitoli"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sous-titres (SRT)"
+            "value": "Sous-titres"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtítulos (SRT)"
+            "value": "Subtítulos"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas (SRT)"
+            "value": "Legendas"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas (SRT)"
+            "value": "Legendas"
           }
         }
       }
     },
-    "export.title": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.title.",
+    "export.typeWithSize": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.typeWithSize.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Export “{title}”"
+            "value": "{type} ({size})"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esporta “{title}”"
+            "value": "{type} ({size})"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exporter « {title} »"
+            "value": "{type} ({size})"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportar “{title}”"
+            "value": "{type} ({size})"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportar “{title}”"
+            "value": "{type} ({size})"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Exportar «{title}»"
+            "value": "{type} ({size})"
           }
         }
       }
     },
-    "export.vtt.description": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.vtt.description.",
+    "export.vtt.description.short": {
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.vtt.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtitles with times and speaker names, for web video players."
+            "value": "With speaker names, for web video"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sottotitoli con tempi e nomi delle voci, per i lettori video web."
+            "value": "Con i nomi delle persone, per i video sul web"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sous-titres avec horodatages et noms des intervenants, pour les lecteurs vidéo web."
+            "value": "Avec les noms des intervenants, pour la vidéo web"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Subtítulos con tiempos y nombres de hablantes, para reproductores de video web."
+            "value": "Con los nombres de los hablantes, para vídeo web"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas com tempos e nomes dos locutores, para players de vídeo na web."
+            "value": "Com os nomes dos falantes, para vídeo na web"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legendas com tempos e nomes dos oradores, para leitores de vídeo na web."
-          }
-        }
-      }
-    },
-    "export.vtt.label": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, export.vtt.label.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Subtitles (WebVTT)"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sottotitoli (WebVTT)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sous-titres (WebVTT)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Subtítulos (WebVTT)"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Legendas (WebVTT)"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Legendas (WebVTT)"
+            "value": "Com os nomes dos oradores, para vídeo na web"
           }
         }
       }

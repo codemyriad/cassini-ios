@@ -1,47 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ confirmed speech": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ confirmed speech"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ de habla confirmada"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ de parole confirmée"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ di parlato confermato"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ de fala confirmada"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ de fala confirmada"
-          }
-        }
-      }
-    },
     "%@ · %@ · %@": {
       "comment": "Versions: what made a version (Edited passages, Previous transcript…), its date and time, and its word count",
       "extractionState": "manual",
@@ -840,48 +799,6 @@
         }
       }
     },
-    "Cassini stops recognising this voice. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, android.savedVoices.forget.body.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini stops recognising this voice. Names already in your meetings stay."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini smette di riconoscere questa voce. I nomi già presenti nelle riunioni restano."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini cesse de reconnaître cette voix. Les noms déjà présents dans vos réunions restent."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cassini deja de reconocer esta voz. Los nombres que ya están en tus reuniones se mantienen."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões permanecem."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O Cassini deixa de reconhecer esta voz. Os nomes já presentes nas suas reuniões mantêm-se."
-          }
-        }
-      }
-    },
     "Could not save the speaker": {
       "extractionState": "manual",
       "localizations": {
@@ -1149,88 +1066,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tudo o que %@ disse será mostrado como %@."
-          }
-        }
-      }
-    },
-    "Forget": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Forget"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Olvidar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oublier"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dimentica"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esquecer"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esquecer"
-          }
-        }
-      }
-    },
-    "Forget %@?": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Forget %@?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Olvidar a %@?"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oublier %@ ?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dimenticare %@?"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esquecer %@?"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esquecer %@?"
           }
         }
       }
@@ -2158,47 +1993,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dar nome a este orador"
-          }
-        }
-      }
-    },
-    "No saved voices yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No saved voices yet"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aún no hay voces guardadas"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucune voix mémorisée pour l’instant"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna voce salvata"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma voz salva ainda"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ainda sem vozes guardadas"
           }
         }
       }

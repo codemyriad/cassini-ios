@@ -13,20 +13,20 @@ OUTPUT = Path('Cassini/Resources/Strings/ExportPhase2.xcstrings')
 LOOKUP = Path('Cassini/Strings/ExportPhase2Copy.swift')
 LANGUAGES = ('en', 'it', 'fr', 'es', 'pt-BR', 'pt-PT')
 PROPERTIES = {
-    'export.title': 'title',
+    'export.heading': 'heading',
+    'export.otherFormats': 'otherFormats',
     'export.cassiniFile.label': 'cassiniFile',
-    'export.cassiniFile.description': 'cassiniDescription',
+    'export.cassiniFile.description.short': 'cassiniDescription',
     'export.markdown.label': 'markdown',
-    'export.markdown.description': 'markdownDescription',
+    'export.markdown.description.short': 'markdownDescription',
     'export.plainText.label': 'plainText',
-    'export.plainText.description': 'plainTextDescription',
-    'export.srt.label': 'srt',
-    'export.srt.description': 'srtDescription',
-    'export.vtt.label': 'vtt',
-    'export.vtt.description': 'vttDescription',
+    'export.plainText.description.short': 'plainTextDescription',
+    'export.subtitles.label': 'subtitles',
+    'export.srt.description.short': 'srtDescription',
+    'export.vtt.description.short': 'vttDescription',
+    'export.typeWithSize': 'typeWithSize',
     'export.originalAudio.label': 'originalAudio',
     'export.originalAudio.description': 'originalDescription',
-    'export.moreFormats': 'moreFormats',
     'export.audioOnly.note': 'audioOnlyNote',
     'export.exportButton': 'exportButton',
     'export.formatGroup.a11y': 'formatGroup',
@@ -58,7 +58,7 @@ def outputs(root=ROOT):
             translation = entry if language == 'en' else entry['l10n'][language]
             value = entry['en'] if language == 'en' else translation['text']
             placeholders = set(re.findall(r'\{\w+\}', value))
-            expected_placeholders = {'{title}'} if entry['id'] == 'export.title' else set()
+            expected_placeholders = {'{type}', '{size}'} if entry['id'] == 'export.typeWithSize' else set()
             if (not isinstance(value, str) or not value.strip()
                     or placeholders != expected_placeholders or '%' in value):
                 raise ValueError(f'Placeholder drift: {entry["id"]} {language}')
@@ -86,7 +86,14 @@ def outputs(root=ROOT):
             f'        String(localized: "{key}", table: "ExportPhase2")',
             '    }',
         ]
-    lines += ['}', '']
+    lines += [
+        '',
+        '    static func typeWithSize(_ type: String, size: String) -> String {',
+        '        typeWithSize.replacingOccurrences(of: "{type}", with: type).replacingOccurrences(of: "{size}", with: size)',
+        '    }',
+        '}',
+        '',
+    ]
     return {OUTPUT: catalog, LOOKUP: '\n'.join(lines).encode()}
 
 
