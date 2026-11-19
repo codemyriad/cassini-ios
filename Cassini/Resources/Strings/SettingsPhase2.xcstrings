@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "about.help": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.help.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.help.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "about.help.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.help.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.help.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "about.licenceLine.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.licenceLine.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.licenceLine.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "about.licencesNotices": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.licencesNotices.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.licencesNotices.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "about.licencesNotices.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.licencesNotices.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.licencesNotices.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -212,7 +212,7 @@
       }
     },
     "about.nameVersion": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.nameVersion.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.nameVersion.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "about.privacy": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.privacy.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.privacy.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -296,7 +296,7 @@
       }
     },
     "about.privacy.subtitle.ipad": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.privacy.subtitle.ipad.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.privacy.subtitle.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -338,7 +338,7 @@
       }
     },
     "about.privacy.subtitle.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.privacy.subtitle.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.privacy.subtitle.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -380,7 +380,7 @@
       }
     },
     "about.sourceCode": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.sourceCode.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.sourceCode.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -422,7 +422,7 @@
       }
     },
     "about.tagline.ipad": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.tagline.ipad.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.tagline.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
       }
     },
     "about.tagline.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.tagline.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.tagline.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -506,7 +506,7 @@
       }
     },
     "about.title": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.title.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -548,7 +548,7 @@
       }
     },
     "about.version": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, about.version.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, about.version.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -590,7 +590,7 @@
       }
     },
     "backup.info.cassiniNever": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.cassiniNever.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.cassiniNever.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -632,7 +632,7 @@
       }
     },
     "backup.info.row.meetings": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.meetings.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.meetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -674,7 +674,7 @@
       }
     },
     "backup.info.row.meetings.detail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.meetings.detail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.meetings.detail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -716,7 +716,7 @@
       }
     },
     "backup.info.row.models": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.models.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.models.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -758,7 +758,7 @@
       }
     },
     "backup.info.row.models.detail.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.models.detail.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.models.detail.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -800,7 +800,7 @@
       }
     },
     "backup.info.row.savedVoices.choice": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.savedVoices.choice.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.savedVoices.choice.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -842,7 +842,7 @@
       }
     },
     "backup.info.row.settings": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.settings.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.settings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -884,7 +884,7 @@
       }
     },
     "backup.info.row.settings.detail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.row.settings.detail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.row.settings.detail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -926,7 +926,7 @@
       }
     },
     "backup.info.status.backedUp": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.status.backedUp.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.backedUp.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -968,7 +968,7 @@
       }
     },
     "backup.info.status.notBackedUp": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.status.notBackedUp.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.status.notBackedUp.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1010,7 +1010,7 @@
       }
     },
     "backup.info.who.computer": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.computer.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.computer.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1052,7 +1052,7 @@
       }
     },
     "backup.info.who.computer.detail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.computer.detail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.computer.detail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1094,7 +1094,7 @@
       }
     },
     "backup.info.who.heading": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.heading.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1136,7 +1136,7 @@
       }
     },
     "backup.info.who.icloud.detail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.icloud.detail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.icloud.detail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1178,7 +1178,7 @@
       }
     },
     "backup.info.who.zip": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.zip.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.zip.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1220,7 +1220,7 @@
       }
     },
     "backup.info.who.zip.detail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.info.who.zip.detail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.info.who.zip.detail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1262,7 +1262,7 @@
       }
     },
     "backup.meetings.switch": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.meetings.switch.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.meetings.switch.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1304,7 +1304,7 @@
       }
     },
     "backup.meetings.switch.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.meetings.switch.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.meetings.switch.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1346,7 +1346,7 @@
       }
     },
     "backup.ownCopy.heading": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.ownCopy.heading.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.ownCopy.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1388,49 +1388,49 @@
       }
     },
     "backup.ownCopy.zip.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.ownCopy.zip.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.ownCopy.zip.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Save every meeting to a folder, a drive or another app."
+            "value": "Save every meeting to a folder or app."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Salva tutte le riunioni in una cartella, un’unità o un’altra app."
+            "value": "Salva tutte le riunioni in una cartella o in un’app."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sauvegardez toutes les réunions dans un dossier, sur un disque ou dans une autre app."
+            "value": "Enregistrez toutes les réunions dans un dossier ou une app."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guarda todas las reuniones en una carpeta, una unidad u otra app."
+            "value": "Guarda todas las reuniones en una carpeta o una app."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Salve todas as reuniões em uma pasta, uma unidade ou outro app."
+            "value": "Salve todas as reuniões em uma pasta ou app."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guarde todas as reuniões numa pasta, numa unidade ou noutra aplicação."
+            "value": "Guarde todas as reuniões numa pasta ou aplicação."
           }
         }
       }
     },
     "backup.page.answer.icloud": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.page.answer.icloud.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.page.answer.icloud.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1472,7 +1472,7 @@
       }
     },
     "backup.page.answer.icloud.body": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.page.answer.icloud.body.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.page.answer.icloud.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1514,7 +1514,7 @@
       }
     },
     "backup.savedVoices.switch": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.savedVoices.switch.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1556,7 +1556,7 @@
       }
     },
     "backup.savedVoices.switch.why": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, backup.savedVoices.switch.why.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, backup.savedVoices.switch.why.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1598,7 +1598,7 @@
       }
     },
     "common.notNow": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, common.notNow.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, common.notNow.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1640,7 +1640,7 @@
       }
     },
     "common.savedVoices": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, common.savedVoices.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, common.savedVoices.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1682,7 +1682,7 @@
       }
     },
     "common.speakers": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, common.speakers.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, common.speakers.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1724,7 +1724,7 @@
       }
     },
     "firstRun.howTo.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, firstRun.howTo.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, firstRun.howTo.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1766,7 +1766,7 @@
       }
     },
     "library.meetingCount": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, library.meetingCount.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, library.meetingCount.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1910,7 +1910,7 @@
       }
     },
     "models.builtIn": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.builtIn.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.builtIn.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1952,7 +1952,7 @@
       }
     },
     "models.download": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.download.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.download.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1994,7 +1994,7 @@
       }
     },
     "models.keepTranscript": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.keepTranscript.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.keepTranscript.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2036,7 +2036,7 @@
       }
     },
     "models.offer.body.ipad": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.body.ipad.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.body.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2078,7 +2078,7 @@
       }
     },
     "models.offer.body.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.body.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.body.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2120,7 +2120,7 @@
       }
     },
     "models.offer.download": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.download.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.download.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2162,7 +2162,7 @@
       }
     },
     "models.offer.part.recognise": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.part.recognise.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.part.recognise.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2204,7 +2204,7 @@
       }
     },
     "models.offer.part.speech": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.part.speech.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.part.speech.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2246,7 +2246,7 @@
       }
     },
     "models.offer.part.tellApart": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.part.tellApart.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.part.tellApart.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2288,7 +2288,7 @@
       }
     },
     "models.offer.recordingKept": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.recordingKept.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.recordingKept.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2330,49 +2330,49 @@
       }
     },
     "models.offer.spaceNeeded": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.spaceNeeded.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.spaceNeeded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Needs about {size} free while it installs. Each file is checked before it is used."
+            "value": "Needs about {size} free to install. Each file is checked before it’s used."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Servono circa {size} liberi durante l’installazione. Ogni file viene verificato prima dell’uso."
+            "value": "Servono circa {size} liberi per l’installazione. Ogni file viene verificato prima dell’uso."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Il faut environ {size} d’espace libre pendant l’installation. Chaque fichier est vérifié avant d’être utilisé."
+            "value": "Il faut environ {size} d’espace libre pour l’installation. Chaque fichier est vérifié avant d’être utilisé."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Necesita unos {size} libres mientras se instala. Cada archivo se comprueba antes de usarlo."
+            "value": "Necesita unos {size} libres para instalarse. Cada archivo se comprueba antes de usarlo."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Precisa de cerca de {size} livres durante a instalação. Cada arquivo é verificado antes de ser usado."
+            "value": "Precisa de cerca de {size} livres para instalar. Cada arquivo é verificado antes de ser usado."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Precisa de cerca de {size} livres durante a instalação. Cada ficheiro é verificado antes de ser usado."
+            "value": "Precisa de cerca de {size} livres para instalar. Cada ficheiro é verificado antes de ser usado."
           }
         }
       }
     },
     "models.offer.title.ipad": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.title.ipad.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.title.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2414,7 +2414,7 @@
       }
     },
     "models.offer.title.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.offer.title.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.offer.title.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2456,7 +2456,7 @@
       }
     },
     "models.parakeetUltra.description.short": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.parakeetUltra.description.short.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.parakeetUltra.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2498,7 +2498,7 @@
       }
     },
     "models.parakeetUltra.name": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.parakeetUltra.name.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.parakeetUltra.name.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2540,7 +2540,7 @@
       }
     },
     "models.recogniseVoices.description.short": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.recogniseVoices.description.short.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.recogniseVoices.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2582,7 +2582,7 @@
       }
     },
     "models.recogniseVoices.name": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.recogniseVoices.name.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.recogniseVoices.name.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2624,7 +2624,7 @@
       }
     },
     "models.status.on": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.status.on.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.status.on.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2666,7 +2666,7 @@
       }
     },
     "models.tellSpeakersApart.description.short": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.tellSpeakersApart.description.short.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.tellSpeakersApart.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2708,7 +2708,7 @@
       }
     },
     "models.tellSpeakersApart.name": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.tellSpeakersApart.name.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.tellSpeakersApart.name.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2750,7 +2750,7 @@
       }
     },
     "models.whereFrom": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.whereFrom.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.whereFrom.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2792,7 +2792,7 @@
       }
     },
     "models.whistle.description.short": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.whistle.description.short.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.whistle.description.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2834,7 +2834,7 @@
       }
     },
     "models.whistle.name": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, models.whistle.name.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, models.whistle.name.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2876,7 +2876,7 @@
       }
     },
     "savedVoices.forgetEveryone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.forgetEveryone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.forgetEveryone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2918,7 +2918,7 @@
       }
     },
     "savedVoices.howToAdd.short": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.howToAdd.short.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.howToAdd.short.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2960,7 +2960,7 @@
       }
     },
     "savedVoices.peopleCount": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.peopleCount.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.peopleCount.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3104,7 +3104,7 @@
       }
     },
     "savedVoices.privacy.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.privacy.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3146,7 +3146,7 @@
       }
     },
     "savedVoices.row.forgetEllipsis": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.forgetEllipsis.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.forgetEllipsis.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3188,7 +3188,7 @@
       }
     },
     "savedVoices.row.options.a11y": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.options.a11y.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.options.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3230,7 +3230,7 @@
       }
     },
     "savedVoices.row.rename": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, savedVoices.row.rename.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, savedVoices.row.rename.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3272,7 +3272,7 @@
       }
     },
     "settings.answer.off": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.answer.off.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.answer.off.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3314,7 +3314,7 @@
       }
     },
     "settings.ios.speakers.autoName": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.ios.speakers.autoName.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.ios.speakers.autoName.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3356,7 +3356,7 @@
       }
     },
     "settings.ios.speakers.autoName.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.ios.speakers.autoName.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.ios.speakers.autoName.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3398,7 +3398,7 @@
       }
     },
     "settings.moreDetail": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.moreDetail.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.moreDetail.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3440,7 +3440,7 @@
       }
     },
     "settings.phone.aboutRow.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.aboutRow.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.aboutRow.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3482,7 +3482,7 @@
       }
     },
     "settings.phone.audioHours": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.audioHours.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.audioHours.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3626,7 +3626,7 @@
       }
     },
     "settings.phone.backup": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.backup.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.backup.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3668,7 +3668,7 @@
       }
     },
     "settings.phone.backup.answer.icloud": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.backup.answer.icloud.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.backup.answer.icloud.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3710,7 +3710,7 @@
       }
     },
     "settings.phone.group.app": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.group.app.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.group.app.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3752,7 +3752,7 @@
       }
     },
     "settings.phone.group.meetings": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.group.meetings.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.group.meetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3794,7 +3794,7 @@
       }
     },
     "settings.phone.group.transcripts": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.group.transcripts.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.group.transcripts.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3836,7 +3836,7 @@
       }
     },
     "settings.phone.language": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.language.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.language.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3878,7 +3878,7 @@
       }
     },
     "settings.phone.libraryStats": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.libraryStats.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.libraryStats.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3920,7 +3920,7 @@
       }
     },
     "settings.phone.speakers.runsOnDevice.ipad": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.speakers.runsOnDevice.ipad.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.runsOnDevice.ipad.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3962,7 +3962,7 @@
       }
     },
     "settings.phone.speakers.runsOnDevice.iphone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.speakers.runsOnDevice.iphone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.runsOnDevice.iphone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4004,7 +4004,7 @@
       }
     },
     "settings.phone.speakers.whoIsSpeaking": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.speakers.whoIsSpeaking.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.speakers.whoIsSpeaking.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4046,7 +4046,7 @@
       }
     },
     "settings.phone.transcription.afterRecording": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.afterRecording.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.afterRecording.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4088,7 +4088,7 @@
       }
     },
     "settings.phone.transcription.forNew": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.forNew.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.forNew.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4130,7 +4130,7 @@
       }
     },
     "settings.phone.transcription.goingOnline": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.goingOnline.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.goingOnline.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4172,7 +4172,7 @@
       }
     },
     "settings.phone.transcription.online": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.online.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.online.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4214,7 +4214,7 @@
       }
     },
     "settings.phone.transcription.rightAway": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.rightAway.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.rightAway.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4256,7 +4256,7 @@
       }
     },
     "settings.phone.transcription.rightAway.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.transcription.rightAway.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.transcription.rightAway.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4298,7 +4298,7 @@
       }
     },
     "settings.phone.trash.ios": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.phone.trash.ios.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.phone.trash.ios.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4340,7 +4340,7 @@
       }
     },
     "settings.tab.transcription": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, settings.tab.transcription.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, settings.tab.transcription.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4382,7 +4382,7 @@
       }
     },
     "trash.phone.intro": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, trash.phone.intro.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, trash.phone.intro.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4424,7 +4424,7 @@
       }
     },
     "voices.rememberDefault.subtitle": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.rememberDefault.subtitle.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.rememberDefault.subtitle.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4466,7 +4466,7 @@
       }
     },
     "voices.rememberDefault.title": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.rememberDefault.title.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.rememberDefault.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4508,7 +4508,7 @@
       }
     },
     "voices.setup.body.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.body.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.body.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4550,7 +4550,7 @@
       }
     },
     "voices.setup.changeLater.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.changeLater.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.changeLater.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4592,7 +4592,7 @@
       }
     },
     "voices.setup.enable.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.enable.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.enable.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4634,7 +4634,7 @@
       }
     },
     "voices.setup.kindness": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.kindness.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.kindness.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4676,7 +4676,7 @@
       }
     },
     "voices.setup.privacy.phone": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.privacy.phone.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4718,7 +4718,7 @@
       }
     },
     "voices.setup.title": {
-      "comment": "Generated from cassini-ux 277c65423909ec6f696836eeefede6d4ac5e4c84, voices.setup.title.",
+      "comment": "Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e, voices.setup.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {

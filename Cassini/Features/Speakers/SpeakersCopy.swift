@@ -161,15 +161,14 @@ enum SpeakersCopy {
     static func meta(notes: Int, seconds: Double) -> String {
         let speech = SavedVoiceList.roughMinutes(seconds).map(RecordingCopy.hoursMinutes)
             ?? String(localized: "under 1 min", table: "Speakers")
-        let confirmedSpeech = String(localized: "\(speech) confirmed speech", table: "Speakers")
-        return SavedVoicesPhase2Copy.meta(meetings: notes, confirmedSpeech: confirmedSpeech)
+        return SavedVoicesPhase2Copy.meta(meetings: notes, confirmedSpeech: speech)
     }
     static func options(_ name: String) -> String { String(localized: "Options for \(name)", table: "Speakers") }
     static let renameMore = String(localized: "Rename…", table: "Speakers")
     static let forgetMore = String(localized: "Forget…", table: "Speakers")
-    static func forgetTitle(_ name: String) -> String { String(localized: "Forget \(name)?", table: "Speakers") }
-    static let forgetBody = String(localized: "Cassini stops recognising this voice. Names already in your meetings stay.", table: "Speakers")
-    static let forget = String(localized: "Forget", table: "Speakers")
+    static func forgetTitle(_ name: String) -> String { SavedVoicesPhase2Copy.forgetTitle(name) }
+    static func forgetBody(_ name: String) -> String { SavedVoicesPhase2Copy.forgetBody(name) }
+    static var forget: String { SavedVoicesPhase2Copy.forgetPrimary }
     static var stale: String { SavedVoicesPhase2Copy.stale }
     static var footnote: String { SavedVoicesPhase2Copy.howToAdd }
     static let forgetEveryoneMore = String(localized: "Forget everyone…", table: "Speakers")
@@ -178,7 +177,7 @@ enum SpeakersCopy {
         String(localized: "Cassini stops recognising all \(count) saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.", table: "Speakers")
     }
     static let forgetEveryone = String(localized: "Forget everyone", table: "Speakers")
-    static let empty = String(localized: "No saved voices yet", table: "Speakers")
+    static var empty: String { SavedVoicesPhase2Copy.empty }
     static let unreadableTitle = String(localized: "Saved voices can’t be read", table: "Speakers")
     static let unreadableBody = String(localized: "They were made by a newer Cassini or are damaged. Nothing was changed.", table: "Speakers")
     /// iOS: voiceprints of meetings remain although nobody is saved.
