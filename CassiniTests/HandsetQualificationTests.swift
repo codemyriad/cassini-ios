@@ -375,6 +375,7 @@ final class HandsetQualificationTests: XCTestCase {
         ]
         func makeLane(
             audioFilename: String = RecordingController.captureFilename,
+            words: [ComparableWord] = words,
             matchedVoicesBySpeaker: [String: String] = ["1": "Alice", "3": "Carla"],
             speechProvenance: JSONObject? = baseProv,
             precomputeCheckpointsSaved: Int = 2,
@@ -453,6 +454,20 @@ final class HandsetQualificationTests: XCTestCase {
         let whistleIgnoredEval = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistleIgnoredPressure)
         XCTAssertTrue(whistleIgnoredEval.equivalencePassed)
         XCTAssertFalse(whistleIgnoredEval.pressureRecoveryPassed, "Whistle ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
+
+        // Whistle: zero published words across all 4 lanes must fail both equivalencePassed and pressureRecoveryPassed.
+        let whistleEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleEmptyControl = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleEmptyHeadStart = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
+        let whistleEmptyPressure = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
+        let whistleEmptyEval = Self.evaluateWhistlePaired(
+            baseline: whistleEmptyBaseline,
+            cafControl: whistleEmptyControl,
+            headStart: whistleEmptyHeadStart,
+            pressure: whistleEmptyPressure
+        )
+        XCTAssertFalse(whistleEmptyEval.equivalencePassed, "Whistle empty transcripts must set equivalencePassed = false")
+        XCTAssertFalse(whistleEmptyEval.pressureRecoveryPassed, "Whistle empty transcripts must set pressureRecoveryPassed = false")
     }
 
     @MainActor
@@ -1084,8 +1099,10 @@ final class HandsetQualificationTests: XCTestCase {
         note.duration = Double(totalSeconds)
         try await notes.save(note)
         let speechCAF = notes.audioURL(for: note)
-        // Start with an empty unfinalized CAF header and append 1 s/s in real time while AVAudioRecorder captures from hardware mic.
-        try Self.writeCAF(to: speechCAF, sampleRate: 48_000, pcm: Data(), finalized: false)
+        // Start with an empty unfinalized CAF header and append 2 s every 2 s on a background actor
+        // so disk writes and flushes never block `@MainActor`.
+        let cafWriter = QualCAFWriter(url: speechCAF)
+        _ = try await cafWriter.create(sampleRate: 48_000, initialPCM: Data(), finalized: false)
 
         let checkpoints = CheckpointFiles(notes: notes)
         let provenance = ProvenanceFiles(notes: notes)
@@ -1165,36 +1182,29 @@ final class HandsetQualificationTests: XCTestCase {
         precomputer.start(noteID: note.id, captureURL: speechCAF)
 
         // Pace appending 2 seconds of real 48 kHz PCM every 2 seconds for `totalSeconds` (real-time rate),
-        // streaming slices from the bounded single-cycle buffer and tracking total bytes written.
-        let writerHandle = try FileHandle(forWritingTo: speechCAF)
-        try writerHandle.seekToEnd()
+        // streaming slices from the bounded single-cycle buffer via the background CAF writer actor.
         let chunkSeconds = 2
         let bytesPerSecond = 48_000 * 2
         var writtenSeconds = 0
-        var totalPCMBytesWritten: UInt64 = 0
         var cycleOffset = 0
         while writtenSeconds < totalSeconds {
             let nextEnd = min(totalSeconds, writtenSeconds + chunkSeconds)
-            var remainingBytes = (nextEnd - writtenSeconds) * bytesPerSecond
-            while remainingBytes > 0 {
-                let take = min(remainingBytes, cyclePCM.count - cycleOffset)
-                try writerHandle.write(contentsOf: cyclePCM[cycleOffset..<(cycleOffset + take)])
-                totalPCMBytesWritten += UInt64(take)
-                remainingBytes -= take
-                cycleOffset = (cycleOffset + take) % cyclePCM.count
-            }
-            try writerHandle.synchronize()
+            let (nextOffset, _) = try await cafWriter.appendCycleSlice(
+                from: cyclePCM,
+                offset: cycleOffset,
+                byteCount: (nextEnd - writtenSeconds) * bytesPerSecond
+            )
+            cycleOffset = nextOffset
             writtenSeconds = nextEnd
             if writtenSeconds < totalSeconds {
                 try await Task.sleep(for: .seconds(chunkSeconds))
             }
         }
-        try writerHandle.close()
         // Measure Stop-to-published-transcript latency from capture end (covering CAF finalization,
         // microphone stop, precomputer stop, and post-Stop TranscriptionJob completion).
         let stopStart = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
-        // Finalize the CAF header just as AVAudioRecorder.stop() does, using the streamed byte counter.
-        try Self.finalizeCAFHeader(at: speechCAF, pcmBytes: totalPCMBytesWritten)
+        // Finalize the CAF header just as AVAudioRecorder.stop() does, using the writer's streamed byte counter.
+        try await cafWriter.finalizeHeader()
 
         // Stop hardware mic and precomputer.
         let micElapsed = micStarted ? micAdapter.elapsed : 0
@@ -1492,7 +1502,7 @@ final class HandsetQualificationTests: XCTestCase {
 
         // Append any remaining tail audio before starting the Stop-to-published timer so `fileCapture.stop()`
         // only finalizes the CAF header in place (matching real AVAudioRecorder.stop() without rewriting 29 MB).
-        try fileCapture.appendRemainingAudio()
+        try await fileCapture.appendRemainingAudio()
 
         // Production Stop -> RecordingController.finishAudio -> TranscriptionJob (timed);
         // PortableExportService export is verified separately afterward.
@@ -1662,7 +1672,7 @@ final class HandsetQualificationTests: XCTestCase {
 
         // Append any remaining tail audio before starting the Stop-to-published timer so `fileCapture.stop()`
         // only finalizes the CAF header in place (matching real AVAudioRecorder.stop() without rewriting 29 MB).
-        try fileCapture.appendRemainingAudio()
+        try await fileCapture.appendRemainingAudio()
 
         let postStopSegs = Mutex(0)
         let transcriber = WhistleTranscriber(acceptance: cap)
@@ -2094,6 +2104,8 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.speakerCount == baseline.speakerCount &&
             headStart.matchedVoiceNames == baseline.matchedVoiceNames
         let controlAnchorOK =
+            !baseline.words.isEmpty &&
+            !cafControl.words.isEmpty &&
             !cafControl.speakerTurns.isEmpty &&
             cafControl.speakerCount == 3 &&
             Set(cafControl.speakerTurns.map(\.speaker)).count == 3 &&
@@ -2144,7 +2156,9 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.exportVerified &&
             abs(headStart.exportedDurationSeconds - baseline.exportedDurationSeconds) < 0.15 &&
             productionWER <= 0.02
+        let nonEmptyWords = !baseline.words.isEmpty && !cafControl.words.isEmpty
         let headStartIdenticalOK =
+            nonEmptyWords &&
             controlProv != nil &&
             controlProv?["engine"]?.string == "Whistle" &&
             headStart.speechProvenance == controlProv &&
@@ -2157,6 +2171,7 @@ final class HandsetQualificationTests: XCTestCase {
             return pressure.precomputeCheckpointsSaved <= injectedAt + 1
         }()
         let pressureOK =
+            nonEmptyWords &&
             controlProv != nil &&
             controlProv?["engine"]?.string == "Whistle" &&
             pressureYieldedOK &&
@@ -2251,13 +2266,77 @@ final class HandsetQualificationTests: XCTestCase {
         return Double(prev[hyp.count]) / Double(ref.count)
     }
 
+    /// Serial background actor for CAF creation, chunked appends, disk flushes, and in-place header finalization,
+    /// keeping all file I/O off `@MainActor`.
+    private actor QualCAFWriter {
+        private let url: URL
+        private var handle: FileHandle?
+        private var bytesWritten: UInt64 = 0
+
+        init(url: URL) {
+            self.url = url
+        }
+
+        func create(sampleRate: Double, initialPCM: Data, finalized: Bool) throws -> UInt64 {
+            try HandsetQualificationTests.writeCAF(to: url, sampleRate: sampleRate, pcm: initialPCM, finalized: finalized)
+            bytesWritten = UInt64(initialPCM.count)
+            return bytesWritten
+        }
+
+        func append(_ data: Data) throws -> UInt64 {
+            guard !data.isEmpty else { return bytesWritten }
+            let fh: FileHandle
+            if let existing = handle {
+                fh = existing
+            } else {
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+                handle = fh
+            }
+            try fh.write(contentsOf: data)
+            try fh.synchronize()
+            bytesWritten += UInt64(data.count)
+            return bytesWritten
+        }
+
+        func appendCycleSlice(from cyclePCM: Data, offset: Int, byteCount: Int) throws -> (newOffset: Int, totalBytes: UInt64) {
+            let fh: FileHandle
+            if let existing = handle {
+                fh = existing
+            } else {
+                fh = try FileHandle(forWritingTo: url)
+                try fh.seekToEnd()
+                handle = fh
+            }
+            var remaining = byteCount
+            var cur = offset
+            while remaining > 0 {
+                let take = min(remaining, cyclePCM.count - cur)
+                try fh.write(contentsOf: cyclePCM[cur..<(cur + take)])
+                bytesWritten += UInt64(take)
+                remaining -= take
+                cur = (cur + take) % cyclePCM.count
+            }
+            try fh.synchronize()
+            return (cur, bytesWritten)
+        }
+
+        func finalizeHeader() throws {
+            if let existing = handle {
+                try existing.close()
+                handle = nil
+            }
+            try HandsetQualificationTests.finalizeCAFHeader(at: url, pcmBytes: bytesWritten)
+        }
+    }
+
     @MainActor
     private final class QualFileCapture: AudioCapture {
         let events: AsyncStream<CaptureEvent>
         private let continuation: AsyncStream<CaptureEvent>.Continuation
         var elapsed: TimeInterval = 0
         private(set) var recordedAt: Date?
-        private var captureURL: URL?
+        private var writer: QualCAFWriter?
         private var bytesWritten: Int = 0
         private let prefixPCM: Data?
         private let fullPCM: Data
@@ -2271,40 +2350,35 @@ final class HandsetQualificationTests: XCTestCase {
         }
 
         var fileBytes: Int64 {
-            guard let url = captureURL else { return 0 }
-            return Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+            writer == nil ? 0 : Int64(bytesWritten) + 64
         }
 
         func start(url: URL) async throws -> CaptureFormat {
-            self.captureURL = url
+            let w = QualCAFWriter(url: url)
+            self.writer = w
             self.recordedAt = Date()
             let initial = prefixPCM ?? fullPCM
-            try HandsetQualificationTests.writeCAF(to: url, sampleRate: 48_000, pcm: initial, finalized: false)
-            self.bytesWritten = initial.count
-            self.elapsed = Double(initial.count / 2) / 48_000.0
+            let written = try await w.create(sampleRate: 48_000, initialPCM: initial, finalized: false)
+            self.bytesWritten = Int(written)
+            self.elapsed = Double(written / 2) / 48_000.0
             return .pcm48kMono
         }
 
-        /// Appends any remaining fixture PCM beyond the precompute prefix before Stop is timed.
-        func appendRemainingAudio() throws {
-            guard let url = captureURL, bytesWritten < fullPCM.count else { return }
-            let handle = try FileHandle(forWritingTo: url)
-            defer { try? handle.close() }
-            try handle.seekToEnd()
-            try handle.write(contentsOf: fullPCM[bytesWritten..<fullPCM.count])
-            try handle.synchronize()
-            bytesWritten = fullPCM.count
-            elapsed = fullDuration
+        /// Appends any remaining fixture PCM beyond the precompute prefix on the background actor before Stop is timed.
+        func appendRemainingAudio() async throws {
+            guard let w = writer, bytesWritten < fullPCM.count else { return }
+            let tail = Data(fullPCM[bytesWritten..<fullPCM.count])
+            let written = try await w.append(tail)
+            self.bytesWritten = Int(written)
+            self.elapsed = fullDuration
         }
 
         func pause() {}
         func resume() throws {}
 
         func stop() async throws -> CaptureResult {
-            try appendRemainingAudio()
-            if let url = captureURL {
-                try HandsetQualificationTests.finalizeCAFHeader(at: url, pcmBytes: UInt64(bytesWritten))
-            }
+            try await appendRemainingAudio()
+            try await writer?.finalizeHeader()
             self.elapsed = fullDuration
             return CaptureResult(duration: fullDuration)
         }
