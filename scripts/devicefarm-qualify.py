@@ -194,40 +194,77 @@ def extract_reports(df, run_arn: str, out_dir: Path) -> list[dict]:
     return reports
 
 
+KNOWN_TEST_METHODS = frozenset({
+    "testQualificationHarnessAndTelemetryContract",
+    "testWordErrorRateEdgeCases",
+    "testContinuousCaptureContinuityRejectsEarlyPause",
+    "test01RealCAFLiveReaderAndInterruptionLifecycle",
+    "test02PairedEquivalenceAnd5MinMetrics",
+    "test03ThirtyMinuteContinuousParakeet",
+    "test04ThirtyMinuteContinuousWhistle",
+})
+
+
 def validate_filter_and_config(test_filter: str, qual_cfg: dict) -> list[tuple[str, str | None]]:
-    """Validate --filter against qual_cfg enable flags and return expected (test, engine) report keys."""
-    tokens = [t.strip() for t in test_filter.split(",") if t.strip()]
-    if not tokens:
-        raise SystemExit("--filter must not be empty.")
+    """Validate --filter against known tests and qual_cfg enable flags; return expected (test, engine) report keys."""
+    raw_parts = [t.strip() for t in test_filter.split(",")]
+    if not raw_parts or any(not t for t in raw_parts):
+        raise SystemExit(f"Invalid --filter {test_filter!r}: must be a comma-separated list of non-empty test selectors.")
 
-    whole_class = any(t == "HandsetQualificationTests" or t.endswith("/HandsetQualificationTests") for t in tokens)
-    methods = {t.split("/")[-1] for t in tokens if "/" in t}
+    explicit_methods: set[str] = set()
+    expanded_methods: set[str] = set()
+    for token in raw_parts:
+        parts = token.split("/")
+        if parts == ["HandsetQualificationTests"] or parts == ["CassiniTests", "HandsetQualificationTests"]:
+            expanded_methods.add("test01RealCAFLiveReaderAndInterruptionLifecycle")
+            expanded_methods.add("test02PairedEquivalenceAnd5MinMetrics")
+            if qual_cfg.get("runLongParakeet"):
+                expanded_methods.add("test03ThirtyMinuteContinuousParakeet")
+            if qual_cfg.get("runLongWhistle"):
+                expanded_methods.add("test04ThirtyMinuteContinuousWhistle")
+        elif (
+            (len(parts) == 2 and parts[0] == "HandsetQualificationTests")
+            or (len(parts) == 3 and parts[0] == "CassiniTests" and parts[1] == "HandsetQualificationTests")
+        ):
+            method = parts[-1]
+            if method not in KNOWN_TEST_METHODS:
+                raise SystemExit(
+                    f"Unknown or misspelled test selector {token!r}; "
+                    f"expected HandsetQualificationTests or one of {sorted(KNOWN_TEST_METHODS)}."
+                )
+            explicit_methods.add(method)
+            expanded_methods.add(method)
+        else:
+            raise SystemExit(
+                f"Unsupported test selector {token!r}; "
+                "expected [CassiniTests/]HandsetQualificationTests[/<method>]."
+            )
 
-    if "test03ThirtyMinuteContinuousParakeet" in methods and not qual_cfg.get("runLongParakeet"):
+    if "test03ThirtyMinuteContinuousParakeet" in explicit_methods and not qual_cfg.get("runLongParakeet"):
         raise SystemExit(
             "Filter selects test03ThirtyMinuteContinuousParakeet without --long-parakeet; "
             "the test would XCTSkip and emit no report."
         )
-    if "test04ThirtyMinuteContinuousWhistle" in methods and not qual_cfg.get("runLongWhistle"):
+    if "test04ThirtyMinuteContinuousWhistle" in explicit_methods and not qual_cfg.get("runLongWhistle"):
         raise SystemExit(
             "Filter selects test04ThirtyMinuteContinuousWhistle without --long-whistle; "
             "the test would XCTSkip and emit no report."
         )
-    if "test02PairedEquivalenceAnd5MinMetrics" in methods and not (
+    if "test02PairedEquivalenceAnd5MinMetrics" in expanded_methods and not (
         qual_cfg.get("runParakeet") or qual_cfg.get("runWhistle")
     ):
         raise SystemExit(
-            "Filter selects test02PairedEquivalenceAnd5MinMetrics with both --no-parakeet and --no-whistle."
+            "Filter includes test02PairedEquivalenceAnd5MinMetrics with both --no-parakeet and --no-whistle."
         )
 
     expected: list[tuple[str, str | None]] = []
-    if whole_class or "test01RealCAFLiveReaderAndInterruptionLifecycle" in methods:
+    if "test01RealCAFLiveReaderAndInterruptionLifecycle" in expanded_methods:
         expected.append(("test01RealCAFLiveReaderAndInterruptionLifecycle", None))
-    if whole_class or "test02PairedEquivalenceAnd5MinMetrics" in methods:
+    if "test02PairedEquivalenceAnd5MinMetrics" in expanded_methods:
         expected.append(("test02PairedEquivalenceAnd5MinMetrics", None))
-    if "test03ThirtyMinuteContinuousParakeet" in methods or (whole_class and qual_cfg.get("runLongParakeet")):
+    if "test03ThirtyMinuteContinuousParakeet" in expanded_methods:
         expected.append(("runThirtyMinuteContinuousCapture", "parakeet"))
-    if "test04ThirtyMinuteContinuousWhistle" in methods or (whole_class and qual_cfg.get("runLongWhistle")):
+    if "test04ThirtyMinuteContinuousWhistle" in expanded_methods:
         expected.append(("runThirtyMinuteContinuousCapture", "whistle"))
     return expected
 
@@ -249,6 +286,10 @@ def verify_reports(reports: list[dict], expected: list[tuple[str, str | None]], 
             label = f"{test_name} (engine={engine})" if engine else test_name
             raise SystemExit(f"Device Farm run PASSED but is missing expected qualification report: {label}.")
         if test_name == "test02PairedEquivalenceAnd5MinMetrics":
+            if not (qual_cfg.get("runParakeet") or qual_cfg.get("runWhistle")):
+                raise SystemExit(
+                    "test02PairedEquivalenceAnd5MinMetrics requires at least one enabled engine (Parakeet or Whistle)."
+                )
             if qual_cfg.get("runParakeet") and not any("parakeet" in rep for rep in matches):
                 raise SystemExit("Device Farm run PASSED but test02 report is missing 'parakeet' section.")
             if qual_cfg.get("runWhistle") and not any("whistle" in rep for rep in matches):

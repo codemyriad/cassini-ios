@@ -163,6 +163,36 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
                 "HandsetQualificationTests/test02PairedEquivalenceAnd5MinMetrics",
                 both_disabled,
             )
+        # Class selectors expand to include test02, so --no-parakeet --no-whistle must also be rejected.
+        for class_filter in ("HandsetQualificationTests", "CassiniTests/HandsetQualificationTests"):
+            with self.assertRaises(SystemExit) as ctx:
+                MOD.validate_filter_and_config(class_filter, both_disabled)
+            self.assertIn("test02PairedEquivalenceAnd5MinMetrics", str(ctx.exception))
+
+        # Unknown / misspelled selectors must fail fast even alongside a valid contract test selector.
+        with self.assertRaises(SystemExit) as typo_ctx:
+            MOD.validate_filter_and_config(
+                "HandsetQualificationTests/testQualificationHarnessAndTelemetryContract,"
+                "HandsetQualificationTests/test03ThirtyMinuteContinuousParakeeet",
+                dict(base_cfg, runLongParakeet=True),
+            )
+        self.assertIn("Unknown or misspelled", str(typo_ctx.exception))
+
+    def test_verify_reports_rejects_test02_with_no_enabled_engines(self) -> None:
+        both_disabled = {
+            "shortSeconds": 300,
+            "longSeconds": 1800,
+            "runParakeet": False,
+            "runWhistle": False,
+            "runLongParakeet": False,
+            "runLongWhistle": False,
+        }
+        with self.assertRaises(SystemExit):
+            MOD.verify_reports(
+                [{"test": "test02PairedEquivalenceAnd5MinMetrics"}],
+                [("test02PairedEquivalenceAnd5MinMetrics", None)],
+                both_disabled,
+            )
 
     def test_verify_reports_fails_when_passed_run_is_missing_expected_report(self) -> None:
         cfg = {

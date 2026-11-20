@@ -273,28 +273,23 @@ final class HandsetQualificationTests: XCTestCase {
         let adapter = AVCaptureAdapter(session: session, makeRecorder: { _ in fakeRec })
         _ = try await adapter.start(url: finalURL)
 
-        var received: [CaptureEvent] = []
-        let collector = Task {
-            for await event in adapter.events {
-                if case .level = event { continue }
-                received.append(event)
-                if received.count == 2 { break }
-            }
-        }
+        let eventGate = CaptureEventGate(stream: adapter.events)
+        defer { eventGate.cancel() }
         NotificationCenter.default.post(
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
             userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
         )
+        try await eventGate.waitFor("interrupted", count: 1, timeout: .seconds(5))
         try adapter.resume()
         NotificationCenter.default.post(
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
             userInfo: [AVAudioSessionRouteChangeReasonKey: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue]
         )
-        await collector.value
+        try await eventGate.waitFor("routeLost", count: 1, timeout: .seconds(5))
         _ = try await adapter.stop()
-        XCTAssertEqual(received, [.interrupted, .routeLost])
+        XCTAssertEqual(eventGate.observedEvents, ["interrupted", "routeLost"])
         XCTAssertEqual(fakeRec.pauseCount, 2)
 
         // 4. PrecomputePressure yields immediately under thermal .serious, low memory, and backgrounding.
@@ -332,6 +327,71 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertEqual(Self.wordErrorRate(reference: [w("hello")], hypothesis: [w("...")]), 1.0)
         XCTAssertEqual(Self.wordErrorRate(reference: [w("Hello,"), w("world!")], hypothesis: [w("hello"), w("world")]), 0.0)
         XCTAssertEqual(Self.wordErrorRate(reference: [w("hello"), w("world")], hypothesis: [w("hello"), w("mars")]), 0.5)
+    }
+
+    @MainActor
+    func testContinuousCaptureContinuityRejectsEarlyPause() async throws {
+        final class EarlyPauseRecorder: CaptureRecorder {
+            var delegate: (any AVAudioRecorderDelegate)?
+            var isMeteringEnabled = false
+            var currentTime: TimeInterval = 1.5
+            let url: URL
+            var pauseCount = 0
+            init(url: URL) { self.url = url }
+            func record() -> Bool { true }
+            func pause() { pauseCount += 1 }
+            func stop() {}
+            func updateMeters() {}
+            func averagePower(forChannel channelNumber: Int) -> Float { -12 }
+        }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qual-continuity-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let cafURL = dir.appendingPathComponent("early-pause.caf")
+
+        let fakeRec = EarlyPauseRecorder(url: cafURL)
+        let session = CaptureSession(requestPermission: { true }, prepare: {}, activate: {}, deactivate: {})
+        let adapter = AVCaptureAdapter(session: session, makeRecorder: { _ in fakeRec })
+        _ = try await adapter.start(url: cafURL)
+
+        let eventGate = CaptureEventGate(stream: adapter.events)
+        defer { eventGate.cancel() }
+        // Simulate an early BT route loss pausing the recorder at 1.5 s while the 30-s capture window continues.
+        NotificationCenter.default.post(
+            name: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            userInfo: [AVAudioSessionRouteChangeReasonKey: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue]
+        )
+        try await eventGate.waitFor("routeLost", count: 1, timeout: .seconds(5))
+        _ = try await adapter.stop()
+        XCTAssertEqual(fakeRec.pauseCount, 1)
+
+        // Even though recorder.currentTime (1.5 s) would match a truncated 1.5 s CAF, comparing against the
+        // monotonic interval (30.0 s) and rejecting route-loss events catches the truncated recording.
+        let failures = Self.validateContinuousMicCapture(
+            recordedDurationSeconds: fakeRec.currentTime,
+            monotonicElapsedSeconds: 30.0,
+            events: eventGate.observedEvents
+        )
+        XCTAssertEqual(failures.count, 2, "Must report both unexpected capture event and monotonic duration drift")
+        XCTAssertTrue(failures.contains { $0.contains("routeLost") })
+        XCTAssertTrue(failures.contains { $0.contains("drifted") })
+
+        // Truncation alone (without an event) also fails against monotonic elapsed time.
+        let driftOnly = Self.validateContinuousMicCapture(
+            recordedDurationSeconds: 1.5,
+            monotonicElapsedSeconds: 30.0,
+            events: []
+        )
+        XCTAssertEqual(driftOnly.count, 1)
+
+        // Uninterrupted continuous capture within tolerance passes.
+        let healthy = Self.validateContinuousMicCapture(
+            recordedDurationSeconds: 30.0,
+            monotonicElapsedSeconds: 30.1,
+            events: []
+        )
+        XCTAssertEqual(healthy, [])
     }
 
     // MARK: - Opt-in Physical Handset Test 1: Real AVAudioRecorder + LiveCAFReader + Interruption Lifecycle
@@ -390,19 +450,8 @@ final class HandsetQualificationTests: XCTestCase {
             let fakeSession = CaptureSession(requestPermission: { true }, prepare: {}, activate: {}, deactivate: {})
             let lifecycleAdapter = AVCaptureAdapter(session: fakeSession, makeRecorder: { _ in fakeRec })
             _ = try await lifecycleAdapter.start(url: cafURL)
-            let events = Mutex<[String]>([])
-            let watcher = Task {
-                for await ev in lifecycleAdapter.events {
-                    switch ev {
-                    case .interrupted: events.withLock { $0.append("interrupted") }
-                    case .routeLost: events.withLock { $0.append("routeLost") }
-                    case .failed: events.withLock { $0.append("failed") }
-                    case .mediaReset: events.withLock { $0.append("mediaReset") }
-                    case .level: break
-                    }
-                    if events.withLock({ $0.count >= 2 }) { break }
-                }
-            }
+            let eventGate = CaptureEventGate(stream: lifecycleAdapter.events)
+            defer { eventGate.cancel() }
             lifecycleAdapter.pause()
             try lifecycleAdapter.resume()
             NotificationCenter.default.post(
@@ -410,13 +459,14 @@ final class HandsetQualificationTests: XCTestCase {
                 object: AVAudioSession.sharedInstance(),
                 userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
             )
+            try await eventGate.waitFor("interrupted", count: 1, timeout: .seconds(5))
             try lifecycleAdapter.resume()
             NotificationCenter.default.post(
                 name: AVAudioSession.routeChangeNotification,
                 object: AVAudioSession.sharedInstance(),
                 userInfo: [AVAudioSessionRouteChangeReasonKey: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue]
             )
-            await watcher.value
+            try await eventGate.waitFor("routeLost", count: 1, timeout: .seconds(5))
             _ = try await lifecycleAdapter.stop()
 
             try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM, finalized: true)
@@ -430,7 +480,7 @@ final class HandsetQualificationTests: XCTestCase {
             let opusBytes = try Data(contentsOf: opusURL)
             XCTAssertGreaterThan(opusBytes.count, 0)
 
-            let observedEvents = events.withLock { $0 }
+            let observedEvents = eventGate.observedEvents
             XCTAssertTrue(observedEvents.contains("interrupted"))
             XCTAssertTrue(observedEvents.contains("routeLost"))
             let snap = monitor.finish()
@@ -910,10 +960,12 @@ final class HandsetQualificationTests: XCTestCase {
         let micCAF = workDir.appendingPathComponent("hardware-mic.caf")
         let micAdapter = AVCaptureAdapter()
         var micStarted = false
+        var micMonotonicStart: UInt64 = 0
         var micError: String?
         let micPermission = AVAudioApplication.shared.recordPermission
         if micPermission == .granted {
             _ = try await micAdapter.start(url: micCAF)
+            micMonotonicStart = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
             micStarted = true
         } else {
             micError = "permission_\(micPermission == .denied ? "denied" : "undetermined")_headless_xctest"
@@ -963,7 +1015,13 @@ final class HandsetQualificationTests: XCTestCase {
 
         // Stop hardware mic and precomputer.
         let micElapsed = micStarted ? micAdapter.elapsed : 0
-        if micStarted { _ = try await micAdapter.stop() }
+        let micMonotonicElapsed: Double
+        if micStarted {
+            _ = try await micAdapter.stop()
+            micMonotonicElapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - micMonotonicStart) / 1_000_000_000.0
+        } else {
+            micMonotonicElapsed = 0
+        }
         micWatcher.cancel()
         await precomputer.stop(noteID: note.id)
         let recordingSnap = monitor.finish()
@@ -995,9 +1053,13 @@ final class HandsetQualificationTests: XCTestCase {
             let avFile = try AVAudioFile(forReading: micCAF)
             micFrames = avFile.length
             micDuration = Double(avFile.length) / avFile.fileFormat.sampleRate
-            droppedFrameDriftSeconds = abs(micDuration - micElapsed)
-            XCTAssertEqual(micEvents.withLock { $0 }.filter { $0.contains("failed") }, [], "Zero AVAudioRecorder encode errors")
-            XCTAssertLessThan(droppedFrameDriftSeconds, 0.5, "Zero dropped AVAudioRecorder buffers over continuous capture")
+            droppedFrameDriftSeconds = abs(micDuration - micMonotonicElapsed)
+            let continuityFailures = Self.validateContinuousMicCapture(
+                recordedDurationSeconds: micDuration,
+                monotonicElapsedSeconds: micMonotonicElapsed,
+                events: micEvents.withLock { $0 }
+            )
+            XCTAssertEqual(continuityFailures, [], "30-min continuous mic capture must have zero interruptions/route-loss/errors and match monotonic elapsed duration")
         }
 
         let stored = await notes.note(note.id)
@@ -1015,6 +1077,7 @@ final class HandsetQualificationTests: XCTestCase {
             "micStarted": micStarted,
             "micError": micError ?? "none",
             "micElapsedSeconds": micElapsed,
+            "micMonotonicElapsedSeconds": micMonotonicElapsed,
             "micFinalDurationSeconds": micDuration,
             "micFinalFrames": micFrames,
             "micDriftSeconds": droppedFrameDriftSeconds,
@@ -1785,6 +1848,28 @@ final class HandsetQualificationTests: XCTestCase {
             }
             try await Task.sleep(for: .milliseconds(10))
         }
+    }
+
+    private static func validateContinuousMicCapture(
+        recordedDurationSeconds: Double,
+        monotonicElapsedSeconds: Double,
+        events: [String],
+        maxDriftSeconds: Double = 0.5
+    ) -> [String] {
+        var failures: [String] = []
+        if !events.isEmpty {
+            failures.append("Unexpected capture events during continuous recording: \(events)")
+        }
+        let drift = abs(recordedDurationSeconds - monotonicElapsedSeconds)
+        if drift >= maxDriftSeconds {
+            failures.append(
+                String(
+                    format: "Mic CAF duration (%.2fs) drifted from monotonic capture interval (%.2fs) by %.2fs >= %.2fs",
+                    recordedDurationSeconds, monotonicElapsedSeconds, drift, maxDriftSeconds
+                )
+            )
+        }
+        return failures
     }
 
     private static func wordErrorRate(reference: [ComparableWord], hypothesis: [ComparableWord]) -> Double {
