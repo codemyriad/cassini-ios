@@ -324,6 +324,16 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertLessThan(abs(afterStopProd.exportedDurationSeconds - headStartProd.exportedDurationSeconds), 0.15)
     }
 
+    func testWordErrorRateEdgeCases() {
+        let w: (String) -> ComparableWord = { ComparableWord(text: $0, startMs: 0, endMs: 100, speaker: nil) }
+        XCTAssertEqual(Self.wordErrorRate(reference: [], hypothesis: []), 0.0)
+        XCTAssertEqual(Self.wordErrorRate(reference: [], hypothesis: [w("hello")]), 1.0)
+        XCTAssertEqual(Self.wordErrorRate(reference: [w("hello"), w("world")], hypothesis: []), 1.0)
+        XCTAssertEqual(Self.wordErrorRate(reference: [w("hello")], hypothesis: [w("...")]), 1.0)
+        XCTAssertEqual(Self.wordErrorRate(reference: [w("Hello,"), w("world!")], hypothesis: [w("hello"), w("world")]), 0.0)
+        XCTAssertEqual(Self.wordErrorRate(reference: [w("hello"), w("world")], hypothesis: [w("hello"), w("mars")]), 0.5)
+    }
+
     // MARK: - Opt-in Physical Handset Test 1: Real AVAudioRecorder + LiveCAFReader + Interruption Lifecycle
 
     @MainActor
@@ -587,12 +597,46 @@ final class HandsetQualificationTests: XCTestCase {
             "os": ProcessInfo.processInfo.operatingSystemVersionString
         ]
 
-        // Record-only control (zero ML during recording, zero auto-enqueue on Stop).
+        // Record-only control via production RecordingController (zero ML during recording, zero auto-enqueue on Stop).
         do {
+            let controlRoot = workDir.appendingPathComponent("record-only", isDirectory: true)
+            try FileManager.default.createDirectory(at: controlRoot, withIntermediateDirectories: true)
+            let notes = try NoteStore(root: controlRoot.appendingPathComponent("notes", isDirectory: true))
+            let recordingNotes = CountingRecordingNotes(store: notes)
+            let handoff = FakeRecordingHandoff()
+            let precomputeSpy = SpyPrecompute()
+            let clock = SystemClock()
+            let suite = "io.codemyriad.cassini.qual.recordonly.\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let settings = SettingsStore(defaults: defaults, clock: clock, defaultLanguage: "en-US")
+            settings.recordConsent()
+            settings.transcriptionMode = .recordOnly
+
+            let capture = QualFileCapture(prefixPCM: nil, fullPCM: speechPCM)
+            let controller = RecordingController(parts: .init(
+                ready: {},
+                notes: recordingNotes,
+                capture: capture,
+                storage: UnlimitedStorage(),
+                audio: LocalAudioProcessing(),
+                settings: settings,
+                handoff: handoff,
+                consent: ModelConsent { _, _ in true },
+                clock: clock,
+                defaultTitle: { _ in "Record Only Control" },
+                precompute: precomputeSpy
+            ))
+
             let mon = HandsetTelemetryMonitor.start()
-            let caf = workDir.appendingPathComponent("record-only.caf")
-            try Self.writeCAF(to: caf, sampleRate: 48_000, pcm: speechPCM, finalized: true)
+            XCTAssertTrue(controller.start())
+            _ = try await waitForActiveRecording(controller: controller, timeout: .seconds(15))
+            controller.finish()
+            await controller.settle()
             let snap = mon.finish()
+
+            XCTAssertEqual(precomputeSpy.startCount, 0, "recordOnly must never start recording-time precomputation")
+            XCTAssertTrue(handoff.handedOff.isEmpty, "recordOnly must never hand off to transcription on Stop")
             report["recordOnly"] = try Self.asDictionary(snap)
         }
 
@@ -1112,6 +1156,8 @@ final class HandsetQualificationTests: XCTestCase {
         var precomputeSaved = 0
         var precomputeTelemetry: TelemetrySnapshot?
         let savedCounter = Mutex(0)
+        let pressureInjected = Mutex(false)
+        let countAtInjection = Mutex<Int?>(nil)
         let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
         let memInjected = Mutex<Int64?>(nil)
         let activeInjected = Mutex(true)
@@ -1137,9 +1183,17 @@ final class HandsetQualificationTests: XCTestCase {
             onCheckpointSaved: { _, _ in
                 let n = savedCounter.withLock { $0 += 1; return $0 }
                 if let limit = injectPressureAtWindow, n >= limit {
-                    thermalInjected.withLock { $0 = .serious }
-                    memInjected.withLock { $0 = 10 << 20 }
-                    activeInjected.withLock { $0 = false }
+                    let firstTrigger = pressureInjected.withLock { already -> Bool in
+                        if already { return false }
+                        already = true
+                        return true
+                    }
+                    if firstTrigger {
+                        countAtInjection.withLock { $0 = n }
+                        thermalInjected.withLock { $0 = .serious }
+                        memInjected.withLock { $0 = 10 << 20 }
+                        activeInjected.withLock { $0 = false }
+                    }
                 }
             }
         )
@@ -1172,11 +1226,16 @@ final class HandsetQualificationTests: XCTestCase {
             precomputeTelemetry = preMon.finish()
             precomputeSaved = savedCounter.withLock { $0 }
             if let limit = injectPressureAtWindow {
-                XCTAssertLessThanOrEqual(precomputeSaved, limit + 1, "Precompute must pause within 1 window on thermal/memory/background pressure")
+                XCTAssertTrue(pressureInjected.withLock { $0 }, "Parakeet pressure injection must actually fire during precompute")
+                let injectedAt = try XCTUnwrap(countAtInjection.withLock { $0 })
+                XCTAssertGreaterThanOrEqual(injectedAt, limit, "Parakeet must save at least \(limit) checkpoint(s) before/at pressure injection")
+                XCTAssertLessThanOrEqual(precomputeSaved - injectedAt, 1,
+                                         "Parakeet precompute must pause within 1 window after pressure injection (saved \(precomputeSaved), injected at \(injectedAt))")
             }
         }
 
-        // Production Stop -> RecordingController.finishAudio -> TranscriptionJob -> PortableExportService.
+        // Production Stop -> RecordingController.finishAudio -> TranscriptionJob (timed);
+        // PortableExportService export is verified separately afterward.
         let postStopWindows = Mutex(0)
         let host = MatchingJobHost(notes: notes, voices: enrolledVoices)
         let transcriber = ParakeetTranscriber(models: parakeetModels, runtime: SherpaRuntime.speech)
@@ -1194,6 +1253,8 @@ final class HandsetQualificationTests: XCTestCase {
                                     stop: StopSignal()) { event in
             if case .checkpointed = event { postStopWindows.withLock { $0 += 1 } }
         }
+        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
+        let postSnap = postMon.finish()
         XCTAssertEqual(outcome, JobOutcome.done)
 
         let fetchedSaved = await notes.note(noteID)
@@ -1202,8 +1263,6 @@ final class HandsetQualificationTests: XCTestCase {
         let exportDir = root.appendingPathComponent("export", isDirectory: true)
         let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
-        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
-        let postSnap = postMon.finish()
 
         let doc = CassiniDocument.read(opusURL)
         // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
@@ -1271,6 +1330,8 @@ final class HandsetQualificationTests: XCTestCase {
         var precomputeSaved = 0
         var precomputeTelemetry: TelemetrySnapshot?
         let savedCounter = Mutex(0)
+        let pressureInjected = Mutex(false)
+        let countAtInjection = Mutex<Int?>(nil)
         let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
         let activeInjected = Mutex(true)
 
@@ -1287,8 +1348,16 @@ final class HandsetQualificationTests: XCTestCase {
                 guard !cp.segments.isEmpty else { return }
                 let n = savedCounter.withLock { $0 += 1; return $0 }
                 if let limit = injectPressureAtCheckpoint, n >= limit {
-                    thermalInjected.withLock { $0 = .serious }
-                    activeInjected.withLock { $0 = false }
+                    let firstTrigger = pressureInjected.withLock { already -> Bool in
+                        if already { return false }
+                        already = true
+                        return true
+                    }
+                    if firstTrigger {
+                        countAtInjection.withLock { $0 = n }
+                        thermalInjected.withLock { $0 = .serious }
+                        activeInjected.withLock { $0 = false }
+                    }
                 }
             }
         )
@@ -1320,6 +1389,13 @@ final class HandsetQualificationTests: XCTestCase {
             await precomputer.runOnce(noteID: noteID, captureURL: cafURL)
             precomputeTelemetry = preMon.finish()
             precomputeSaved = savedCounter.withLock { $0 }
+            if let limit = injectPressureAtCheckpoint {
+                XCTAssertTrue(pressureInjected.withLock { $0 }, "Whistle pressure injection must actually fire during precompute")
+                let injectedAt = try XCTUnwrap(countAtInjection.withLock { $0 })
+                XCTAssertGreaterThanOrEqual(injectedAt, limit, "Whistle must save at least \(limit) checkpoint(s) before/at pressure injection")
+                XCTAssertLessThanOrEqual(precomputeSaved - injectedAt, 1,
+                                         "Whistle precompute must pause within 1 segment after pressure injection (saved \(precomputeSaved), injected at \(injectedAt))")
+            }
         }
 
         let postStopSegs = Mutex(0)
@@ -1340,6 +1416,8 @@ final class HandsetQualificationTests: XCTestCase {
 
         let outcome = await job.run(Job(noteID: noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
                                     stop: StopSignal()) { _ in }
+        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
+        let postSnap = postMon.finish()
         XCTAssertEqual(outcome, JobOutcome.done)
 
         let fetchedSaved = await notes.note(noteID)
@@ -1348,8 +1426,6 @@ final class HandsetQualificationTests: XCTestCase {
         let exportDir = root.appendingPathComponent("export", isDirectory: true)
         let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
-        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
-        let postSnap = postMon.finish()
 
         let doc = CassiniDocument.read(opusURL)
         // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
@@ -1690,6 +1766,7 @@ final class HandsetQualificationTests: XCTestCase {
         let ref = reference.map { $0.text.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
         let hyp = hypothesis.map { $0.text.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
         guard !ref.isEmpty else { return hyp.isEmpty ? 0.0 : 1.0 }
+        guard !hyp.isEmpty else { return 1.0 }
         var prev = Array(0...hyp.count)
         var curr = Array(repeating: 0, count: hyp.count + 1)
         for i in 1...ref.count {
@@ -1763,6 +1840,15 @@ final class HandsetQualificationTests: XCTestCase {
         func stop(noteID: UUID) async {}
         func preempt() async {}
         func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool { true }
+    }
+
+    private final class SpyPrecompute: RecordingPrecomputing, @unchecked Sendable {
+        private let starts = Mutex(0)
+        var startCount: Int { starts.withLock { $0 } }
+        func start(noteID: UUID, captureURL: URL) { starts.withLock { $0 += 1 } }
+        func stop(noteID: UUID) async {}
+        func preempt() async {}
+        func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool { false }
     }
 
     /// Exercises `RecordingController.finishAudio`'s fallback to preserving `capture.caf` when M4A compression is skipped,

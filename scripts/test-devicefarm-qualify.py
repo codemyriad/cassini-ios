@@ -99,12 +99,40 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
             run_pages=[],
             pool_pages=[
                 {"devicePools": [{"name": "other", "arn": "arn:other"}], "nextToken": "1"},
-                {"devicePools": [{"name": "target", "arn": "arn:target"}]},
+                {
+                    "devicePools": [
+                        {
+                            "name": "target",
+                            "arn": "arn:target",
+                            "rules": [{"attribute": "ARN", "operator": "IN", "value": '["arn:device"]'}],
+                        }
+                    ]
+                },
             ],
         )
         arn = MOD.ensure_device_pool(df, "target", "arn:device")
         self.assertEqual(arn, "arn:target")
         self.assertEqual(len(df.list_pools_calls), 2)
+
+    def test_ensure_device_pool_fails_fast_on_device_arn_mismatch(self) -> None:
+        df = FakeDeviceFarm(
+            run_pages=[],
+            pool_pages=[
+                {
+                    "devicePools": [
+                        {
+                            "name": "target",
+                            "arn": "arn:target",
+                            "rules": [{"attribute": "ARN", "operator": "IN", "value": '["arn:different-device"]'}],
+                        }
+                    ]
+                }
+            ],
+        )
+        with self.assertRaises(SystemExit) as ctx:
+            MOD.ensure_device_pool(df, "target", "arn:requested-device")
+        self.assertIn("arn:requested-device", str(ctx.exception))
+        self.assertIn("target", str(ctx.exception))
 
 
 if __name__ == "__main__":

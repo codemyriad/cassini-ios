@@ -131,9 +131,28 @@ def upload_file(df, path: Path, upload_type: str) -> str:
         time.sleep(3)
 
 
+def _pool_matches_device(pool: dict, device_arn: str) -> bool:
+    rules = pool.get("rules") or []
+    if len(rules) != 1:
+        return False
+    rule = rules[0]
+    if rule.get("attribute") != "ARN" or rule.get("operator") != "IN":
+        return False
+    try:
+        arns = json.loads(rule.get("value", "[]"))
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return arns == [device_arn]
+
+
 def ensure_device_pool(df, name: str, device_arn: str) -> str:
     for pool in _paginate(df.list_device_pools, "devicePools", arn=PROJECT_ARN, type="PRIVATE"):
         if pool["name"] == name:
+            if not _pool_matches_device(pool, device_arn):
+                raise SystemExit(
+                    f"Device pool {name!r} ({pool['arn']}) does not match requested --device-arn {device_arn!r} "
+                    f"(existing rules: {pool.get('rules')!r}). Use a distinct --pool-name."
+                )
             return pool["arn"]
     return df.create_device_pool(
         projectArn=PROJECT_ARN,
