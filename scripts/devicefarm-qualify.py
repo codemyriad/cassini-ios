@@ -3,7 +3,7 @@
 
 Usage:
   AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \
-      --device-arn <ARN> --name d1126-iphone11-5min --profile short --filter HandsetQualificationTests/test02PairedEquivalenceAnd5MinMetrics
+      --device-arn <ARN> --pool-name <POOL_NAME> --name d1126-iphone11-5min --filter HandsetQualificationTests/test02PairedEquivalenceAnd5MinMetrics
 
 Enforces the D89 $160/month deny ceiling before scheduling any new run.
 """
