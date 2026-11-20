@@ -532,6 +532,56 @@ final class HandsetQualificationTests: XCTestCase {
         }
     }
 
+    func testLongRunValidatorsRejectDiscardedCheckpointAndEarlyDiarizerFailure() {
+        let dummyURL = URL(fileURLWithPath: "/tmp/dummy.caf")
+        let freshReq = TranscriptionRequest(url: dummyURL, language: "en-US", allowDownload: false)
+
+        // Discarded checkpoints (zero resume) must fail for both Parakeet and Whistle.
+        XCTAssertFalse(Self.validateLongRunCheckpointResume(engine: .parakeet, request: freshReq).isEmpty)
+        XCTAssertFalse(Self.validateLongRunCheckpointResume(engine: .whistle, request: freshReq).isEmpty)
+        XCTAssertFalse(Self.validateLongRunCheckpointResume(engine: .parakeet, request: nil).isEmpty)
+
+        // Positive resume checkpoints pass for both engines.
+        let parakeetResumedReq = TranscriptionRequest(
+            url: dummyURL,
+            language: "en-US",
+            resume: TranscriptResume(recognition: RecognitionCheckpoint(start: 0, end: 160_000, position: 160_000), words: []),
+            allowDownload: false
+        )
+        XCTAssertEqual(Self.validateLongRunCheckpointResume(engine: .parakeet, request: parakeetResumedReq), [])
+
+        let whistleResumedReq = TranscriptionRequest(
+            url: dummyURL,
+            language: "en-US",
+            allowDownload: false,
+            whistleResume: WhistleCheckpoint(sourceFrame: 480_000, processedSamples: 160_000, doneSamples: 160_000, state: Data([1]))
+        )
+        XCTAssertEqual(Self.validateLongRunCheckpointResume(engine: .whistle, request: whistleResumedReq), [])
+
+        // Parakeet 30-min Sortformer continuity: speakerAnalysisFailure, nil analysis, or early-only turns must fail.
+        let prefix = WindowSpeakers.freshPrefix()
+        let earlyOnly = SpeakerAnalysis(
+            turns: [
+                DiarizerTurn(0, 10_000, 0).speakerTurn(prefix: prefix),
+                DiarizerTurn(11_000, 20_000, 1).speakerTurn(prefix: prefix)
+            ],
+            prints: []
+        )
+        XCTAssertFalse(Self.validateLongRunParakeetSpeakers(speakerAnalysisFailure: .speakers, analysis: earlyOnly, totalDurationSeconds: 1800).isEmpty)
+        XCTAssertFalse(Self.validateLongRunParakeetSpeakers(speakerAnalysisFailure: nil, analysis: nil, totalDurationSeconds: 1800).isEmpty)
+        XCTAssertFalse(Self.validateLongRunParakeetSpeakers(speakerAnalysisFailure: nil, analysis: earlyOnly, totalDurationSeconds: 1800).isEmpty)
+
+        let fullRunSpeakers = SpeakerAnalysis(
+            turns: [
+                DiarizerTurn(0, 10_000, 0).speakerTurn(prefix: prefix),
+                DiarizerTurn(1_500_000, 1_520_000, 0).speakerTurn(prefix: prefix),
+                DiarizerTurn(1_530_000, 1_550_000, 2).speakerTurn(prefix: prefix)
+            ],
+            prints: []
+        )
+        XCTAssertEqual(Self.validateLongRunParakeetSpeakers(speakerAnalysisFailure: nil, analysis: fullRunSpeakers, totalDurationSeconds: 1800), [])
+    }
+
     @MainActor
     func testContinuousCaptureContinuityRejectsEarlyPause() async throws {
         final class EarlyPauseRecorder: CaptureRecorder {
@@ -1297,15 +1347,25 @@ final class HandsetQualificationTests: XCTestCase {
 
         // Now run the post-Stop TranscriptionJob using the precompute checkpoint.
         let postStopMonitor = HandsetTelemetryMonitor.start()
-        let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
+        let capturedRequest = Mutex<TranscriptionRequest?>(nil)
+        let observingTranscriber = CountingTranscriber(
+            inner: transcriber,
+            onRequest: { req in capturedRequest.withLock { $0 = req } }
+        )
+        let longHost = LongRunJobHost(identifySpeakers: engine == .parakeet)
+        let job = TranscriptionJob(notes: notes, transcriber: observingTranscriber, analyzer: analyzer,
                                    checkpoints: checkpoints, provenance: provenance,
-                                   host: StaticJobHost(identifySpeakers: engine == .parakeet, voices: []),
+                                   host: longHost,
                                    clock: SystemClock(), budget: budget)
         let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
                                     stop: StopSignal()) { _ in }
         let stopToPublished = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - stopStart) / 1_000_000_000.0
         let postStopSnap = postStopMonitor.finish()
         XCTAssertEqual(outcome, JobOutcome.done)
+
+        let finalRequest = capturedRequest.withLock { $0 }
+        let resumeFailures = Self.validateLongRunCheckpointResume(engine: engine, request: finalRequest)
+        XCTAssertEqual(resumeFailures, [], "30-min post-Stop job must resume from recording-time checkpoint rather than restarting from 0")
 
         // Inspect hardware mic CAF for dropped frames / continuity (outside the Stop-to-published timer).
         var micFrames: Int64 = 0
@@ -1328,12 +1388,26 @@ final class HandsetQualificationTests: XCTestCase {
         let saved = try XCTUnwrap(stored)
         let wordCount = Self.extractComparableWords(from: saved.transcript, includeSpeaker: false).count
         XCTAssertGreaterThan(wordCount, 0)
+        if engine == .parakeet {
+            let speakerFailures = Self.validateLongRunParakeetSpeakers(
+                speakerAnalysisFailure: saved.speakerAnalysisFailure,
+                analysis: longHost.recordedAnalysis,
+                totalDurationSeconds: Double(totalSeconds)
+            )
+            XCTAssertEqual(speakerFailures, [], "30-min Parakeet Sortformer must remain healthy through the end of the recording")
+        }
+
+        let resumedFromMs: Int64 = switch engine {
+        case .parakeet: finalRequest?.resume?.recognition.doneMs ?? 0
+        case .whistle: Int64(finalRequest?.whistleResume?.processedSamples ?? 0) * 1000 / 16_000
+        }
 
         let report: [String: Any] = [
             "test": "runThirtyMinuteContinuousCapture",
             "engine": engine.rawValue,
             "audioSeconds": totalSeconds,
             "precomputeCheckpointsSaved": precomputeCheckpointsSaved,
+            "postStopResumedFromMs": resumedFromMs,
             "stopToPublishedSeconds": stopToPublished,
             "wordCount": wordCount,
             "micStarted": micStarted,
@@ -2160,6 +2234,52 @@ final class HandsetQualificationTests: XCTestCase {
         }
     }
 
+    private static func validateLongRunCheckpointResume(
+        engine: LongEngine,
+        request: TranscriptionRequest?
+    ) -> [String] {
+        guard let request else {
+            return ["Post-Stop TranscriptionJob never invoked transcriber for \(engine.rawValue)"]
+        }
+        switch engine {
+        case .parakeet:
+            guard let resume = request.resume, resume.recognition.doneMs > 0 else {
+                return ["30-min Parakeet post-Stop job discarded recording-time checkpoint (resume.doneMs == \(request.resume?.recognition.doneMs ?? 0))"]
+            }
+            return []
+        case .whistle:
+            guard let wResume = request.whistleResume, wResume.processedSamples > 0 else {
+                return ["30-min Whistle post-Stop job discarded recording-time checkpoint (whistleResume.processedSamples == \(request.whistleResume?.processedSamples ?? 0))"]
+            }
+            return []
+        }
+    }
+
+    private static func validateLongRunParakeetSpeakers(
+        speakerAnalysisFailure: JobFailure?,
+        analysis: SpeakerAnalysis?,
+        totalDurationSeconds: Double
+    ) -> [String] {
+        var failures: [String] = []
+        if let failure = speakerAnalysisFailure {
+            failures.append("30-min Parakeet speakerAnalysisFailure must be nil (got \(failure))")
+        }
+        guard let analysis, !analysis.turns.isEmpty else {
+            failures.append("30-min Parakeet Sortformer produced no speaker turns")
+            return failures
+        }
+        let lateThreshold = totalDurationSeconds * 0.8
+        let lateTurns = analysis.turns.filter { $0.end >= lateThreshold }
+        let distinctLateSpeakers = Set(lateTurns.map { canonicalSpeakerSlot($0.speakerID) })
+        if distinctLateSpeakers.count < 2 {
+            let maxEnd = analysis.turns.map(\.end).max() ?? 0
+            failures.append(
+                "30-min Parakeet Sortformer must produce >= 2 distinct speakers in the final 20% (>= \(Int(lateThreshold))s); got \(distinctLateSpeakers.count) (maxTurnEnd=\(String(format: "%.1f", maxEnd))s)"
+            )
+        }
+        return failures
+    }
+
     private static func validateContinuousMicCapture(
         recordedDurationSeconds: Double,
         monotonicElapsedSeconds: Double,
@@ -2639,6 +2759,23 @@ final class HandsetQualificationTests: XCTestCase {
         }
     }
 
+    private final class LongRunJobHost: TranscriptionJobHost, @unchecked Sendable {
+        let identifySpeakers: Bool
+        private let analysisStorage = Mutex<SpeakerAnalysis?>(nil)
+        var recordedAnalysis: SpeakerAnalysis? { analysisStorage.withLock { $0 } }
+
+        init(identifySpeakers: Bool) { self.identifySpeakers = identifySpeakers }
+
+        func jobSettings() async -> JobSettings {
+            JobSettings(allowSpeechDownload: false, identifySpeakers: identifySpeakers, allowSpeakerDownload: false,
+                        voicesGeneration: 0, automaticallyNameVoices: false)
+        }
+        func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] { { [] } }
+        func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {
+            analysisStorage.withLock { $0 = analysis }
+        }
+    }
+
     private struct StaticJobHost: TranscriptionJobHost {
         let identifySpeakers: Bool
         let voices: [SavedVoice]
@@ -2693,13 +2830,16 @@ final class HandsetQualificationTests: XCTestCase {
 
     private struct CountingTranscriber: Transcribing {
         let inner: any Transcribing
+        let onRequest: @Sendable (TranscriptionRequest) -> Void
         let onWindow: @Sendable () -> Void
         let onSegment: @Sendable (Int) -> Void
 
         init(inner: any Transcribing,
+             onRequest: @escaping @Sendable (TranscriptionRequest) -> Void = { _ in },
              onWindow: @escaping @Sendable () -> Void = {},
              onSegment: @escaping @Sendable (Int) -> Void = { _ in }) {
             self.inner = inner
+            self.onRequest = onRequest
             self.onWindow = onWindow
             self.onSegment = onSegment
         }
@@ -2719,7 +2859,8 @@ final class HandsetQualificationTests: XCTestCase {
         func runLanguage(requested: String) async -> String? { await inner.runLanguage(requested: requested) }
         func transcribe(_ request: TranscriptionRequest,
                         events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
-            try await inner.transcribe(request) { event in
+            onRequest(request)
+            return try await inner.transcribe(request) { event in
                 switch event {
                 case .window:
                     onWindow()

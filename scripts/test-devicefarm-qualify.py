@@ -230,7 +230,7 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
 
     def test_resolve_run_output_dir_rejects_path_traversal(self) -> None:
         base_out = ROOT / "DerivedData.noindex/devicefarm-out"
-        for bad_name in ("../escape", "/tmp/escape", "a/b", "a\\b", "..", ".", ""):
+        for bad_name in ("../escape", "/tmp/escape", "a/b", "a\\b", "..", ".", "", "ok\n"):
             with self.assertRaises(SystemExit, msg=f"Expected rejection for --name {bad_name!r}"):
                 MOD.resolve_run_output_dir(base_out, bad_name)
 

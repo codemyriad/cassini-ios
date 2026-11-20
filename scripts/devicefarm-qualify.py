@@ -201,6 +201,7 @@ KNOWN_TEST_METHODS = frozenset({
     "testCanonicalSpeakerSlotAndVoiceMapComparison",
     "testPairedEvaluationRejectsSwappedVoicesAndProvenanceMismatch",
     "testGateImmediateTimeoutDoesNotHang",
+    "testLongRunValidatorsRejectDiscardedCheckpointAndEarlyDiarizerFailure",
     "testContinuousCaptureContinuityRejectsEarlyPause",
     "test01RealCAFLiveReaderAndInterruptionLifecycle",
     "test02PairedEquivalenceAnd5MinMetrics",
@@ -208,12 +209,12 @@ KNOWN_TEST_METHODS = frozenset({
     "test04ThirtyMinuteContinuousWhistle",
 })
 
-SAFE_RUN_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+SAFE_RUN_NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def resolve_run_output_dir(base_out: Path, name: str) -> Path:
     """Validate --name as a safe single path component and ensure out_dir stays inside base_out."""
-    if not name or name in (".", "..") or not SAFE_RUN_NAME_RE.match(name) or ".." in name:
+    if not name or name in (".", "..") or not SAFE_RUN_NAME_RE.fullmatch(name) or ".." in name:
         raise SystemExit(
             f"Invalid --name {name!r}: must be a single safe path component matching [A-Za-z0-9._-]+ without '..'."
         )
