@@ -30,17 +30,18 @@ Audio: 300 s 48 kHz mono PCM16LE 3-speaker real speech (bundled `WhistleTests/jf
 | Handset (OS) | Engine | Mode | Transcription-Job Latency (s, post-`precomputer.stop`) | Speedup | Post-Stop Units | Words / Speakers / Matched Voices | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Peak Thermal | CPU Time (s) | Equivalence |
 | --- | --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- | ---: | --- |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | `recordOnly` | control | 0.03 | — | 0 | 0 / 0 / — | 113.8 | 2,039.8 | 0 | `nominal` | 0.01 | N/A |
-| **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer + CAM++** | `afterStop` | **75.10** | 1.00× | 5 windows | 571 / 3 / `Alice, Carla` | 1,299.8 | 798.2 | 0 | `nominal` | 126.76 | baseline |
-| **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer + CAM++** | `transcribeWhileRecording` | **31.53** | **2.38×** | **2 windows** | 571 / 3 / `Alice, Carla` | 1,299.8 | 855.9 (pre) / 1,180.7 (post) | 0 | `nominal` | 100.50 + 40.63 (+11.3%) | **PASS** |
+| **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer + CAM++** | `afterStop` | **75.10** | 1.00× | 5 checkpoints† | 571 / 3 / `Alice, Carla` | 1,299.8 | 798.2 | 0 | `nominal` | 126.76 | baseline |
+| **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer + CAM++** | `transcribeWhileRecording` | **31.53** | **2.38×** | **2 checkpoints†** | 571 / 3 / `Alice, Carla` | 1,299.8 | 855.9 (pre) / 1,180.7 (post) | 0 | `nominal` | 100.50 + 40.63 (+11.3%) | **PASS** |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | **Whistle** | `afterStop` | **35.39** | 1.00× | 86 segments | 576 / — / — | 1,299.8* | 1,796.6 | 0 | `nominal` | 52.96 | baseline |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | **Whistle** | `transcribeWhileRecording` | **17.81** | **1.99×** | **5 segments** | 576 / — / — | 1,299.8* | 1,754.3 (pre) / 1,798.7 (post) | 0 | `nominal` | 39.60 + 18.74 (+10.2%) | **PASS** |
 | **iPhone 14 Pro** (iOS 27.0, 6 GB) | `recordOnly` | control | 0.01 | — | 0 | 0 / 0 / — | 510.8 | 2,904.5 | 0 | `nominal` | 0.01 | N/A |
-| **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Parakeet + Sortformer + CAM++** | `afterStop` | **36.60** | 1.00× | 4 windows | 571 / 3 / `Alice, Carla` | 1,413.3 | 1,658.7 | 0 | `nominal` | 62.35 | baseline |
-| **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Parakeet + Sortformer + CAM++** | `transcribeWhileRecording` | **19.03** | **1.92×** | **2 windows** | 571 / 3 / `Alice, Carla` | 1,413.3 | 1,817.9 (pre) / 2,370.2 (post) | 0 | `nominal` | 62.66 + 24.77 (+40.2%) | **PASS** |
+| **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Parakeet + Sortformer + CAM++** | `afterStop` | **36.60** | 1.00× | 4 checkpoints† | 571 / 3 / `Alice, Carla` | 1,413.3 | 1,658.7 | 0 | `nominal` | 62.35 | baseline |
+| **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Parakeet + Sortformer + CAM++** | `transcribeWhileRecording` | **19.03** | **1.92×** | **2 checkpoints†** | 571 / 3 / `Alice, Carla` | 1,413.3 | 1,817.9 (pre) / 2,370.2 (post) | 0 | `nominal` | 62.66 + 24.77 (+40.2%) | **PASS** |
 | **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Whistle** | `afterStop` | **20.05** | 1.00× | 86 segments | 576 / — / — | 1,413.3* | 2,935.9 | 0 | `nominal` | 29.73 | baseline |
 | **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Whistle** | `transcribeWhileRecording` | **11.26** | **1.78×** | **5 segments** | 576 / — / — | 1,413.3* | 2,890.9 (pre) / 2,913.9 (post) | 0 | `nominal` | 20.32 + 11.82 (+8.1%) | **PASS** |
 
 *\*`ledger_phys_footprint_peak` is a process-lifetime kernel high-water mark, so Whistle's process peak in the same `test02` process reflects Parakeet's earlier peak; see Section 2.2 for standalone Whistle peak (`257.0 MiB` recording / `415.8 MiB` post-Stop).*
+*†Historical Parakeet `Post-Stop Units` in this table were recorded as `.checkpointed` writes (which are time-throttled plus a completion write); `HandsetQualificationTests` has since been updated to count `TranscriptionEvent.window` decodes directly.*
 
 ### 2.2 30-minute (1,800 s) Continuous Real-Time Recording Qualification
 

@@ -738,6 +738,8 @@ final class HandsetQualificationTests: XCTestCase {
                            "Identical-CAF Parakeet control speaker turns must cover all 3 distinct fixture speakers")
             XCTAssertEqual(parakeetCafControl.matchedVoiceNames, ["Alice", "Carla"],
                            "Identical-CAF Parakeet control must match the expected CAM++ saved voices (Alice, Carla)")
+            XCTAssertEqual(parakeetCafControl.matchedVoicesBySpeaker.count, 2,
+                           "Identical-CAF Parakeet control must bind both matched voices to distinct speakers")
 
             // Production end-to-end equivalence (M4A afterStop vs CAF transcribeWhileRecording).
             let parakeetProductionWER = Self.wordErrorRate(reference: parakeetBaseline.words, hypothesis: parakeetHeadStart.words)
@@ -751,8 +753,10 @@ final class HandsetQualificationTests: XCTestCase {
             // Strict identical-audio checkpoint equivalence (D109 §1.3: zero drift from CAF prefix resume).
             XCTAssertEqual(parakeetHeadStart.opusSha256, parakeetCafControl.opusSha256, "Identical-CAF Parakeet .opus payload must match")
             XCTAssertEqual(parakeetHeadStart.words, parakeetCafControl.words, "Identical-CAF Parakeet words & timings must match")
-            XCTAssertEqual(parakeetHeadStart.speakerTurns, parakeetCafControl.speakerTurns, "Identical-CAF Parakeet Sortformer speaker turns must match")
+            XCTAssertEqual(parakeetHeadStart.speakerTurns, parakeetCafControl.speakerTurns, "Identical-CAF Parakeet raw Sortformer turns must match")
             XCTAssertEqual(parakeetHeadStart.matchedVoiceNames, parakeetCafControl.matchedVoiceNames, "Identical-CAF Parakeet CAM++ saved-voice matches must match")
+            XCTAssertEqual(parakeetHeadStart.matchedVoicesBySpeaker, parakeetCafControl.matchedVoicesBySpeaker,
+                           "Identical-CAF Parakeet CAM++ speakerID -> voiceName assignments must match")
             XCTAssertGreaterThan(parakeetHeadStart.precomputeCheckpointsSaved, 0)
             XCTAssertLessThan(parakeetHeadStart.postStopWindowsDecoded, parakeetBaseline.postStopWindowsDecoded,
                               "Head-start must decode fewer post-Stop windows than afterStop")
@@ -770,6 +774,8 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertEqual(parakeetPressure.words, parakeetCafControl.words, "Parakeet pressure-yield tail recovery must match identical-CAF afterStop")
             XCTAssertEqual(parakeetPressure.speakerTurns, parakeetCafControl.speakerTurns)
             XCTAssertEqual(parakeetPressure.matchedVoiceNames, parakeetCafControl.matchedVoiceNames)
+            XCTAssertEqual(parakeetPressure.matchedVoicesBySpeaker, parakeetCafControl.matchedVoicesBySpeaker,
+                           "Parakeet pressure-yield CAM++ speakerID -> voiceName assignments must match identical-CAF afterStop")
 
             report["parakeet"] = [
                 "equivalencePassed": true,
@@ -1123,6 +1129,7 @@ final class HandsetQualificationTests: XCTestCase {
         let speakerTurns: [ComparableTurn]
         let speakerCount: Int
         let matchedVoiceNames: [String]
+        let matchedVoicesBySpeaker: [String: String]
         let precomputeCheckpointsSaved: Int
         let postStopWindowsDecoded: Int
         let postStopSegmentsDecoded: Int
@@ -1324,7 +1331,11 @@ final class HandsetQualificationTests: XCTestCase {
         let postStopWindows = Mutex(0)
         let host = MatchingJobHost(notes: notes, voices: enrolledVoices)
         let transcriber = ParakeetTranscriber(models: parakeetModels, runtime: SherpaRuntime.speech)
-        let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
+        let countingTranscriber = CountingTranscriber(
+            inner: transcriber,
+            onWindow: { postStopWindows.withLock { $0 += 1 } }
+        )
+        let job = TranscriptionJob(notes: notes, transcriber: countingTranscriber, analyzer: analyzer,
                                    checkpoints: checkpoints, provenance: provenance, host: host,
                                    clock: clock, budget: budget)
 
@@ -1335,9 +1346,7 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertEqual(handoff.handedOff, [noteID])
 
         let outcome = await job.run(Job(noteID: noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
-                                    stop: StopSignal()) { event in
-            if case .checkpointed = event { postStopWindows.withLock { $0 += 1 } }
-        }
+                                    stop: StopSignal()) { _ in }
         let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
         let postSnap = postMon.finish()
         XCTAssertEqual(outcome, JobOutcome.done)
@@ -1360,9 +1369,12 @@ final class HandsetQualificationTests: XCTestCase {
         let words = saved.transcript.flatMap { seg in
             seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: seg.speaker) }
         }
-        let turns = saved.transcript.compactMap { seg -> ComparableTurn? in
-            guard let spk = seg.speaker else { return nil }
-            return ComparableTurn(speaker: spk, startMs: Int64((seg.start * 1000).rounded()), endMs: Int64((seg.end * 1000).rounded()))
+        let turns = host.recordedTurns.map { turn in
+            ComparableTurn(
+                speaker: turn.speakerID,
+                startMs: Int64((turn.start * 1000).rounded()),
+                endMs: Int64((turn.end * 1000).rounded())
+            )
         }
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
@@ -1373,6 +1385,7 @@ final class HandsetQualificationTests: XCTestCase {
             speakerTurns: turns,
             speakerCount: saved.speakers?.count ?? 0,
             matchedVoiceNames: host.matchedNames.sorted(),
+            matchedVoicesBySpeaker: host.matchedVoicesBySpeaker,
             precomputeCheckpointsSaved: precomputeSaved,
             postStopWindowsDecoded: postStopWindows.withLock { $0 },
             postStopSegmentsDecoded: 0,
@@ -1536,6 +1549,7 @@ final class HandsetQualificationTests: XCTestCase {
             speakerTurns: [],
             speakerCount: 0,
             matchedVoiceNames: [],
+            matchedVoicesBySpeaker: [:],
             precomputeCheckpointsSaved: precomputeSaved,
             postStopWindowsDecoded: 0,
             postStopSegmentsDecoded: postStopSegs.withLock { $0 },
@@ -2037,7 +2051,11 @@ final class HandsetQualificationTests: XCTestCase {
         let notes: NoteStore
         let voices: [SavedVoice]
         private let matched = Mutex<[String]>([])
+        private let matchedBySpeakerStorage = Mutex<[String: String]>([:])
+        private let turnsStorage = Mutex<[SpeakerTurn]>([])
         var matchedNames: [String] { matched.withLock { $0 } }
+        var matchedVoicesBySpeaker: [String: String] { matchedBySpeakerStorage.withLock { $0 } }
+        var recordedTurns: [SpeakerTurn] { turnsStorage.withLock { $0 } }
 
         init(notes: NoteStore, voices: [SavedVoice]) {
             self.notes = notes
@@ -2052,11 +2070,18 @@ final class HandsetQualificationTests: XCTestCase {
         func liveVoices(generation: Int) async -> @Sendable () -> [SavedVoice] { { [voices] in voices } }
 
         func applySpeakers(_ analysis: SpeakerAnalysis, to noteID: UUID, generation: Int) async throws {
+            turnsStorage.withLock { $0 = analysis.turns }
             guard var note = await notes.note(noteID) else { return }
             let matching = AnalysisMatches.of(note, turns: analysis.turns, prints: analysis.prints,
                                               savedVoices: voices, earlierPrints: [], trashed: [], excluded: [:])
-            let names = matching.matches.values.compactMap { m in voices.first { $0.id == m.voiceID }?.name }
-            matched.withLock { $0 = names }
+            var bySpeaker: [String: String] = [:]
+            for (speakerID, match) in matching.matches {
+                if let name = voices.first(where: { $0.id == match.voiceID })?.name {
+                    bySpeaker[speakerID] = name
+                }
+            }
+            matchedBySpeakerStorage.withLock { $0 = bySpeaker }
+            matched.withLock { $0 = Array(bySpeaker.values) }
             matching.apply(to: &note, turns: analysis.turns, autoName: true, stamp: VersionStamp(date: Date()),
                            attributed: analysis.transcript, excluded: [:], labels: [:], colourIndices: [:], explicitNames: [])
             try await notes.save(note)
@@ -2064,8 +2089,18 @@ final class HandsetQualificationTests: XCTestCase {
     }
 
     private struct CountingTranscriber: Transcribing {
-        let inner: WhistleTranscriber
+        let inner: any Transcribing
+        let onWindow: @Sendable () -> Void
         let onSegment: @Sendable (Int) -> Void
+
+        init(inner: any Transcribing,
+             onWindow: @escaping @Sendable () -> Void = {},
+             onSegment: @escaping @Sendable (Int) -> Void = { _ in }) {
+            self.inner = inner
+            self.onWindow = onWindow
+            self.onSegment = onSegment
+        }
+
         var recognizer: SpeechRecognizer { inner.recognizer }
         var assetInstallBytes: Int64 { inner.assetInstallBytes }
         func forJob(recognizer: String?) throws -> any Transcribing { self }
@@ -2082,8 +2117,13 @@ final class HandsetQualificationTests: XCTestCase {
         func transcribe(_ request: TranscriptionRequest,
                         events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
             try await inner.transcribe(request) { event in
-                if case .whistleBatch(let batch) = event, !batch.segments.isEmpty {
+                switch event {
+                case .window:
+                    onWindow()
+                case .whistleBatch(let batch) where !batch.segments.isEmpty:
                     onSegment(batch.segments.count)
+                default:
+                    break
                 }
                 events(event)
             }
