@@ -25,6 +25,8 @@ Empirical physical-handset qualification of `transcribeWhileRecording` vs. `afte
 
 Audio: 300 s 48 kHz mono PCM16LE 3-speaker real speech (bundled `WhistleTests/jfk.wav` at 1.00×, 0.86×, 1.16× pitch/rate profiles with 0.6 s silence gaps). Saved-voice store populated with **3 real CAM++-enrolled voices** (`Alice`, `Bruno`, `Carla`).
 
+*Note: The empirical table below was captured from the identical-CAF paired qualification pass (verifying `D109` §1.3 zero-drift checkpoint resume). Following cross-model review, `HandsetQualificationTests` was updated to also drive both modes through production `RecordingController.finishAudio` (`afterStop` → `audio.m4a` vs. `transcribeWhileRecording` → `capture.caf`) and `PortableExportService.export` (`.opus` `CassiniDocument` verification), verified in the always-on contract test.*
+
 | Handset (OS) | Engine | Mode | Stop-to-Published (s) | Speedup | Post-Stop Units | Words / Speakers / Matched Voices | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Peak Thermal | CPU Time (s) | Equivalence |
 | --- | --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- | ---: | --- |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | `recordOnly` | control | 0.03 | — | 0 | 0 / 0 / — | 113.8 | 2,039.8 | 0 | `nominal` | 0.01 | N/A |

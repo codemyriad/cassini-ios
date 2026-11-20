@@ -33,9 +33,26 @@ def run(cmd: list[str], cwd: Path = ROOT) -> None:
     subprocess.run(cmd, cwd=cwd, check=True)
 
 
-def check_budget(df) -> float:
-    now = dt.datetime.now(dt.timezone.utc)
-    runs = df.list_runs(arn=PROJECT_ARN)["runs"]
+def _paginate(fn, key: str, **kwargs) -> list[dict]:
+    items: list[dict] = []
+    next_token: str | None = None
+    seen_tokens: set[str] = set()
+    while True:
+        call_kwargs = dict(kwargs)
+        if next_token is not None:
+            call_kwargs["nextToken"] = next_token
+        resp = fn(**call_kwargs)
+        items.extend(resp.get(key, []))
+        next_token = resp.get("nextToken")
+        if not next_token or next_token in seen_tokens:
+            break
+        seen_tokens.add(next_token)
+    return items
+
+
+def check_budget(df, now: dt.datetime | None = None) -> float:
+    now = now or dt.datetime.now(dt.timezone.utc)
+    runs = _paginate(df.list_runs, "runs", arn=PROJECT_ARN)
     metered = sum(
         (r.get("deviceMinutes", {}).get("metered", 0.0) or 0.0)
         for r in runs
@@ -115,7 +132,7 @@ def upload_file(df, path: Path, upload_type: str) -> str:
 
 
 def ensure_device_pool(df, name: str, device_arn: str) -> str:
-    for pool in df.list_device_pools(arn=PROJECT_ARN, type="PRIVATE")["devicePools"]:
+    for pool in _paginate(df.list_device_pools, "devicePools", arn=PROJECT_ARN, type="PRIVATE"):
         if pool["name"] == name:
             return pool["arn"]
     return df.create_device_pool(
@@ -128,11 +145,11 @@ def ensure_device_pool(df, name: str, device_arn: str) -> str:
 def extract_reports(df, run_arn: str, out_dir: Path) -> list[dict]:
     reports = []
     out_dir.mkdir(parents=True, exist_ok=True)
-    for job in df.list_jobs(arn=run_arn)["jobs"]:
-        for suite in df.list_suites(arn=job["arn"])["suites"]:
-            for test in df.list_tests(arn=suite["arn"])["tests"]:
+    for job in _paginate(df.list_jobs, "jobs", arn=run_arn):
+        for suite in _paginate(df.list_suites, "suites", arn=job["arn"]):
+            for test in _paginate(df.list_tests, "tests", arn=suite["arn"]):
                 for art_type in ("LOG", "FILE"):
-                    for art in df.list_artifacts(arn=test["arn"], type=art_type)["artifacts"]:
+                    for art in _paginate(df.list_artifacts, "artifacts", arn=test["arn"], type=art_type):
                         if art["name"] in ("Automation Output", "Application Output") or art["extension"] in ("log", "txt", "json"):
                             body = urllib.request.urlopen(art["url"], timeout=120).read().decode("utf-8", errors="replace")
                             safe = f"{suite['name']}-{test['name']}-{art['name']}".replace("/", "_")

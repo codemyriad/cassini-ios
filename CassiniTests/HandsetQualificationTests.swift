@@ -286,7 +286,7 @@ final class HandsetQualificationTests: XCTestCase {
             object: AVAudioSession.sharedInstance(),
             userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
         )
-        try await adapter.resume()
+        try adapter.resume()
         NotificationCenter.default.post(
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
@@ -302,6 +302,26 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertTrue(PrecomputePressure(isAppActive: { false }, thermalState: { .nominal }, availableMemory: { 2 << 30 }).shouldYield())
         XCTAssertTrue(PrecomputePressure(isAppActive: { true }, thermalState: { .nominal }, availableMemory: { 50 << 20 }).shouldYield(minMemoryBytes: ParakeetMemory.beforeWindowBytes))
         XCTAssertFalse(PrecomputePressure(isAppActive: { true }, thermalState: { .nominal }, availableMemory: { 2 << 30 }).shouldYield(minMemoryBytes: ParakeetMemory.beforeWindowBytes))
+
+        // 5. Production RecordingController finalization (afterStop -> M4A vs transcribeWhileRecording -> CAF)
+        //    and PortableExportService export produce verified CassiniDocuments with matching decoded audio duration.
+        let afterStopProd = try await runProductionFinalizationAndExportContract(
+            root: dir.appendingPathComponent("prod-afterStop", isDirectory: true),
+            pcm: pcm,
+            mode: .afterStop,
+            hasPrecomputeCheckpoint: false
+        )
+        let headStartProd = try await runProductionFinalizationAndExportContract(
+            root: dir.appendingPathComponent("prod-headStart", isDirectory: true),
+            pcm: pcm,
+            mode: .transcribeWhileRecording,
+            hasPrecomputeCheckpoint: true
+        )
+        XCTAssertEqual(afterStopProd.audioFilename, RecordingController.compressedFilename)
+        XCTAssertEqual(headStartProd.audioFilename, RecordingController.captureFilename)
+        XCTAssertTrue(afterStopProd.exportVerified)
+        XCTAssertTrue(headStartProd.exportVerified)
+        XCTAssertLessThan(abs(afterStopProd.exportedDurationSeconds - headStartProd.exportedDurationSeconds), 0.15)
     }
 
     // MARK: - Opt-in Physical Handset Test 1: Real AVAudioRecorder + LiveCAFReader + Interruption Lifecycle
@@ -377,13 +397,13 @@ final class HandsetQualificationTests: XCTestCase {
                 }
             }
             lifecycleAdapter.pause()
-            try await lifecycleAdapter.resume()
+            try lifecycleAdapter.resume()
             NotificationCenter.default.post(
                 name: AVAudioSession.interruptionNotification,
                 object: AVAudioSession.sharedInstance(),
                 userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
             )
-            try await lifecycleAdapter.resume()
+            try lifecycleAdapter.resume()
             NotificationCenter.default.post(
                 name: AVAudioSession.routeChangeNotification,
                 object: AVAudioSession.sharedInstance(),
@@ -417,41 +437,39 @@ final class HandsetQualificationTests: XCTestCase {
             return
         }
 
-        // Record for 4 seconds, sample LiveCAFReader while AVAudioRecorder is actively writing.
-        try await Task.sleep(for: .seconds(4))
-        let liveReader = try LiveCAFReader(url: cafURL)
-        let safeFrames1 = try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
-        XCTAssertGreaterThan(safeFrames1, 48_000, "AVAudioRecorder must flush >= 1 s of PCM16LE frames to capture.caf while live")
+        // Start event-gated observer immediately after hardware capture begins (zero fixed sleeps).
+        let eventGate = CaptureEventGate(stream: adapter.events)
+        defer { eventGate.cancel() }
+
+        // Wait until AVAudioRecorder flushes >= 1 s of PCM16LE frames to capture.caf while live.
+        let liveReader = try await waitForLiveCAFReader(at: cafURL, timeout: .seconds(15))
+        let safeFrames1 = try await waitForCAFSafeFrames(
+            reader: liveReader,
+            atLeast: 48_000,
+            timeout: .seconds(15),
+            description: "initial AVAudioRecorder live CAF flush (>= 1 s)"
+        )
         let liveSha1 = try liveReader.prefixSHA256(committedFrames: safeFrames1)
 
-        // Pause -> wait -> Resume lifecycle.
+        // Pause -> Resume lifecycle: verify resume()'s async session activation completes via CAF frame growth.
         adapter.pause()
-        let elapsedAtPause = adapter.elapsed
-        try await Task.sleep(for: .seconds(2))
-        let elapsedWhilePaused = adapter.elapsed
-        XCTAssertLessThan(abs(elapsedWhilePaused - elapsedAtPause), 0.25, "Paused AVAudioRecorder must not advance")
-        try await adapter.resume()
-        try await Task.sleep(for: .seconds(3))
+        let framesAtPause = try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+        try adapter.resume()
+        let framesAfterResume = try await waitForCAFSafeFrames(
+            reader: liveReader,
+            atLeast: framesAtPause + 48_000,
+            timeout: .seconds(15),
+            description: "CAF frame growth after pause -> resume"
+        )
 
         // Simulated incoming call audio interruption (began -> ended) + recovery.
-        let events = Mutex<[String]>([])
-        let watcher = Task {
-            for await ev in adapter.events {
-                switch ev {
-                case .interrupted: events.withLock { $0.append("interrupted") }
-                case .routeLost: events.withLock { $0.append("routeLost") }
-                case .failed: events.withLock { $0.append("failed") }
-                case .mediaReset: events.withLock { $0.append("mediaReset") }
-                case .level: break
-                }
-            }
-        }
+        // Await the observed .interrupted event before ending the interruption and resuming.
         NotificationCenter.default.post(
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
             userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
         )
-        try await Task.sleep(for: .milliseconds(300))
+        try await eventGate.waitFor("interrupted", count: 1, timeout: .seconds(15))
         NotificationCenter.default.post(
             name: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
@@ -460,21 +478,39 @@ final class HandsetQualificationTests: XCTestCase {
                 AVAudioSessionInterruptionOptionKey: AVAudioSession.InterruptionOptions.shouldResume.rawValue
             ]
         )
-        try await adapter.resume()
-        try await Task.sleep(for: .seconds(2))
+        let framesBeforeInterruptResume = max(
+            framesAfterResume,
+            try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+        )
+        try adapter.resume()
+        let framesAfterInterruptResume = try await waitForCAFSafeFrames(
+            reader: liveReader,
+            atLeast: framesBeforeInterruptResume + 24_000,
+            timeout: .seconds(15),
+            description: "CAF frame growth after interruption recovery resume"
+        )
 
         // Simulated Bluetooth headset disconnect (oldDeviceUnavailable) + recovery.
+        // Await the observed .routeLost event before resuming and verifying CAF frame growth.
         NotificationCenter.default.post(
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
             userInfo: [AVAudioSessionRouteChangeReasonKey: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue]
         )
-        try await Task.sleep(for: .milliseconds(300))
-        try await adapter.resume()
-        try await Task.sleep(for: .seconds(2))
+        try await eventGate.waitFor("routeLost", count: 1, timeout: .seconds(15))
+        let framesBeforeRouteResume = max(
+            framesAfterInterruptResume,
+            try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+        )
+        try adapter.resume()
+        let safeFrames2 = try await waitForCAFSafeFrames(
+            reader: liveReader,
+            atLeast: framesBeforeRouteResume + 24_000,
+            timeout: .seconds(15),
+            description: "CAF frame growth after route-loss recovery resume"
+        )
 
         // Capture second live prefix SHA-256 before Stop.
-        let safeFrames2 = try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
         XCTAssertGreaterThan(safeFrames2, safeFrames1)
         let liveSha2 = try liveReader.prefixSHA256(committedFrames: safeFrames2)
         liveReader.close()
@@ -482,7 +518,7 @@ final class HandsetQualificationTests: XCTestCase {
         // Finalize via AVAudioRecorder.stop() and compare prefix hashes + Opus publication.
         let finalElapsed = adapter.elapsed
         _ = try await adapter.stop()
-        watcher.cancel()
+        eventGate.cancel()
 
         let finalReader = try LiveCAFReader(url: cafURL)
         defer { finalReader.close() }
@@ -503,7 +539,7 @@ final class HandsetQualificationTests: XCTestCase {
         let opusBytes = try Data(contentsOf: opusURL)
         XCTAssertGreaterThan(opusBytes.count, 0)
 
-        let observedEvents = events.withLock { $0 }
+        let observedEvents = eventGate.observedEvents
         XCTAssertTrue(observedEvents.contains("interrupted"))
         XCTAssertTrue(observedEvents.contains("routeLost"))
         XCTAssertFalse(observedEvents.contains("failed"))
@@ -560,15 +596,26 @@ final class HandsetQualificationTests: XCTestCase {
             report["recordOnly"] = try Self.asDictionary(snap)
         }
 
-        // Parakeet + Sortformer + CAM++ paired run (afterStop vs transcribeWhileRecording + pressure injection).
+        // Parakeet + Sortformer + CAM++ paired run (production afterStop M4A, identical-CAF control,
+        // production transcribeWhileRecording CAF, and pressure injection).
         if config.runParakeet {
             let parakeetBaseline = try await runParakeetPairedLane(
-                root: workDir.appendingPathComponent("parakeet-afterStop", isDirectory: true),
+                root: workDir.appendingPathComponent("parakeet-afterStop-m4a", isDirectory: true),
                 modelsRoot: modelsRoot,
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: nil,
                 enrolledVoices: enrolledVoices,
-                injectPressureAtWindow: nil
+                injectPressureAtWindow: nil,
+                preserveCAFWithoutCheckpoint: false
+            )
+            let parakeetCafControl = try await runParakeetPairedLane(
+                root: workDir.appendingPathComponent("parakeet-afterStop-caf", isDirectory: true),
+                modelsRoot: modelsRoot,
+                fullPCM: speechPCM,
+                precomputePrefixSeconds: nil,
+                enrolledVoices: enrolledVoices,
+                injectPressureAtWindow: nil,
+                preserveCAFWithoutCheckpoint: true
             )
             let precomputeSeconds = max(60, config.shortSeconds - 15)
             let parakeetHeadStart = try await runParakeetPairedLane(
@@ -577,13 +624,33 @@ final class HandsetQualificationTests: XCTestCase {
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: precomputeSeconds,
                 enrolledVoices: enrolledVoices,
-                injectPressureAtWindow: nil
+                injectPressureAtWindow: nil,
+                preserveCAFWithoutCheckpoint: false
             )
-            // Strict equivalence checks.
-            XCTAssertEqual(parakeetHeadStart.opusSha256, parakeetBaseline.opusSha256, "Parakeet .opus payload must match")
-            XCTAssertEqual(parakeetHeadStart.words, parakeetBaseline.words, "Parakeet words & timings must match")
-            XCTAssertEqual(parakeetHeadStart.speakerTurns, parakeetBaseline.speakerTurns, "Parakeet Sortformer speaker turns must match")
-            XCTAssertEqual(parakeetHeadStart.matchedVoiceNames, parakeetBaseline.matchedVoiceNames, "Parakeet CAM++ saved-voice matches must match")
+            // Production finalization & PortableExportService verification.
+            XCTAssertEqual(parakeetBaseline.audioFilename, RecordingController.compressedFilename,
+                           "Production afterStop must finalize to audio.m4a via RecordingController.finishAudio")
+            XCTAssertEqual(parakeetHeadStart.audioFilename, RecordingController.captureFilename,
+                           "Production transcribeWhileRecording with checkpoint must preserve capture.caf")
+            XCTAssertTrue(parakeetBaseline.exportVerified, "Production afterStop PortableExportService .opus must verify .ok")
+            XCTAssertTrue(parakeetHeadStart.exportVerified, "Production transcribeWhileRecording PortableExportService .opus must verify .ok")
+            XCTAssertLessThan(abs(parakeetHeadStart.exportedDurationSeconds - parakeetBaseline.exportedDurationSeconds), 0.15,
+                              "Production afterStop (M4A->Opus) and transcribeWhileRecording (CAF->Opus) exported durations must match")
+
+            // Production end-to-end equivalence (M4A afterStop vs CAF transcribeWhileRecording).
+            let parakeetProductionWER = Self.wordErrorRate(reference: parakeetBaseline.words, hypothesis: parakeetHeadStart.words)
+            XCTAssertLessThanOrEqual(parakeetProductionWER, 0.02,
+                                     "Production Parakeet afterStop (M4A) vs transcribeWhileRecording (CAF) WER must be <= 2%")
+            XCTAssertEqual(parakeetHeadStart.speakerCount, parakeetBaseline.speakerCount,
+                           "Production Parakeet speaker count must match across M4A vs CAF finalization")
+            XCTAssertEqual(parakeetHeadStart.matchedVoiceNames, parakeetBaseline.matchedVoiceNames,
+                           "Production Parakeet CAM++ saved-voice matches must match across M4A vs CAF finalization")
+
+            // Strict identical-audio checkpoint equivalence (D109 §1.3: zero drift from CAF prefix resume).
+            XCTAssertEqual(parakeetHeadStart.opusSha256, parakeetCafControl.opusSha256, "Identical-CAF Parakeet .opus payload must match")
+            XCTAssertEqual(parakeetHeadStart.words, parakeetCafControl.words, "Identical-CAF Parakeet words & timings must match")
+            XCTAssertEqual(parakeetHeadStart.speakerTurns, parakeetCafControl.speakerTurns, "Identical-CAF Parakeet Sortformer speaker turns must match")
+            XCTAssertEqual(parakeetHeadStart.matchedVoiceNames, parakeetCafControl.matchedVoiceNames, "Identical-CAF Parakeet CAM++ saved-voice matches must match")
             XCTAssertGreaterThan(parakeetHeadStart.precomputeCheckpointsSaved, 0)
             XCTAssertLessThan(parakeetHeadStart.postStopWindowsDecoded, parakeetBaseline.postStopWindowsDecoded,
                               "Head-start must decode fewer post-Stop windows than afterStop")
@@ -595,14 +662,21 @@ final class HandsetQualificationTests: XCTestCase {
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: precomputeSeconds,
                 enrolledVoices: enrolledVoices,
-                injectPressureAtWindow: 2
+                injectPressureAtWindow: 2,
+                preserveCAFWithoutCheckpoint: false
             )
-            XCTAssertEqual(parakeetPressure.words, parakeetBaseline.words, "Parakeet pressure-yield tail recovery must match afterStop")
-            XCTAssertEqual(parakeetPressure.speakerTurns, parakeetBaseline.speakerTurns)
-            XCTAssertEqual(parakeetPressure.matchedVoiceNames, parakeetBaseline.matchedVoiceNames)
+            XCTAssertEqual(parakeetPressure.words, parakeetCafControl.words, "Parakeet pressure-yield tail recovery must match identical-CAF afterStop")
+            XCTAssertEqual(parakeetPressure.speakerTurns, parakeetCafControl.speakerTurns)
+            XCTAssertEqual(parakeetPressure.matchedVoiceNames, parakeetCafControl.matchedVoiceNames)
 
             report["parakeet"] = [
                 "equivalencePassed": true,
+                "productionFinalizationChecked": true,
+                "productionAfterStopAudioFilename": parakeetBaseline.audioFilename,
+                "productionHeadStartAudioFilename": parakeetHeadStart.audioFilename,
+                "productionM4aVsCafWER": parakeetProductionWER,
+                "productionM4aVsCafExactWords": (parakeetHeadStart.words == parakeetBaseline.words),
+                "productionM4aVsCafDurationDeltaSeconds": abs(parakeetHeadStart.exportedDurationSeconds - parakeetBaseline.exportedDurationSeconds),
                 "pressureRecoveryPassed": true,
                 "wordCount": parakeetBaseline.words.count,
                 "speakerCount": parakeetBaseline.speakerCount,
@@ -618,23 +692,46 @@ final class HandsetQualificationTests: XCTestCase {
             ] as [String: Any]
         }
 
-        // Whistle paired run (afterStop vs transcribeWhileRecording + pressure injection).
+        // Whistle paired run (production afterStop M4A, identical-CAF control,
+        // production transcribeWhileRecording CAF, and pressure injection).
         if config.runWhistle {
             let whistleBaseline = try await runWhistlePairedLane(
-                root: workDir.appendingPathComponent("whistle-afterStop", isDirectory: true),
+                root: workDir.appendingPathComponent("whistle-afterStop-m4a", isDirectory: true),
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: nil,
-                injectPressureAtCheckpoint: nil
+                injectPressureAtCheckpoint: nil,
+                preserveCAFWithoutCheckpoint: false
+            )
+            let whistleCafControl = try await runWhistlePairedLane(
+                root: workDir.appendingPathComponent("whistle-afterStop-caf", isDirectory: true),
+                fullPCM: speechPCM,
+                precomputePrefixSeconds: nil,
+                injectPressureAtCheckpoint: nil,
+                preserveCAFWithoutCheckpoint: true
             )
             let precomputeSeconds = max(60, config.shortSeconds - 15)
             let whistleHeadStart = try await runWhistlePairedLane(
                 root: workDir.appendingPathComponent("whistle-headStart", isDirectory: true),
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: precomputeSeconds,
-                injectPressureAtCheckpoint: nil
+                injectPressureAtCheckpoint: nil,
+                preserveCAFWithoutCheckpoint: false
             )
-            XCTAssertEqual(whistleHeadStart.opusSha256, whistleBaseline.opusSha256, "Whistle .opus payload must match")
-            XCTAssertEqual(whistleHeadStart.words, whistleBaseline.words, "Whistle words & timings must match")
+            XCTAssertEqual(whistleBaseline.audioFilename, RecordingController.compressedFilename,
+                           "Production afterStop must finalize to audio.m4a via RecordingController.finishAudio")
+            XCTAssertEqual(whistleHeadStart.audioFilename, RecordingController.captureFilename,
+                           "Production transcribeWhileRecording with checkpoint must preserve capture.caf")
+            XCTAssertTrue(whistleBaseline.exportVerified)
+            XCTAssertTrue(whistleHeadStart.exportVerified)
+            XCTAssertLessThan(abs(whistleHeadStart.exportedDurationSeconds - whistleBaseline.exportedDurationSeconds), 0.15)
+
+            let whistleProductionWER = Self.wordErrorRate(reference: whistleBaseline.words, hypothesis: whistleHeadStart.words)
+            XCTAssertLessThanOrEqual(whistleProductionWER, 0.02,
+                                     "Production Whistle afterStop (M4A) vs transcribeWhileRecording (CAF) WER must be <= 2%")
+
+            // Strict identical-audio checkpoint equivalence (D109 §1.3).
+            XCTAssertEqual(whistleHeadStart.opusSha256, whistleCafControl.opusSha256, "Identical-CAF Whistle .opus payload must match")
+            XCTAssertEqual(whistleHeadStart.words, whistleCafControl.words, "Identical-CAF Whistle words & timings must match")
             XCTAssertGreaterThan(whistleHeadStart.precomputeCheckpointsSaved, 0)
             XCTAssertLessThan(whistleHeadStart.postStopSegmentsDecoded, whistleBaseline.postStopSegmentsDecoded,
                               "Whistle head-start must decode fewer post-Stop segments than afterStop")
@@ -643,12 +740,19 @@ final class HandsetQualificationTests: XCTestCase {
                 root: workDir.appendingPathComponent("whistle-pressure", isDirectory: true),
                 fullPCM: speechPCM,
                 precomputePrefixSeconds: precomputeSeconds,
-                injectPressureAtCheckpoint: 3
+                injectPressureAtCheckpoint: 3,
+                preserveCAFWithoutCheckpoint: false
             )
-            XCTAssertEqual(whistlePressure.words, whistleBaseline.words, "Whistle pressure-yield tail recovery must match afterStop")
+            XCTAssertEqual(whistlePressure.words, whistleCafControl.words, "Whistle pressure-yield tail recovery must match identical-CAF afterStop")
 
             report["whistle"] = [
                 "equivalencePassed": true,
+                "productionFinalizationChecked": true,
+                "productionAfterStopAudioFilename": whistleBaseline.audioFilename,
+                "productionHeadStartAudioFilename": whistleHeadStart.audioFilename,
+                "productionM4aVsCafWER": whistleProductionWER,
+                "productionM4aVsCafExactWords": (whistleHeadStart.words == whistleBaseline.words),
+                "productionM4aVsCafDurationDeltaSeconds": abs(whistleHeadStart.exportedDurationSeconds - whistleBaseline.exportedDurationSeconds),
                 "pressureRecoveryPassed": true,
                 "wordCount": whistleBaseline.words.count,
                 "afterStopStopToPublishedSeconds": whistleBaseline.stopToPublishedSeconds,
@@ -834,7 +938,7 @@ final class HandsetQualificationTests: XCTestCase {
                                     stop: StopSignal()) { _ in }
         let stopToPublished = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - stopStart) / 1_000_000_000.0
         let postStopSnap = postStopMonitor.finish()
-        XCTAssertEqual(outcome, .done)
+        XCTAssertEqual(outcome, JobOutcome.done)
 
         let stored = await notes.note(note.id)
         let saved = try XCTUnwrap(stored)
@@ -877,6 +981,9 @@ final class HandsetQualificationTests: XCTestCase {
     }
 
     private struct PairedLaneResult {
+        let audioFilename: String
+        let exportVerified: Bool
+        let exportedDurationSeconds: Double
         let opusSha256: String
         let words: [ComparableWord]
         let speakerTurns: [ComparableTurn]
@@ -890,6 +997,73 @@ final class HandsetQualificationTests: XCTestCase {
         let precomputeTelemetry: TelemetrySnapshot?
     }
 
+    private struct ProductionExportContractResult {
+        let audioFilename: String
+        let exportVerified: Bool
+        let exportedDurationSeconds: Double
+    }
+
+    @MainActor
+    private func runProductionFinalizationAndExportContract(
+        root: URL,
+        pcm: Data,
+        mode: TranscriptionMode,
+        hasPrecomputeCheckpoint: Bool
+    ) async throws -> ProductionExportContractResult {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let notes = try NoteStore(root: root.appendingPathComponent("notes", isDirectory: true))
+        let provenance = ProvenanceFiles(notes: notes)
+        let recordingNotes = CountingRecordingNotes(store: notes)
+        let handoff = FakeRecordingHandoff()
+        let clock = FakeClock()
+        let suite = "io.codemyriad.cassini.qual.contract.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(defaults: defaults, clock: clock, defaultLanguage: "en-US")
+        settings.recordConsent()
+        settings.transcriptionMode = mode
+
+        let capture = QualFileCapture(prefixPCM: nil, fullPCM: pcm)
+        let precomputeStub: (any RecordingPrecomputing)? = hasPrecomputeCheckpoint ? StaticCheckpointPrecompute() : nil
+        let controller = RecordingController(parts: .init(
+            ready: {},
+            notes: recordingNotes,
+            capture: capture,
+            storage: UnlimitedStorage(),
+            audio: LocalAudioProcessing(),
+            settings: settings,
+            handoff: handoff,
+            consent: ModelConsent { _, _ in true },
+            clock: clock,
+            defaultTitle: { _ in "Qual Contract" },
+            precompute: precomputeStub
+        ))
+
+        XCTAssertTrue(controller.start())
+        let active = try await waitForActiveRecording(controller: controller, timeout: .seconds(15))
+        controller.finish()
+        await controller.settle()
+        XCTAssertEqual(handoff.handedOff, [active.noteID])
+
+        let fetchedSaved = await notes.note(active.noteID)
+        let saved = try XCTUnwrap(fetchedSaved)
+        let playableURL = notes.audioURL(for: saved)
+        let exportDir = root.appendingPathComponent("export", isDirectory: true)
+        let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
+        let exportedURL = try await exporter.export(saved, original: playableURL, playable: playableURL, into: exportDir, filename: "published")
+        let doc = CassiniDocument.read(exportedURL)
+        let decodedCAF = root.appendingPathComponent("decoded-export.caf")
+        try OpusAudio.decode(exportedURL, to: decodedCAF)
+        defer { try? FileManager.default.removeItem(at: decodedCAF) }
+        let decodedFile = try AVAudioFile(forReading: decodedCAF)
+        let decodedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
+        return ProductionExportContractResult(
+            audioFilename: saved.audioFilename,
+            exportVerified: doc.state == DocumentState.ok,
+            exportedDurationSeconds: decodedDuration
+        )
+    }
+
     @MainActor
     private func runParakeetPairedLane(
         root: URL,
@@ -897,15 +1071,11 @@ final class HandsetQualificationTests: XCTestCase {
         fullPCM: Data,
         precomputePrefixSeconds: Int?,
         enrolledVoices: [SavedVoice],
-        injectPressureAtWindow: Int?
+        injectPressureAtWindow: Int?,
+        preserveCAFWithoutCheckpoint: Bool
     ) async throws -> PairedLaneResult {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let notes = try NoteStore(root: root.appendingPathComponent("notes", isDirectory: true))
-        var note = Note(title: "Parakeet Paired", audioFilename: "capture.caf")
-        note.duration = Double(fullPCM.count / 2) / 48_000.0
-        try await notes.save(note)
-        let cafURL = notes.audioURL(for: note)
-
         let checkpoints = CheckpointFiles(notes: notes)
         let provenance = ProvenanceFiles(notes: notes)
         let budget = NativeBudget()
@@ -916,46 +1086,80 @@ final class HandsetQualificationTests: XCTestCase {
         let analyzer = SpeakerAnalyzer(models: speakerModels, runtime: SherpaRuntime.speakers)
         let parakeetModels = ParakeetTranscriber.Models(root: modelsRoot)
 
+        let recordingNotes = CountingRecordingNotes(store: notes)
+        let handoff = FakeRecordingHandoff()
+        let clock = FakeClock()
+        let suite = "io.codemyriad.cassini.qual.parakeet.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(defaults: defaults, clock: clock, defaultLanguage: "en-US")
+        settings.recordConsent()
+        settings.transcriptionMode = precomputePrefixSeconds == nil ? TranscriptionMode.afterStop : .transcribeWhileRecording
+
+        let prefixPCM: Data? = precomputePrefixSeconds.map { fullPCM.prefix(min(fullPCM.count, $0 * 48_000 * 2)) }
+        let fileCapture = QualFileCapture(prefixPCM: prefixPCM, fullPCM: fullPCM)
+        let audioProcessor: any AudioProcessing = preserveCAFWithoutCheckpoint ? NoCompressAudioProcessing() : LocalAudioProcessing()
+
         var precomputeSaved = 0
         var precomputeTelemetry: TelemetrySnapshot?
+        let savedCounter = Mutex(0)
+        let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
+        let memInjected = Mutex<Int64?>(nil)
+        let activeInjected = Mutex(true)
 
-        if let prefixSec = precomputePrefixSeconds {
-            let prefixBytes = min(fullPCM.count, prefixSec * 48_000 * 2)
-            try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM.prefix(prefixBytes), finalized: false)
-            let savedCounter = Mutex(0)
-            let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
-            let memInjected = Mutex<Int64?>(nil)
-            let activeInjected = Mutex(true)
-
-            let preMon = HandsetTelemetryMonitor.start()
-            let pre = CAFPrefixPrecomputer(
-                checkpoints: checkpoints,
-                budget: budget,
-                mode: { .transcribeWhileRecording },
-                engine: {
-                    .parakeet(.init(
-                        models: parakeetModels,
-                        runtime: SherpaRuntime.speech,
-                        speakerEngines: { await analyzer.streamingEngines() },
-                        identifySpeakers: { true },
-                        printsReady: { await analyzer.printsReady() }
-                    ))
-                },
-                pressure: PrecomputePressure(
-                    isAppActive: { activeInjected.withLock { $0 } },
-                    thermalState: { thermalInjected.withLock { $0 } },
-                    availableMemory: { memInjected.withLock { $0 } ?? TranscriptionJob.availableMemory() }
-                ),
-                onCheckpointSaved: { _, _ in
-                    let n = savedCounter.withLock { $0 += 1; return $0 }
-                    if let limit = injectPressureAtWindow, n >= limit {
-                        thermalInjected.withLock { $0 = .serious }
-                        memInjected.withLock { $0 = 10 << 20 }
-                        activeInjected.withLock { $0 = false }
-                    }
+        let precomputer: CAFPrefixPrecomputer? = precomputePrefixSeconds == nil ? nil : CAFPrefixPrecomputer(
+            checkpoints: checkpoints,
+            budget: budget,
+            mode: { .transcribeWhileRecording },
+            engine: {
+                .parakeet(.init(
+                    models: parakeetModels,
+                    runtime: SherpaRuntime.speech,
+                    speakerEngines: { await analyzer.streamingEngines() },
+                    identifySpeakers: { true },
+                    printsReady: { await analyzer.printsReady() }
+                ))
+            },
+            pressure: PrecomputePressure(
+                isAppActive: { activeInjected.withLock { $0 } },
+                thermalState: { thermalInjected.withLock { $0 } },
+                availableMemory: { memInjected.withLock { $0 } ?? TranscriptionJob.availableMemory() }
+            ),
+            onCheckpointSaved: { _, _ in
+                let n = savedCounter.withLock { $0 += 1; return $0 }
+                if let limit = injectPressureAtWindow, n >= limit {
+                    thermalInjected.withLock { $0 = .serious }
+                    memInjected.withLock { $0 = 10 << 20 }
+                    activeInjected.withLock { $0 = false }
                 }
-            )
-            await pre.runOnce(noteID: note.id, captureURL: cafURL)
+            }
+        )
+        let bridge: (any RecordingPrecomputing)? = precomputer.map(ControlledPrecomputeBridge.init)
+
+        let controller = RecordingController(parts: .init(
+            ready: {},
+            notes: recordingNotes,
+            capture: fileCapture,
+            storage: UnlimitedStorage(),
+            audio: audioProcessor,
+            settings: settings,
+            handoff: handoff,
+            consent: ModelConsent { _, _ in true },
+            clock: clock,
+            defaultTitle: { _ in "Parakeet Paired" },
+            precompute: bridge
+        ))
+
+        XCTAssertTrue(controller.start())
+        let active = try await waitForActiveRecording(controller: controller, timeout: .seconds(15))
+        let noteID = active.noteID
+        let fetchedActive = await notes.note(noteID)
+        let activeNote = try XCTUnwrap(fetchedActive)
+        let cafURL = notes.audioURL(for: activeNote)
+
+        if let precomputer {
+            let preMon = HandsetTelemetryMonitor.start()
+            await precomputer.runOnce(noteID: noteID, captureURL: cafURL)
             precomputeTelemetry = preMon.finish()
             precomputeSaved = savedCounter.withLock { $0 }
             if let limit = injectPressureAtWindow {
@@ -963,10 +1167,7 @@ final class HandsetQualificationTests: XCTestCase {
             }
         }
 
-        // Finalize CAF (exact Stop transition).
-        try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM, finalized: true)
-
-        // Post-Stop: Opus publish + TranscriptionJob (timed as Stop-to-published-transcript).
+        // Production Stop -> RecordingController.finishAudio -> TranscriptionJob -> PortableExportService.
         let postStopWindows = Mutex(0)
         let host = MatchingJobHost(notes: notes, voices: enrolledVoices)
         let transcriber = ParakeetTranscriber(models: parakeetModels, runtime: SherpaRuntime.speech)
@@ -976,21 +1177,31 @@ final class HandsetQualificationTests: XCTestCase {
 
         let postMon = HandsetTelemetryMonitor.start()
         let started = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
-        let opusURL = root.appendingPathComponent("published.opus")
-        try OpusAudio.encode(cafURL, to: opusURL)
-        let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
+        controller.finish()
+        await controller.settle()
+        XCTAssertEqual(handoff.handedOff, [noteID])
+
+        let outcome = await job.run(Job(noteID: noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
                                     stop: StopSignal()) { event in
             if case .checkpointed = event { postStopWindows.withLock { $0 += 1 } }
         }
-        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
-        let postSnap = postMon.finish()
         XCTAssertEqual(outcome, JobOutcome.done)
 
-        let stored = await notes.note(note.id)
-        let saved = try XCTUnwrap(stored)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest.
+        let fetchedSaved = await notes.note(noteID)
+        let saved = try XCTUnwrap(fetchedSaved)
+        let finalAudioURL = notes.audioURL(for: saved)
+        let exportDir = root.appendingPathComponent("export", isDirectory: true)
+        let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
+        let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
+        let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
+        let postSnap = postMon.finish()
+
+        let doc = CassiniDocument.read(opusURL)
+        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
         try OpusAudio.decode(opusURL, to: decodedOpusCAF)
+        let decodedFile = try AVAudioFile(forReading: decodedOpusCAF)
+        let exportedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
         let opusSha = SHA256.hash(data: try Data(contentsOf: decodedOpusCAF)).map { String(format: "%02x", $0) }.joined()
         try? FileManager.default.removeItem(at: decodedOpusCAF)
         let words = saved.transcript.flatMap { seg in
@@ -1001,6 +1212,9 @@ final class HandsetQualificationTests: XCTestCase {
             return ComparableTurn(speaker: spk, startMs: Int64((seg.start * 1000).rounded()), endMs: Int64((seg.end * 1000).rounded()))
         }
         return PairedLaneResult(
+            audioFilename: saved.audioFilename,
+            exportVerified: doc.state == DocumentState.ok,
+            exportedDurationSeconds: exportedDuration,
             opusSha256: opusSha,
             words: words,
             speakerTurns: turns,
@@ -1020,57 +1234,84 @@ final class HandsetQualificationTests: XCTestCase {
         root: URL,
         fullPCM: Data,
         precomputePrefixSeconds: Int?,
-        injectPressureAtCheckpoint: Int?
+        injectPressureAtCheckpoint: Int?,
+        preserveCAFWithoutCheckpoint: Bool
     ) async throws -> PairedLaneResult {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let notes = try NoteStore(root: root.appendingPathComponent("notes", isDirectory: true))
-        var note = Note(title: "Whistle Paired", audioFilename: "capture.caf")
-        note.duration = Double(fullPCM.count / 2) / 48_000.0
-        try await notes.save(note)
-        let cafURL = notes.audioURL(for: note)
-
         let checkpoints = CheckpointFiles(notes: notes)
         let provenance = ProvenanceFiles(notes: notes)
         let budget = NativeBudget()
         let cap = WhistleCapability(arm64: true, operatingSystemSupported: true, bundleVerified: true,
                                     pipelineAccepted: true, deviceAccepted: true)
 
+        let recordingNotes = CountingRecordingNotes(store: notes)
+        let handoff = FakeRecordingHandoff()
+        let clock = FakeClock()
+        let suite = "io.codemyriad.cassini.qual.whistle.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(defaults: defaults, clock: clock, defaultLanguage: "en-US")
+        settings.recordConsent()
+        settings.transcriptionMode = precomputePrefixSeconds == nil ? TranscriptionMode.afterStop : .transcribeWhileRecording
+
+        let prefixPCM: Data? = precomputePrefixSeconds.map { fullPCM.prefix(min(fullPCM.count, $0 * 48_000 * 2)) }
+        let fileCapture = QualFileCapture(prefixPCM: prefixPCM, fullPCM: fullPCM)
+        let audioProcessor: any AudioProcessing = preserveCAFWithoutCheckpoint ? NoCompressAudioProcessing() : LocalAudioProcessing()
+
         var precomputeSaved = 0
         var precomputeTelemetry: TelemetrySnapshot?
+        let savedCounter = Mutex(0)
+        let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
+        let activeInjected = Mutex(true)
 
-        if let prefixSec = precomputePrefixSeconds {
-            let prefixBytes = min(fullPCM.count, prefixSec * 48_000 * 2)
-            try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM.prefix(prefixBytes), finalized: false)
-            let savedCounter = Mutex(0)
-            let thermalInjected = Mutex(ProcessInfo.ThermalState.nominal)
-            let activeInjected = Mutex(true)
-
-            let preMon = HandsetTelemetryMonitor.start()
-            let pre = CAFPrefixPrecomputer(
-                checkpoints: checkpoints,
-                budget: budget,
-                mode: { .transcribeWhileRecording },
-                engine: { .whistle(.init(acceptance: { cap }, bundle: .main)) },
-                pressure: PrecomputePressure(
-                    isAppActive: { activeInjected.withLock { $0 } },
-                    thermalState: { thermalInjected.withLock { $0 } }
-                ),
-                onCheckpointSaved: { _, cp in
-                    guard !cp.segments.isEmpty else { return }
-                    let n = savedCounter.withLock { $0 += 1; return $0 }
-                    if let limit = injectPressureAtCheckpoint, n >= limit {
-                        thermalInjected.withLock { $0 = .serious }
-                        activeInjected.withLock { $0 = false }
-                    }
+        let precomputer: CAFPrefixPrecomputer? = precomputePrefixSeconds == nil ? nil : CAFPrefixPrecomputer(
+            checkpoints: checkpoints,
+            budget: budget,
+            mode: { .transcribeWhileRecording },
+            engine: { .whistle(.init(acceptance: { cap }, bundle: .main)) },
+            pressure: PrecomputePressure(
+                isAppActive: { activeInjected.withLock { $0 } },
+                thermalState: { thermalInjected.withLock { $0 } }
+            ),
+            onCheckpointSaved: { _, cp in
+                guard !cp.segments.isEmpty else { return }
+                let n = savedCounter.withLock { $0 += 1; return $0 }
+                if let limit = injectPressureAtCheckpoint, n >= limit {
+                    thermalInjected.withLock { $0 = .serious }
+                    activeInjected.withLock { $0 = false }
                 }
-            )
-            await pre.runOnce(noteID: note.id, captureURL: cafURL)
+            }
+        )
+        let bridge: (any RecordingPrecomputing)? = precomputer.map(ControlledPrecomputeBridge.init)
+
+        let controller = RecordingController(parts: .init(
+            ready: {},
+            notes: recordingNotes,
+            capture: fileCapture,
+            storage: UnlimitedStorage(),
+            audio: audioProcessor,
+            settings: settings,
+            handoff: handoff,
+            consent: ModelConsent { _, _ in true },
+            clock: clock,
+            defaultTitle: { _ in "Whistle Paired" },
+            precompute: bridge
+        ))
+
+        XCTAssertTrue(controller.start())
+        let active = try await waitForActiveRecording(controller: controller, timeout: .seconds(15))
+        let noteID = active.noteID
+        let fetchedActive = await notes.note(noteID)
+        let activeNote = try XCTUnwrap(fetchedActive)
+        let cafURL = notes.audioURL(for: activeNote)
+
+        if let precomputer {
+            let preMon = HandsetTelemetryMonitor.start()
+            await precomputer.runOnce(noteID: noteID, captureURL: cafURL)
             precomputeTelemetry = preMon.finish()
             precomputeSaved = savedCounter.withLock { $0 }
         }
-
-        // Finalize CAF.
-        try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM, finalized: true)
 
         let postStopSegs = Mutex(0)
         let transcriber = WhistleTranscriber(acceptance: cap)
@@ -1084,25 +1325,38 @@ final class HandsetQualificationTests: XCTestCase {
 
         let postMon = HandsetTelemetryMonitor.start()
         let started = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
-        let opusURL = root.appendingPathComponent("published.opus")
-        try OpusAudio.encode(cafURL, to: opusURL)
-        let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
+        controller.finish()
+        await controller.settle()
+        XCTAssertEqual(handoff.handedOff, [noteID])
+
+        let outcome = await job.run(Job(noteID: noteID, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
                                     stop: StopSignal()) { _ in }
+        XCTAssertEqual(outcome, JobOutcome.done)
+
+        let fetchedSaved = await notes.note(noteID)
+        let saved = try XCTUnwrap(fetchedSaved)
+        let finalAudioURL = notes.audioURL(for: saved)
+        let exportDir = root.appendingPathComponent("export", isDirectory: true)
+        let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
+        let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
         let elapsed = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - started) / 1_000_000_000.0
         let postSnap = postMon.finish()
-        XCTAssertEqual(outcome, .done)
 
-        let stored = await notes.note(note.id)
-        let saved = try XCTUnwrap(stored)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest.
+        let doc = CassiniDocument.read(opusURL)
+        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
         try OpusAudio.decode(opusURL, to: decodedOpusCAF)
+        let decodedFile = try AVAudioFile(forReading: decodedOpusCAF)
+        let exportedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
         let opusSha = SHA256.hash(data: try Data(contentsOf: decodedOpusCAF)).map { String(format: "%02x", $0) }.joined()
         try? FileManager.default.removeItem(at: decodedOpusCAF)
         let words = saved.transcript.flatMap { seg in
             seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: nil) }
         }
         return PairedLaneResult(
+            audioFilename: saved.audioFilename,
+            exportVerified: doc.state == DocumentState.ok,
+            exportedDurationSeconds: exportedDuration,
             opusSha256: opusSha,
             words: words,
             speakerTurns: [],
@@ -1298,7 +1552,219 @@ final class HandsetQualificationTests: XCTestCase {
         add(attachment)
     }
 
-    // MARK: - Local Test Support Doubles
+    // MARK: - Event-Gated Waiters & Local Test Support Doubles
+
+    private struct TimeoutError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    /// Event-driven observer for `AVCaptureAdapter.events` with bounded failure timeouts (zero fixed sleeps).
+    private final class CaptureEventGate: @unchecked Sendable {
+        private struct State {
+            var observed: [String] = []
+            var waiters: [(id: UUID, name: String, count: Int, continuation: CheckedContinuation<Void, any Error>)] = []
+        }
+
+        private let state = Mutex(State())
+        private var task: Task<Void, Never>?
+
+        init(stream: AsyncStream<CaptureEvent>) {
+            task = Task { [weak self] in
+                for await ev in stream {
+                    guard let self else { return }
+                    let label: String? = switch ev {
+                    case .interrupted: "interrupted"
+                    case .routeLost: "routeLost"
+                    case .failed: "failed"
+                    case .mediaReset: "mediaReset"
+                    case .level: nil
+                    }
+                    guard let label else { continue }
+                    let ready: [CheckedContinuation<Void, any Error>] = self.state.withLock { s in
+                        s.observed.append(label)
+                        var matched: [CheckedContinuation<Void, any Error>] = []
+                        s.waiters.removeAll { waiter in
+                            let seen = s.observed.filter { $0 == waiter.name }.count
+                            if seen >= waiter.count {
+                                matched.append(waiter.continuation)
+                                return true
+                            }
+                            return false
+                        }
+                        return matched
+                    }
+                    for cont in ready { cont.resume() }
+                }
+            }
+        }
+
+        var observedEvents: [String] { state.withLock { $0.observed } }
+
+        func cancel() {
+            task?.cancel()
+            task = nil
+            let pending = state.withLock { s -> [CheckedContinuation<Void, any Error>] in
+                let list = s.waiters.map(\.continuation)
+                s.waiters.removeAll()
+                return list
+            }
+            for cont in pending { cont.resume(throwing: CancellationError()) }
+        }
+
+        func waitFor(_ name: String, count: Int, timeout: Duration) async throws {
+            let waiterID = UUID()
+            let timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled, let self else { return }
+                let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
+                    guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
+                    return s.waiters.remove(at: idx).continuation
+                }
+                expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for capture event '\(name)' (count >= \(count))"))
+            }
+            defer { timeoutTask.cancel() }
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let alreadySatisfied = state.withLock { s -> Bool in
+                    if s.observed.filter({ $0 == name }).count >= count { return true }
+                    s.waiters.append((waiterID, name, count, continuation))
+                    return false
+                }
+                if alreadySatisfied { continuation.resume() }
+            }
+        }
+    }
+
+    @MainActor
+    private func waitForLiveCAFReader(at url: URL, timeout: Duration) async throws -> LiveCAFReader {
+        let deadline = ContinuousClock.now + timeout
+        while true {
+            if let reader = try? LiveCAFReader(url: url) { return reader }
+            if ContinuousClock.now >= deadline {
+                throw TimeoutError(message: "Timed out after \(timeout) waiting for LiveCAFReader to open \(url.lastPathComponent)")
+            }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+    }
+
+    @MainActor
+    private func waitForCAFSafeFrames(
+        reader: LiveCAFReader,
+        atLeast targetFrames: UInt64,
+        timeout: Duration,
+        description: String
+    ) async throws -> UInt64 {
+        let deadline = ContinuousClock.now + timeout
+        while true {
+            let safe = (try? reader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)) ?? 0
+            if safe >= targetFrames { return safe }
+            if ContinuousClock.now >= deadline {
+                throw TimeoutError(message: "Timed out after \(timeout) waiting for \(description): reached \(safe) / \(targetFrames) frames")
+            }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+    }
+
+    @MainActor
+    private func waitForActiveRecording(controller: RecordingController, timeout: Duration) async throws -> ActiveRecording {
+        let deadline = ContinuousClock.now + timeout
+        while true {
+            if let active = controller.state.activeRecording { return active }
+            if ContinuousClock.now >= deadline {
+                throw TimeoutError(message: "Timed out after \(timeout) waiting for RecordingController to become active (state: \(controller.state))")
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
+    private static func wordErrorRate(reference: [ComparableWord], hypothesis: [ComparableWord]) -> Double {
+        let ref = reference.map { $0.text.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+        let hyp = hypothesis.map { $0.text.lowercased().trimmingCharacters(in: .punctuationCharacters) }.filter { !$0.isEmpty }
+        guard !ref.isEmpty else { return hyp.isEmpty ? 0.0 : 1.0 }
+        var prev = Array(0...hyp.count)
+        var curr = Array(repeating: 0, count: hyp.count + 1)
+        for i in 1...ref.count {
+            curr[0] = i
+            for j in 1...hyp.count {
+                let cost = ref[i - 1] == hyp[j - 1] ? 0 : 1
+                curr[j] = min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+            }
+            swap(&prev, &curr)
+        }
+        return Double(prev[hyp.count]) / Double(ref.count)
+    }
+
+    @MainActor
+    private final class QualFileCapture: AudioCapture {
+        let events: AsyncStream<CaptureEvent>
+        private let continuation: AsyncStream<CaptureEvent>.Continuation
+        var elapsed: TimeInterval = 0
+        private(set) var recordedAt: Date?
+        private var captureURL: URL?
+        private let prefixPCM: Data?
+        private let fullPCM: Data
+        private let fullDuration: TimeInterval
+
+        init(prefixPCM: Data?, fullPCM: Data, sampleRate: Double = 48_000) {
+            (events, continuation) = AsyncStream.makeStream(of: CaptureEvent.self)
+            self.prefixPCM = prefixPCM
+            self.fullPCM = fullPCM
+            self.fullDuration = Double(fullPCM.count / 2) / sampleRate
+        }
+
+        var fileBytes: Int64 {
+            guard let url = captureURL else { return 0 }
+            return Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        }
+
+        func start(url: URL) async throws -> CaptureFormat {
+            self.captureURL = url
+            self.recordedAt = Date()
+            let initial = prefixPCM ?? fullPCM
+            try HandsetQualificationTests.writeCAF(to: url, sampleRate: 48_000, pcm: initial, finalized: false)
+            self.elapsed = Double(initial.count / 2) / 48_000.0
+            return .pcm48kMono
+        }
+
+        func pause() {}
+        func resume() throws {}
+
+        func stop() async throws -> CaptureResult {
+            if let url = captureURL {
+                try HandsetQualificationTests.writeCAF(to: url, sampleRate: 48_000, pcm: fullPCM, finalized: true)
+            }
+            self.elapsed = fullDuration
+            return CaptureResult(duration: fullDuration)
+        }
+    }
+
+    private final class ControlledPrecomputeBridge: RecordingPrecomputing, @unchecked Sendable {
+        let inner: CAFPrefixPrecomputer
+        init(inner: CAFPrefixPrecomputer) { self.inner = inner }
+        func start(noteID: UUID, captureURL: URL) {}
+        func stop(noteID: UUID) async { await inner.stop(noteID: noteID) }
+        func preempt() async { await inner.preempt() }
+        func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool {
+            inner.hasPrecomputeCheckpoint(for: noteID)
+        }
+    }
+
+    private final class StaticCheckpointPrecompute: RecordingPrecomputing, @unchecked Sendable {
+        func start(noteID: UUID, captureURL: URL) {}
+        func stop(noteID: UUID) async {}
+        func preempt() async {}
+        func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool { true }
+    }
+
+    /// Exercises `RecordingController.finishAudio`'s fallback to preserving `capture.caf` when M4A compression is skipped,
+    /// allowing an identical-CAF `afterStop` control alongside the production M4A `afterStop` lane.
+    private struct NoCompressAudioProcessing: AudioProcessing {
+        private let base = LocalAudioProcessing()
+        func inspect(_ url: URL) async throws -> AudioSummary { try await base.inspect(url) }
+        func compress(_ source: URL, to destination: URL) async throws { throw AudioError.unreadable }
+        func decodeOpus(_ source: URL, to destination: URL) async throws { try await base.decodeOpus(source, to: destination) }
+        func encodeOpus(_ source: URL, to destination: URL) async throws { try await base.encodeOpus(source, to: destination) }
+    }
 
     private struct AlwaysConsent: ModelConsentRecords {
         func consentAt() async -> Date? { Date(timeIntervalSince1970: 1) }
