@@ -194,6 +194,67 @@ def extract_reports(df, run_arn: str, out_dir: Path) -> list[dict]:
     return reports
 
 
+def validate_filter_and_config(test_filter: str, qual_cfg: dict) -> list[tuple[str, str | None]]:
+    """Validate --filter against qual_cfg enable flags and return expected (test, engine) report keys."""
+    tokens = [t.strip() for t in test_filter.split(",") if t.strip()]
+    if not tokens:
+        raise SystemExit("--filter must not be empty.")
+
+    whole_class = any(t == "HandsetQualificationTests" or t.endswith("/HandsetQualificationTests") for t in tokens)
+    methods = {t.split("/")[-1] for t in tokens if "/" in t}
+
+    if "test03ThirtyMinuteContinuousParakeet" in methods and not qual_cfg.get("runLongParakeet"):
+        raise SystemExit(
+            "Filter selects test03ThirtyMinuteContinuousParakeet without --long-parakeet; "
+            "the test would XCTSkip and emit no report."
+        )
+    if "test04ThirtyMinuteContinuousWhistle" in methods and not qual_cfg.get("runLongWhistle"):
+        raise SystemExit(
+            "Filter selects test04ThirtyMinuteContinuousWhistle without --long-whistle; "
+            "the test would XCTSkip and emit no report."
+        )
+    if "test02PairedEquivalenceAnd5MinMetrics" in methods and not (
+        qual_cfg.get("runParakeet") or qual_cfg.get("runWhistle")
+    ):
+        raise SystemExit(
+            "Filter selects test02PairedEquivalenceAnd5MinMetrics with both --no-parakeet and --no-whistle."
+        )
+
+    expected: list[tuple[str, str | None]] = []
+    if whole_class or "test01RealCAFLiveReaderAndInterruptionLifecycle" in methods:
+        expected.append(("test01RealCAFLiveReaderAndInterruptionLifecycle", None))
+    if whole_class or "test02PairedEquivalenceAnd5MinMetrics" in methods:
+        expected.append(("test02PairedEquivalenceAnd5MinMetrics", None))
+    if "test03ThirtyMinuteContinuousParakeet" in methods or (whole_class and qual_cfg.get("runLongParakeet")):
+        expected.append(("runThirtyMinuteContinuousCapture", "parakeet"))
+    if "test04ThirtyMinuteContinuousWhistle" in methods or (whole_class and qual_cfg.get("runLongWhistle")):
+        expected.append(("runThirtyMinuteContinuousCapture", "whistle"))
+    return expected
+
+
+def verify_reports(reports: list[dict], expected: list[tuple[str, str | None]], qual_cfg: dict) -> None:
+    """Fail if any requested measurement lane is missing from the extracted qualification reports."""
+    if not expected:
+        return
+    if not reports:
+        raise SystemExit(
+            f"Device Farm run PASSED but extracted 0 qualification reports (expected {len(expected)}: {expected})."
+        )
+    for test_name, engine in expected:
+        matches = [
+            rep for rep in reports
+            if rep.get("test") == test_name and (engine is None or rep.get("engine") == engine)
+        ]
+        if not matches:
+            label = f"{test_name} (engine={engine})" if engine else test_name
+            raise SystemExit(f"Device Farm run PASSED but is missing expected qualification report: {label}.")
+        if test_name == "test02PairedEquivalenceAnd5MinMetrics":
+            if qual_cfg.get("runParakeet") and not any("parakeet" in rep for rep in matches):
+                raise SystemExit("Device Farm run PASSED but test02 report is missing 'parakeet' section.")
+            if qual_cfg.get("runWhistle") and not any("whistle" in rep for rep in matches):
+                raise SystemExit("Device Farm run PASSED but test02 report is missing 'whistle' section.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--device-arn", required=True)
@@ -211,6 +272,16 @@ def main() -> None:
     parser.add_argument("--no-wait", action="store_true")
     args = parser.parse_args()
 
+    qual_cfg = {
+        "shortSeconds": args.short_seconds,
+        "longSeconds": args.long_seconds,
+        "runParakeet": not args.no_parakeet,
+        "runWhistle": not args.no_whistle,
+        "runLongParakeet": args.long_parakeet,
+        "runLongWhistle": args.long_whistle,
+    }
+    expected_reports = validate_filter_and_config(args.filter, qual_cfg)
+
     import boto3
     df = boto3.client("devicefarm", region_name="us-west-2")
     check_budget(df)
@@ -223,14 +294,6 @@ def main() -> None:
     else:
         app, xctest = build_for_device(derived)
 
-    qual_cfg = {
-        "shortSeconds": args.short_seconds,
-        "longSeconds": args.long_seconds,
-        "runParakeet": not args.no_parakeet,
-        "runWhistle": not args.no_whistle,
-        "runLongParakeet": args.long_parakeet,
-        "runLongWhistle": args.long_whistle,
-    }
     ipa, test_zip = package_artifacts(app, xctest, out_dir, qual_cfg)
     app_arn = upload_file(df, ipa, "IOS_APP")
     test_arn = upload_file(df, test_zip, "XCTEST_TEST_PACKAGE")
@@ -258,6 +321,7 @@ def main() -> None:
             print(f"Extracted {len(reports)} qualification reports -> {out_dir / 'reports.json'}", flush=True)
             if r.get("result") != "PASSED":
                 raise SystemExit(f"Device Farm run ended with {r.get('result')}")
+            verify_reports(reports, expected_reports, qual_cfg)
             return
         time.sleep(30)
 

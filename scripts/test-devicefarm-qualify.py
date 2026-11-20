@@ -134,6 +134,70 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
         self.assertIn("arn:requested-device", str(ctx.exception))
         self.assertIn("target", str(ctx.exception))
 
+    def test_validate_filter_rejects_long_lane_without_enable_flag(self) -> None:
+        base_cfg = {
+            "shortSeconds": 300,
+            "longSeconds": 1800,
+            "runParakeet": True,
+            "runWhistle": True,
+            "runLongParakeet": False,
+            "runLongWhistle": False,
+        }
+        with self.assertRaises(SystemExit) as ctx:
+            MOD.validate_filter_and_config(
+                "HandsetQualificationTests/test03ThirtyMinuteContinuousParakeet",
+                base_cfg,
+            )
+        self.assertIn("--long-parakeet", str(ctx.exception))
+
+        with self.assertRaises(SystemExit) as ctx:
+            MOD.validate_filter_and_config(
+                "HandsetQualificationTests/test04ThirtyMinuteContinuousWhistle",
+                base_cfg,
+            )
+        self.assertIn("--long-whistle", str(ctx.exception))
+
+        both_disabled = dict(base_cfg, runParakeet=False, runWhistle=False)
+        with self.assertRaises(SystemExit):
+            MOD.validate_filter_and_config(
+                "HandsetQualificationTests/test02PairedEquivalenceAnd5MinMetrics",
+                both_disabled,
+            )
+
+    def test_verify_reports_fails_when_passed_run_is_missing_expected_report(self) -> None:
+        cfg = {
+            "shortSeconds": 300,
+            "longSeconds": 1800,
+            "runParakeet": True,
+            "runWhistle": True,
+            "runLongParakeet": True,
+            "runLongWhistle": False,
+        }
+        expected = MOD.validate_filter_and_config(
+            "HandsetQualificationTests/test03ThirtyMinuteContinuousParakeet",
+            cfg,
+        )
+        self.assertEqual(expected, [("runThirtyMinuteContinuousCapture", "parakeet")])
+
+        with self.assertRaises(SystemExit) as empty_ctx:
+            MOD.verify_reports([], expected, cfg)
+        self.assertIn("0 qualification reports", str(empty_ctx.exception))
+
+        with self.assertRaises(SystemExit) as wrong_engine_ctx:
+            MOD.verify_reports(
+                [{"test": "runThirtyMinuteContinuousCapture", "engine": "whistle"}],
+                expected,
+                cfg,
+            )
+        self.assertIn("parakeet", str(wrong_engine_ctx.exception))
+
+        # Succeeds when the expected report is present.
+        MOD.verify_reports(
+            [{"test": "runThirtyMinuteContinuousCapture", "engine": "parakeet"}],
+            expected,
+            cfg,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

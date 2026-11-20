@@ -46,7 +46,7 @@ Audio: 300 s 48 kHz mono PCM16LE 3-speaker real speech (bundled `WhistleTests/jf
 
 Real-time paced 48 kHz `.caf` growth (`2 s` written and `fsync`'d every `2 s` for `1,800 s`) with live `CAFPrefixPrecomputer` under `transcribeWhileRecording`, followed by CAF finalization and immediate `TranscriptionJob` tail finalization.
 
-*Note: The latency figures below reflect transcription-job latency (post-`precomputer.stop`) from the initial Device Farm pass; `runThirtyMinuteContinuousCapture` has since been updated to start its Stop-to-published timer at capture end (before CAF finalization, microphone stop, and `await precomputer.stop(...)`) for subsequent remeasurements.*
+*Note: The latency figures below reflect transcription-job latency (post-`precomputer.stop`) from the initial Device Farm pass; `runThirtyMinuteContinuousCapture` has since been updated to start its Stop-to-published timer at capture end (before CAF finalization, microphone stop, and `await precomputer.stop(...)`) for subsequent remeasurements. Likewise, the historical 30-min RSS / peak footprint / min free RAM figures below were recorded before chunked PCM streaming (when the harness retained ~165 MiB of synthetic PCM in memory) and should be remeasured before setting a memory threshold.*
 
 | Handset (OS) | Engine | Checkpoints Saved | Transcription-Job Latency (s, post-`precomputer.stop`) | Words Published | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Thermal Trajectory (61 × 30 s) | Recording CPU (s) | Post-Stop CPU (s) | Battery (USB-powered) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
@@ -70,8 +70,8 @@ Real-time paced 48 kHz `.caf` growth (`2 s` written and `fsync`'d every `2 s` fo
 
 ## 4. Device-Capability & Thermal Threshold Recommendations (for Silvio's Sign-Off)
 
-1. **Memory thresholds (`ParakeetMemory.beforeLoadBytes = 1450 MiB`, `beforeWindowBytes = 400 MiB`) — keep unchanged.**
-   - Over 30 continuous minutes of Parakeet + Sortformer on a 4 GB **iPhone 11**, `minAvailableMemoryMiB` stayed at `511.1 MiB` (`+111 MiB` headroom above `beforeWindowBytes`), with `0` memory warnings and `0` jetsam kills.
+1. **Memory thresholds (`ParakeetMemory.beforeLoadBytes = 1450 MiB`, `beforeWindowBytes = 400 MiB`) — keep unchanged pending chunked-streaming remeasurement.**
+   - Over 30 continuous minutes of Parakeet + Sortformer on a 4 GB **iPhone 11**, `minAvailableMemoryMiB` stayed at `511.1 MiB` (`+111 MiB` headroom above `beforeWindowBytes`), with `0` memory warnings and `0` jetsam kills. Note that these historical 30-min RSS figures were recorded before chunked PCM streaming (while the harness retained ~165 MiB of synthetic PCM in RAM) and should be remeasured before tightening or relaxing any memory threshold.
 2. **Thermal yield threshold (`ProcessInfo.ThermalState >= .serious`) — keep unchanged.**
    - Neither handset reached `.serious` during 30 minutes of continuous precomputation (`nominal` throughout on iPhone 11; steady `fair` on iPhone 14 Pro). Injected `.serious` yielded cleanly within 1 window/segment.
 3. **Default mode & energy trade-off — keep `afterStop` default until unplugged battery pass + user mode setting.**

@@ -350,17 +350,14 @@ final class HandsetQualificationTests: XCTestCase {
         let adapter = AVCaptureAdapter()
         var report: [String: Any] = ["test": "test01RealCAFLiveReaderAndInterruptionLifecycle"]
 
-        // Attempt real microphone capture only if permission is already granted (headless Device Farm XCTest
-        // cannot dismiss a modal iOS permission alert and would block until timeout).
+        // Attempt real microphone capture when permission is already granted; fail fast if start fails.
+        // Reserve the synthetic fallback strictly for non-granted (headless Device Farm) runs, which
+        // cannot dismiss a modal iOS permission alert and would block until timeout.
         let micPermission = AVAudioApplication.shared.recordPermission
         var usedHardwareMic = false
         if micPermission == .granted {
-            do {
-                _ = try await adapter.start(url: cafURL)
-                usedHardwareMic = true
-            } catch {
-                report["microphoneStatus"] = "unavailable: \(error)"
-            }
+            _ = try await adapter.start(url: cafURL)
+            usedHardwareMic = true
         } else {
             report["microphoneStatus"] = "permission_\(micPermission == .denied ? "denied" : "undetermined")_headless_xctest"
         }
@@ -843,7 +840,10 @@ final class HandsetQualificationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: workDir) }
 
         let modelsRoot: URL? = engine == .parakeet ? try await Self.ensurePinnedModelsInstalled(in: workDir) : nil
-        let (speechPCM, _) = try Self.makeMultiSpeakerSpeech48kPCM16LE(totalSeconds: totalSeconds)
+        // Keep only a single ~35 s multi-speaker cycle (~3.3 MiB) in memory and stream slices to disk
+        // so the 30-min harness does not retain ~165 MiB of synthetic PCM in RAM during RSS telemetry.
+        let cyclePCM = try Self.makeMultiSpeakerSpeechCycle48kPCM16LE()
+        XCTAssertFalse(cyclePCM.isEmpty)
 
         let notesRoot = workDir.appendingPathComponent("notes", isDirectory: true)
         let notes = try NoteStore(root: notesRoot)
@@ -904,21 +904,19 @@ final class HandsetQualificationTests: XCTestCase {
             )
         }
 
-        // Start real AVAudioRecorder concurrently only when microphone permission is already granted
-        // (headless Device Farm XCTest cannot tap the system permission dialog).
+        // Start real AVAudioRecorder concurrently when microphone permission is already granted;
+        // propagate start errors rather than silently skipping mic assertions. Reserve the no-mic
+        // path strictly for non-granted (headless Device Farm) runs.
         let micCAF = workDir.appendingPathComponent("hardware-mic.caf")
         let micAdapter = AVCaptureAdapter()
         var micStarted = false
         var micError: String?
-        if AVAudioApplication.shared.recordPermission == .granted {
-            do {
-                _ = try await micAdapter.start(url: micCAF)
-                micStarted = true
-            } catch {
-                micError = "\(error)"
-            }
+        let micPermission = AVAudioApplication.shared.recordPermission
+        if micPermission == .granted {
+            _ = try await micAdapter.start(url: micCAF)
+            micStarted = true
         } else {
-            micError = "permission_undetermined_headless_xctest"
+            micError = "permission_\(micPermission == .denied ? "denied" : "undetermined")_headless_xctest"
         }
         let micEvents = Mutex<[String]>([])
         let micWatcher = Task {
@@ -931,16 +929,25 @@ final class HandsetQualificationTests: XCTestCase {
         let monitor = HandsetTelemetryMonitor.start()
         precomputer.start(noteID: note.id, captureURL: speechCAF)
 
-        // Pace appending 2 seconds of real 48 kHz PCM every 2 seconds for `totalSeconds` (real-time rate).
+        // Pace appending 2 seconds of real 48 kHz PCM every 2 seconds for `totalSeconds` (real-time rate),
+        // streaming slices from the bounded single-cycle buffer and tracking total bytes written.
         let writerHandle = try FileHandle(forWritingTo: speechCAF)
         try writerHandle.seekToEnd()
         let chunkSeconds = 2
         let bytesPerSecond = 48_000 * 2
         var writtenSeconds = 0
+        var totalPCMBytesWritten: UInt64 = 0
+        var cycleOffset = 0
         while writtenSeconds < totalSeconds {
             let nextEnd = min(totalSeconds, writtenSeconds + chunkSeconds)
-            let range = (writtenSeconds * bytesPerSecond)..<(nextEnd * bytesPerSecond)
-            try writerHandle.write(contentsOf: speechPCM.subdata(in: range))
+            var remainingBytes = (nextEnd - writtenSeconds) * bytesPerSecond
+            while remainingBytes > 0 {
+                let take = min(remainingBytes, cyclePCM.count - cycleOffset)
+                try writerHandle.write(contentsOf: cyclePCM[cycleOffset..<(cycleOffset + take)])
+                totalPCMBytesWritten += UInt64(take)
+                remainingBytes -= take
+                cycleOffset = (cycleOffset + take) % cyclePCM.count
+            }
             try writerHandle.synchronize()
             writtenSeconds = nextEnd
             if writtenSeconds < totalSeconds {
@@ -951,8 +958,8 @@ final class HandsetQualificationTests: XCTestCase {
         // Measure Stop-to-published-transcript latency from capture end (covering CAF finalization,
         // microphone stop, precomputer stop, and post-Stop TranscriptionJob completion).
         let stopStart = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
-        // Finalize the CAF header just as AVAudioRecorder.stop() does.
-        try Self.finalizeCAFHeader(at: speechCAF, pcmBytes: UInt64(speechPCM.count))
+        // Finalize the CAF header just as AVAudioRecorder.stop() does, using the streamed byte counter.
+        try Self.finalizeCAFHeader(at: speechCAF, pcmBytes: totalPCMBytesWritten)
 
         // Stop hardware mic and precomputer.
         let micElapsed = micStarted ? micAdapter.elapsed : 0
@@ -1507,6 +1514,24 @@ final class HandsetQualificationTests: XCTestCase {
             speakerIdx += 1
         }
         return (pcm, voices16k)
+    }
+
+    /// Builds a single bounded repeating cycle (~35 s / ~3.3 MiB) of 48 kHz mono PCM16LE multi-speaker speech
+    /// for chunked streaming in long-duration qualification runs.
+    private static func makeMultiSpeakerSpeechCycle48kPCM16LE() throws -> Data {
+        let jfkURL = try XCTUnwrap(Bundle.main.resourceURL?.appendingPathComponent("WhistleTests/jfk.wav"),
+                                   "WhistleTests/jfk.wav must be bundled in Cassini.app")
+        let base16k = try readMono16k(jfkURL)
+        let ratios: [Double] = [1.0, 0.86, 1.16]
+        let voices48k: [[Float]] = ratios.map { resampleLinear(resampleLinear(base16k, factor: $0), factor: 3.0) }
+        let gap48k = [Float](repeating: 0, count: Int(0.6 * 48_000))
+        let totalFrames = voices48k.reduce(0) { $0 + $1.count + gap48k.count }
+        var cycle = Data(capacity: totalFrames * 2)
+        for clip in voices48k {
+            appendFloatsAsPCM16LE(&cycle, clip[0..<clip.count])
+            appendFloatsAsPCM16LE(&cycle, gap48k[0..<gap48k.count])
+        }
+        return cycle
     }
 
     private static func extractEnrolledVoices(campplusURL: URL, speakerSamples16k: [[Float]]) throws -> [SavedVoice] {
