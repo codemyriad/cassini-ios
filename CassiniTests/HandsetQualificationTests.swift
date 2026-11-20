@@ -244,14 +244,15 @@ final class HandsetQualificationTests: XCTestCase {
         try Self.writeCAF(to: growingURL, sampleRate: 48_000, pcm: pcm, finalized: false)
         try Self.writeCAF(to: finalURL, sampleRate: 48_000, pcm: pcm, finalized: true)
 
-        let liveReader = try LiveCAFReader(url: growingURL)
-        defer { liveReader.close() }
-        let finalReader = try LiveCAFReader(url: finalURL)
-        defer { finalReader.close() }
+        let liveReader = try await BackgroundCAFReader.open(at: growingURL)
+        let finalReader = try await BackgroundCAFReader.open(at: finalURL)
 
         let prefixFrames: UInt64 = 2 * 48_000 + 48
-        XCTAssertEqual(try liveReader.prefixSHA256(committedFrames: prefixFrames),
-                       try finalReader.prefixSHA256(committedFrames: prefixFrames))
+        let liveHash = try await liveReader.prefixSHA256(committedFrames: prefixFrames)
+        let finalHash = try await finalReader.prefixSHA256(committedFrames: prefixFrames)
+        await liveReader.close()
+        await finalReader.close()
+        XCTAssertEqual(liveHash, finalHash)
 
         // 3. Simulated AVAudioSession interruption & route-change hooks on AVCaptureAdapter.
         let recordGate = CountGate()
@@ -500,6 +501,37 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertFalse(parakeetEmptyEval.pressureRecoveryPassed, "Parakeet untimed/empty transcripts must set pressureRecoveryPassed = false")
     }
 
+    func testGateImmediateTimeoutDoesNotHang() async {
+        let countGate = CountGate()
+        for timeout in [Duration.zero, .nanoseconds(1)] {
+            do {
+                try await countGate.waitFor(count: 1, timeout: timeout)
+                XCTFail("Unsignaled CountGate must time out for \(timeout)")
+            } catch is TimeoutError {
+                // Expected.
+            } catch {
+                XCTFail("Unexpected error from CountGate: \(error)")
+            }
+        }
+
+        let (stream, continuation) = AsyncStream.makeStream(of: CaptureEvent.self)
+        let eventGate = CaptureEventGate(stream: stream)
+        defer {
+            eventGate.cancel()
+            continuation.finish()
+        }
+        for timeout in [Duration.zero, .nanoseconds(1)] {
+            do {
+                try await eventGate.waitFor("interrupted", count: 1, timeout: timeout)
+                XCTFail("Unsignaled CaptureEventGate must time out for \(timeout)")
+            } catch is TimeoutError {
+                // Expected.
+            } catch {
+                XCTFail("Unexpected error from CaptureEventGate: \(error)")
+            }
+        }
+    }
+
     @MainActor
     func testContinuousCaptureContinuityRejectsEarlyPause() async throws {
         final class EarlyPauseRecorder: CaptureRecorder {
@@ -599,10 +631,10 @@ final class HandsetQualificationTests: XCTestCase {
             let prefixPCM = Self.makeTonePCM16LE(seconds: 4, sampleRate: 48_000)
             let fullPCM = Self.makeTonePCM16LE(seconds: 8, sampleRate: 48_000)
             try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: prefixPCM, finalized: false)
-            let liveReader = try LiveCAFReader(url: cafURL)
-            let safeFrames1 = try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
-            let liveSha1 = try liveReader.prefixSHA256(committedFrames: safeFrames1)
-            liveReader.close()
+            let liveReader = try await BackgroundCAFReader.open(at: cafURL)
+            let safeFrames1 = try await liveReader.safeThroughFrame()
+            let liveSha1 = try await liveReader.prefixSHA256(committedFrames: safeFrames1)
+            await liveReader.close()
 
             let recordGate = CountGate()
             final class LifecycleRecorder: CaptureRecorder {
@@ -652,9 +684,10 @@ final class HandsetQualificationTests: XCTestCase {
             _ = try await lifecycleAdapter.stop()
 
             try Self.writeCAF(to: cafURL, sampleRate: 48_000, pcm: fullPCM, finalized: true)
-            let finalReader = try LiveCAFReader(url: cafURL)
-            defer { finalReader.close() }
-            let finalSha1 = try finalReader.prefixSHA256(committedFrames: safeFrames1)
+            let finalReader = try await BackgroundCAFReader.open(at: cafURL)
+            let finalSha1 = try await finalReader.prefixSHA256(committedFrames: safeFrames1)
+            let finalFrames = try await finalReader.availableFrames()
+            await finalReader.close()
             XCTAssertEqual(liveSha1, finalSha1)
 
             let opusURL = dir.appendingPathComponent("published.opus")
@@ -666,7 +699,7 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertTrue(observedEvents.contains("routeLost"))
             let snap = monitor.finish()
             report["livePrefix1Frames"] = safeFrames1
-            report["finalFrames"] = try finalReader.availableFrames()
+            report["finalFrames"] = finalFrames
             report["prefix1Matched"] = (liveSha1 == finalSha1)
             report["observedEvents"] = observedEvents
             report["opusBytes"] = opusByteCount
@@ -679,22 +712,20 @@ final class HandsetQualificationTests: XCTestCase {
         let eventGate = CaptureEventGate(stream: adapter.events)
         defer { eventGate.cancel() }
 
-        // Wait until AVAudioRecorder flushes >= 1 s of PCM16LE frames to capture.caf while live.
-        let liveReader = try await waitForLiveCAFReader(at: cafURL, timeout: .seconds(15))
-        let safeFrames1 = try await waitForCAFSafeFrames(
-            reader: liveReader,
+        // Wait until AVAudioRecorder flushes >= 1 s of PCM16LE frames to capture.caf while live (off MainActor).
+        let liveReader = try await BackgroundCAFReader.waitUntilOpen(at: cafURL, timeout: .seconds(15))
+        let safeFrames1 = try await liveReader.waitForSafeFrames(
             atLeast: 48_000,
             timeout: .seconds(15),
             description: "initial AVAudioRecorder live CAF flush (>= 1 s)"
         )
-        let liveSha1 = try liveReader.prefixSHA256(committedFrames: safeFrames1)
+        let liveSha1 = try await liveReader.prefixSHA256(committedFrames: safeFrames1)
 
         // Pause -> Resume lifecycle: verify resume()'s async session activation completes via CAF frame growth.
         adapter.pause()
-        let framesAtPause = try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+        let framesAtPause = try await liveReader.safeThroughFrame()
         try adapter.resume()
-        let framesAfterResume = try await waitForCAFSafeFrames(
-            reader: liveReader,
+        let framesAfterResume = try await liveReader.waitForSafeFrames(
             atLeast: framesAtPause + 48_000,
             timeout: .seconds(15),
             description: "CAF frame growth after pause -> resume"
@@ -718,11 +749,10 @@ final class HandsetQualificationTests: XCTestCase {
         )
         let framesBeforeInterruptResume = max(
             framesAfterResume,
-            try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+            try await liveReader.safeThroughFrame()
         )
         try adapter.resume()
-        let framesAfterInterruptResume = try await waitForCAFSafeFrames(
-            reader: liveReader,
+        let framesAfterInterruptResume = try await liveReader.waitForSafeFrames(
             atLeast: framesBeforeInterruptResume + 24_000,
             timeout: .seconds(15),
             description: "CAF frame growth after interruption recovery resume"
@@ -738,11 +768,10 @@ final class HandsetQualificationTests: XCTestCase {
         try await eventGate.waitFor("routeLost", count: 1, timeout: .seconds(15))
         let framesBeforeRouteResume = max(
             framesAfterInterruptResume,
-            try liveReader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)
+            try await liveReader.safeThroughFrame()
         )
         try adapter.resume()
-        let safeFrames2 = try await waitForCAFSafeFrames(
-            reader: liveReader,
+        let safeFrames2 = try await liveReader.waitForSafeFrames(
             atLeast: framesBeforeRouteResume + 24_000,
             timeout: .seconds(15),
             description: "CAF frame growth after route-loss recovery resume"
@@ -750,19 +779,19 @@ final class HandsetQualificationTests: XCTestCase {
 
         // Capture second live prefix SHA-256 before Stop.
         XCTAssertGreaterThan(safeFrames2, safeFrames1)
-        let liveSha2 = try liveReader.prefixSHA256(committedFrames: safeFrames2)
-        liveReader.close()
+        let liveSha2 = try await liveReader.prefixSHA256(committedFrames: safeFrames2)
+        await liveReader.close()
 
         // Finalize via AVAudioRecorder.stop() and compare prefix hashes + Opus publication.
         let finalElapsed = adapter.elapsed
         _ = try await adapter.stop()
         eventGate.cancel()
 
-        let finalReader = try LiveCAFReader(url: cafURL)
-        defer { finalReader.close() }
-        let finalFrames = try finalReader.availableFrames()
-        let finalSha1 = try finalReader.prefixSHA256(committedFrames: safeFrames1)
-        let finalSha2 = try finalReader.prefixSHA256(committedFrames: safeFrames2)
+        let finalReader = try await BackgroundCAFReader.open(at: cafURL)
+        let finalFrames = try await finalReader.availableFrames()
+        let finalSha1 = try await finalReader.prefixSHA256(committedFrames: safeFrames1)
+        let finalSha2 = try await finalReader.prefixSHA256(committedFrames: safeFrames2)
+        await finalReader.close()
         XCTAssertEqual(liveSha1, finalSha1, "Live CAF prefix 1 must match finalized CAF bit-for-bit after AVAudioRecorder.stop()")
         XCTAssertEqual(liveSha2, finalSha2, "Live CAF prefix 2 must match finalized CAF bit-for-bit after AVAudioRecorder.stop()")
 
@@ -2024,54 +2053,98 @@ final class HandsetQualificationTests: XCTestCase {
 
         func waitFor(_ name: String, count: Int, timeout: Duration) async throws {
             let waiterID = UUID()
-            let timeoutTask = Task { [weak self] in
-                try? await Task.sleep(for: timeout)
-                guard !Task.isCancelled, let self else { return }
-                let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
-                    guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
-                    return s.waiters.remove(at: idx).continuation
-                }
-                expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for capture event '\(name)' (count >= \(count))"))
-            }
-            defer { timeoutTask.cancel() }
+            let timeoutTaskHolder = Mutex<Task<Void, Never>?>(nil)
+            defer { timeoutTaskHolder.withLock { $0 }?.cancel() }
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 let alreadySatisfied = state.withLock { s -> Bool in
                     if s.observed.filter({ $0 == name }).count >= count { return true }
                     s.waiters.append((waiterID, name, count, continuation))
                     return false
                 }
-                if alreadySatisfied { continuation.resume() }
+                if alreadySatisfied {
+                    continuation.resume()
+                    return
+                }
+                // Arm timeout ONLY after the waiter continuation is registered so an immediate expiry cannot race ahead.
+                let task = Task { [weak self] in
+                    try? await Task.sleep(for: timeout)
+                    guard !Task.isCancelled, let self else { return }
+                    let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
+                        guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
+                        return s.waiters.remove(at: idx).continuation
+                    }
+                    expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for capture event '\(name)' (count >= \(count))"))
+                }
+                timeoutTaskHolder.withLock { $0 = task }
             }
         }
     }
 
-    @MainActor
-    private func waitForLiveCAFReader(at url: URL, timeout: Duration) async throws -> LiveCAFReader {
-        let deadline = ContinuousClock.now + timeout
-        while true {
-            if let reader = try? LiveCAFReader(url: url) { return reader }
-            if ContinuousClock.now >= deadline {
-                throw TimeoutError(message: "Timed out after \(timeout) waiting for LiveCAFReader to open \(url.lastPathComponent)")
-            }
-            try await Task.sleep(for: .milliseconds(25))
-        }
-    }
+    /// Serial background actor wrapping `LiveCAFReader` so file opens, `safeThroughFrame()` / `availableFrames()`
+    /// seeks, and prefix SHA-256 reads never run synchronously on `@MainActor`.
+    private actor BackgroundCAFReader {
+        private var reader: LiveCAFReader?
 
-    @MainActor
-    private func waitForCAFSafeFrames(
-        reader: LiveCAFReader,
-        atLeast targetFrames: UInt64,
-        timeout: Duration,
-        description: String
-    ) async throws -> UInt64 {
-        let deadline = ContinuousClock.now + timeout
-        while true {
-            let safe = (try? reader.safeThroughFrame(safetyMarginFrames: LiveCAFReader.defaultSafetyMarginFrames)) ?? 0
-            if safe >= targetFrames { return safe }
-            if ContinuousClock.now >= deadline {
-                throw TimeoutError(message: "Timed out after \(timeout) waiting for \(description): reached \(safe) / \(targetFrames) frames")
+        static func waitUntilOpen(at url: URL, timeout: Duration) async throws -> BackgroundCAFReader {
+            let instance = BackgroundCAFReader()
+            try await instance.openWhenReady(at: url, timeout: timeout)
+            return instance
+        }
+
+        static func open(at url: URL) async throws -> BackgroundCAFReader {
+            let instance = BackgroundCAFReader()
+            try await instance.openNow(at: url)
+            return instance
+        }
+
+        private func openNow(at url: URL) throws {
+            reader = try LiveCAFReader(url: url)
+        }
+
+        private func openWhenReady(at url: URL, timeout: Duration) async throws {
+            let deadline = ContinuousClock.now + timeout
+            while true {
+                if let opened = try? LiveCAFReader(url: url) {
+                    reader = opened
+                    return
+                }
+                if ContinuousClock.now >= deadline {
+                    throw TimeoutError(message: "Timed out after \(timeout) waiting for LiveCAFReader to open \(url.lastPathComponent)")
+                }
+                try await Task.sleep(for: .milliseconds(25))
             }
-            try await Task.sleep(for: .milliseconds(25))
+        }
+
+        func safeThroughFrame(safetyMarginFrames: UInt64 = LiveCAFReader.defaultSafetyMarginFrames) throws -> UInt64 {
+            guard let reader else { throw TimeoutError(message: "BackgroundCAFReader is closed") }
+            return try reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames)
+        }
+
+        func waitForSafeFrames(atLeast targetFrames: UInt64, timeout: Duration, description: String) async throws -> UInt64 {
+            let deadline = ContinuousClock.now + timeout
+            while true {
+                let safe = (try? safeThroughFrame()) ?? 0
+                if safe >= targetFrames { return safe }
+                if ContinuousClock.now >= deadline {
+                    throw TimeoutError(message: "Timed out after \(timeout) waiting for \(description): reached \(safe) / \(targetFrames) frames")
+                }
+                try await Task.sleep(for: .milliseconds(25))
+            }
+        }
+
+        func availableFrames() throws -> UInt64 {
+            guard let reader else { throw TimeoutError(message: "BackgroundCAFReader is closed") }
+            return try reader.availableFrames()
+        }
+
+        func prefixSHA256(committedFrames: UInt64) throws -> String {
+            guard let reader else { throw TimeoutError(message: "BackgroundCAFReader is closed") }
+            return try reader.prefixSHA256(committedFrames: committedFrames)
+        }
+
+        func close() {
+            reader?.close()
+            reader = nil
         }
     }
 
@@ -2302,23 +2375,29 @@ final class HandsetQualificationTests: XCTestCase {
 
         func waitFor(count target: Int, timeout: Duration) async throws {
             let waiterID = UUID()
-            let timeoutTask = Task { [weak self] in
-                try? await Task.sleep(for: timeout)
-                guard !Task.isCancelled, let self else { return }
-                let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
-                    guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
-                    return s.waiters.remove(at: idx).continuation
-                }
-                expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for recorder.record() count >= \(target)"))
-            }
-            defer { timeoutTask.cancel() }
+            let timeoutTaskHolder = Mutex<Task<Void, Never>?>(nil)
+            defer { timeoutTaskHolder.withLock { $0 }?.cancel() }
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, any Error>) in
                 let satisfied = state.withLock { s -> Bool in
                     if s.count >= target { return true }
                     s.waiters.append((waiterID, target, cont))
                     return false
                 }
-                if satisfied { cont.resume() }
+                if satisfied {
+                    cont.resume()
+                    return
+                }
+                // Arm timeout ONLY after the waiter continuation is registered so an immediate expiry cannot race ahead.
+                let task = Task { [weak self] in
+                    try? await Task.sleep(for: timeout)
+                    guard !Task.isCancelled, let self else { return }
+                    let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
+                        guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
+                        return s.waiters.remove(at: idx).continuation
+                    }
+                    expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for recorder.record() count >= \(target)"))
+                }
+                timeoutTaskHolder.withLock { $0 = task }
             }
         }
     }

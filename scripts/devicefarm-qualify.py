@@ -14,6 +14,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -199,12 +200,28 @@ KNOWN_TEST_METHODS = frozenset({
     "testWordErrorRateEdgeCases",
     "testCanonicalSpeakerSlotAndVoiceMapComparison",
     "testPairedEvaluationRejectsSwappedVoicesAndProvenanceMismatch",
+    "testGateImmediateTimeoutDoesNotHang",
     "testContinuousCaptureContinuityRejectsEarlyPause",
     "test01RealCAFLiveReaderAndInterruptionLifecycle",
     "test02PairedEquivalenceAnd5MinMetrics",
     "test03ThirtyMinuteContinuousParakeet",
     "test04ThirtyMinuteContinuousWhistle",
 })
+
+SAFE_RUN_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def resolve_run_output_dir(base_out: Path, name: str) -> Path:
+    """Validate --name as a safe single path component and ensure out_dir stays inside base_out."""
+    if not name or name in (".", "..") or not SAFE_RUN_NAME_RE.match(name) or ".." in name:
+        raise SystemExit(
+            f"Invalid --name {name!r}: must be a single safe path component matching [A-Za-z0-9._-]+ without '..'."
+        )
+    base_resolved = base_out.resolve()
+    out_resolved = (base_resolved / name).resolve()
+    if not out_resolved.is_relative_to(base_resolved) or out_resolved == base_resolved:
+        raise SystemExit(f"Invalid --name {name!r}: resolved output path {out_resolved} escapes {base_resolved}.")
+    return out_resolved
 
 
 def validate_filter_and_config(test_filter: str, qual_cfg: dict) -> list[tuple[str, str | None]]:
@@ -324,13 +341,13 @@ def main() -> None:
         "runLongWhistle": args.long_whistle,
     }
     expected_reports = validate_filter_and_config(args.filter, qual_cfg)
+    out_dir = resolve_run_output_dir(ROOT / "DerivedData.noindex/devicefarm-out", args.name)
 
     import boto3
     df = boto3.client("devicefarm", region_name="us-west-2")
     check_budget(df)
 
     derived = ROOT / "DerivedData.noindex/devicefarm"
-    out_dir = ROOT / "DerivedData.noindex/devicefarm-out" / args.name
     if args.skip_build:
         app = derived / "Build/Products/Debug-iphoneos/Cassini.app"
         xctest = app / "PlugIns/CassiniTests.xctest"

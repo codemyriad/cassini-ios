@@ -228,6 +228,16 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
             cfg,
         )
 
+    def test_resolve_run_output_dir_rejects_path_traversal(self) -> None:
+        base_out = ROOT / "DerivedData.noindex/devicefarm-out"
+        for bad_name in ("../escape", "/tmp/escape", "a/b", "a\\b", "..", ".", ""):
+            with self.assertRaises(SystemExit, msg=f"Expected rejection for --name {bad_name!r}"):
+                MOD.resolve_run_output_dir(base_out, bad_name)
+
+        valid = MOD.resolve_run_output_dir(base_out, "d1126-iphone14pro-5min-v3")
+        self.assertEqual(valid, (base_out.resolve() / "d1126-iphone14pro-5min-v3"))
+        self.assertTrue(valid.is_relative_to(base_out.resolve()))
+
 
 if __name__ == "__main__":
     unittest.main()
