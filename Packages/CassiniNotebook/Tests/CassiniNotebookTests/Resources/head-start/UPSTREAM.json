@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/codemyriad/cassini-ux",
+  "commit": "671abcd26e77d012583adc25f971e0d6b3742f7f",
+  "files": {
+    "transcription-mode-vectors.json": {
+      "path": "vectors/head-start/transcription-mode-vectors.json",
+      "sha256": "30b695bb7fa9e772e9f8013ee3b79d4889c99c3d005c4b7b7c362b1f7d72d166"
+    },
+    "mobile-prefix-checkpoint-vectors.json": {
+      "path": "vectors/head-start/mobile-prefix-checkpoint-vectors.json",
+      "sha256": "68959d02d1c473b83934f53b8b72cb96237512bb14079c8ebd57c4143920e939"
+    }
+  }
+}

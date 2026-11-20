@@ -10,6 +10,7 @@ extension TranscriptionCoordinator {
     /// queue (its `work/` stays for Restore), any other job stays. Returns what the note should remember for Restore.
     public func moveToTrash(_ noteID: UUID) -> TrashedJob? {
         markTrashed(noteID)
+        if let preempt = parts.onPreemptPrecompute { Task { await preempt() } }
         if let current = active, current.noteID == noteID {
             current.stop.stop(.pause(.user))
             return TrashedJob(state: .paused, kind: current.job.kind, recognizer: current.job.recognizer)

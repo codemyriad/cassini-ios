@@ -10,6 +10,8 @@ public final class SettingsStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let clock: any AppClock
     @ObservationIgnored nonisolated private let recognition = Mutex(true)
+    @ObservationIgnored nonisolated private let modeLock = Mutex(TranscriptionMode.defaultMode)
+    @ObservationIgnored nonisolated private let speakersLock = Mutex(true)
 
     @ObservationIgnored private weak var draftNames: DraftNamesStore?
     @ObservationIgnored private var recognitionCleanup: Task<Void, Never>?
@@ -35,6 +37,10 @@ public final class SettingsStore {
 
     /// Inference callbacks see the current switch without hopping to or blocking the main actor.
     public nonisolated var allowsSavedVoiceRecognition: Bool { recognition.withLock { $0 } }
+    /// Off-main-actor snapshot of `transcriptionMode` for recording-time precomputation.
+    public nonisolated var currentTranscriptionMode: TranscriptionMode { modeLock.withLock { $0 } }
+    /// Off-main-actor snapshot of `identifySpeakers` for recording-time precomputation.
+    public nonisolated var currentIdentifySpeakers: Bool { speakersLock.withLock { $0 } }
 
     public private(set) var cloudBackup: Bool
     public private(set) var includeSavedVoicesInBackups: Bool
@@ -68,7 +74,12 @@ public final class SettingsStore {
     /// BCP-47.
     public var speechLanguage: String { didSet { defaults.set(speechLanguage, forKey: SettingsKeys.speechLanguage) } }
     public var autoTranscribe: Bool { didSet { defaults.set(autoTranscribe, forKey: SettingsKeys.autoTranscribe) } }
-    public var identifySpeakers: Bool { didSet { defaults.set(identifySpeakers, forKey: SettingsKeys.identifySpeakers) } }
+    public var identifySpeakers: Bool {
+        didSet {
+            speakersLock.withLock { $0 = identifySpeakers }
+            defaults.set(identifySpeakers, forKey: SettingsKeys.identifySpeakers)
+        }
+    }
     public var recogniseSavedVoices: Bool {
         didSet {
             recognition.withLock { $0 = recogniseSavedVoices }
@@ -90,6 +101,13 @@ public final class SettingsStore {
     public private(set) var finalizationMs: Int64? { didSet { write(finalizationMs, SettingsKeys.finalizationMs) } }
     public private(set) var trashLastPurgeAt: Date? { didSet { write(trashLastPurgeAt, SettingsKeys.trashLastPurgeAt) } }
     public private(set) var voicesGeneration: Int { didSet { defaults.set(voicesGeneration, forKey: SettingsKeys.voicesGeneration) } }
+    /// Non-UI `TranscriptionMode` policy seam (`recordOnly`, `afterStop`, `transcribeWhileRecording`); defaults to `.afterStop`.
+    public var transcriptionMode: TranscriptionMode {
+        didSet {
+            modeLock.withLock { $0 = transcriptionMode }
+            defaults.set(transcriptionMode.rawValue, forKey: SettingsKeys.transcriptionMode)
+        }
+    }
 
     public init(defaults: UserDefaults, clock: any AppClock, defaultLanguage: String = Locale.current.identifier(.bcp47)) {
         self.defaults = defaults
@@ -117,7 +135,10 @@ public final class SettingsStore {
         finalizationMs = (defaults.object(forKey: SettingsKeys.finalizationMs) as? NSNumber)?.int64Value
         trashLastPurgeAt = Self.date(defaults, SettingsKeys.trashLastPurgeAt)
         voicesGeneration = defaults.integer(forKey: SettingsKeys.voicesGeneration)
+        transcriptionMode = TranscriptionMode.resolve(defaults.object(forKey: SettingsKeys.transcriptionMode)).mode
         recognition.withLock { $0 = recogniseSavedVoices }
+        modeLock.withLock { $0 = transcriptionMode }
+        speakersLock.withLock { $0 = identifySpeakers }
     }
 
     /// Whether the speech model may be downloaded.

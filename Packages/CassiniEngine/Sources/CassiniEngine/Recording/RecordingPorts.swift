@@ -53,3 +53,16 @@ public enum MicrophoneAccess: Hashable, Sendable {
 public protocol CaptureRepairing: Sendable {
     func repairCapture(at url: URL) throws
 }
+
+/// Optional recording-time CAF prefix precomputer (`transcribeWhileRecording`).
+/// Must operate strictly read-only on disk off the main actor, never disturbing capture.
+public protocol RecordingPrecomputing: Sendable {
+    /// Starts following committed `.caf` frames for `noteID` at `captureURL` when mode and resources allow.
+    func start(noteID: UUID, captureURL: URL)
+    /// Stops and drains the follower for `noteID`, releasing `NativeBudget` before returning.
+    func stop(noteID: UUID) async
+    /// Immediately preempts any active follower (pause, interruption, backgrounding, manual transcribe, trash).
+    func preempt() async
+    /// True when a precompute checkpoint exists on disk for `noteID` (so Stop preserves `capture.caf` for resume).
+    func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool
+}

@@ -24,6 +24,20 @@ public struct CheckpointSpaceError: Error, Hashable, Sendable {
     public init() {}
 }
 
+/// Error thrown by `CheckpointStoring.load(_:)` when persisted checkpoint files cannot be decoded,
+/// preserving best-effort `origin` classification so precompute checkpoints can silently fall back.
+public struct CheckpointLoadError: Error, Sendable {
+    public let origin: CheckpointOrigin?
+    public let underlying: any Error
+
+    public init(origin: CheckpointOrigin?, underlying: any Error) {
+        self.origin = origin
+        self.underlying = underlying
+    }
+
+    public var isPrecompute: Bool { origin == .precompute }
+}
+
 /// `<note folder>/work/checkpoint.json`, with the previous checkpoint kept as `checkpoint.json.bak`. A save writes a
 /// temporary file, flushes it to disk, moves the current checkpoint to the backup and renames the new one into place;
 /// a load falls back to the backup when the current file is missing or damaged. The note folder is `NoteStore`'s, so the
@@ -63,10 +77,25 @@ public struct CheckpointFiles: CheckpointStoring {
         let main = folder.appendingPathComponent(Self.filename)
         let backup = folder.appendingPathComponent(Self.backupFilename)
         var firstError: (any Error)?
+        var sniffedOrigin: CheckpointOrigin?
         for url in [main, backup] where FileManager.default.fileExists(atPath: url.path) {
-            do { return try CheckpointState.decode(Data(contentsOf: url)) } catch { firstError = firstError ?? error }
+            do {
+                let data = try Data(contentsOf: url)
+                do {
+                    return try CheckpointState.decode(data)
+                } catch {
+                    firstError = firstError ?? error
+                    if sniffedOrigin == nil {
+                        sniffedOrigin = CheckpointState.sniffOrigin(from: data)
+                    }
+                }
+            } catch {
+                firstError = firstError ?? error
+            }
         }
-        if let firstError { throw firstError }
+        if let firstError {
+            throw CheckpointLoadError(origin: sniffedOrigin, underlying: firstError)
+        }
         return nil
     }
 
@@ -76,15 +105,18 @@ public struct CheckpointFiles: CheckpointStoring {
     public func save(_ state: CheckpointState, for noteID: UUID) throws {
         let folder = directory(for: noteID)
         do {
+            let protection: [FileAttributeKey: Any] = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             if !FileManager.default.fileExists(atPath: folder.path) {
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false, attributes: protection)
             }
             let main = folder.appendingPathComponent(Self.filename)
             let backup = folder.appendingPathComponent(Self.backupFilename)
             let temporary = folder.appendingPathComponent(Self.filename + ".tmp")
             try DurableFile.writeSynced(state.encoded(), to: temporary)
+            try? FileManager.default.setAttributes(protection, ofItemAtPath: temporary.path)
             if FileManager.default.fileExists(atPath: main.path) { try DurableFile.rename(main, to: backup) }
             try DurableFile.rename(temporary, to: main)
+            try? FileManager.default.setAttributes(protection, ofItemAtPath: main.path)
             DurableFile.syncDirectory(folder)
         } catch {
             if Self.isOutOfSpace(error) || availableBytes(noteDirectory(noteID)) < Self.minFreeBytes {

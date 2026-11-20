@@ -45,6 +45,9 @@ public final class TranscriptionCoordinator {
         public var progress: JobProgress?
         /// Optional producer time, captured before events enter the asynchronous delivery queue.
         public var eventUptimeMs: (@Sendable () -> Int64)?
+        /// Optional preemption hook invoked before starting a manual/saved-audio job or trashing a note,
+        /// so any recording-time CAF precomputer yields `NativeBudget` immediately.
+        public var onPreemptPrecompute: (@MainActor @Sendable () async -> Void)?
 
         public init(jobs: JobStore, notes: NoteStore, runner: any TranscriptionJobRunning,
                     checkpoints: any JobCheckpoints, consent: ModelConsent, notifier: any Notifier,
@@ -55,13 +58,15 @@ public final class TranscriptionCoordinator {
                     recognizerChoice: (@MainActor @Sendable () -> String?)? = nil,
                     consentForRecognizer: (@MainActor @Sendable (String?) -> ModelConsent)? = nil,
                     fallbackRecognizer: (@MainActor @Sendable (_ job: Job, _ failure: JobFailure) async -> String?)? = nil,
-                    eventUptimeMs: (@Sendable () -> Int64)? = nil) {
+                    eventUptimeMs: (@Sendable () -> Int64)? = nil,
+                    onPreemptPrecompute: (@MainActor @Sendable () async -> Void)? = nil) {
             self.jobs = jobs; self.notes = notes; self.runner = runner; self.checkpoints = checkpoints
             self.consent = consent; self.notifier = notifier; self.background = background; self.clock = clock
             self.backgroundTitle = backgroundTitle; self.backgroundSubtitle = backgroundSubtitle
             self.eventUptimeMs = eventUptimeMs
             self.progress = progress; self.recognizer = recognizer; self.recognizerChoice = recognizerChoice; self.consentForRecognizer = consentForRecognizer
             self.fallbackRecognizer = fallbackRecognizer
+            self.onPreemptPrecompute = onPreemptPrecompute
         }
     }
 
@@ -173,6 +178,7 @@ public final class TranscriptionCoordinator {
         }
         let resume = await parts.jobs.job(noteID)?.state == .paused
         if EnqueueRules.clears(settings.queueHold, origin: origin, resume: resume) { setHold(nil) }
+        await parts.onPreemptPrecompute?()
         let outcome = await lock.run { await enqueue(noteID, kind: kind, language: language, selected: selectedRecognizer) }
         if case .queued = outcome, settings.queueHold == nil { drain() }
         return outcome

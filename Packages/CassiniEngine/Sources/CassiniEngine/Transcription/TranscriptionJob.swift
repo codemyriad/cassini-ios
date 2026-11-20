@@ -194,15 +194,34 @@ public struct TranscriptionJob: TranscriptionJobRunning {
 
         var checkpoint: CheckpointState?
         if transcribes {
-            let expected = CheckpointState.Expected(source: note.audioFilename, signature: CheckpointState.signature(of: url),
-                                                    model: recognizer.checkpointModel(language: language))
+            let fileSignature = CheckpointState.signature(of: url)
+            let model = recognizer.checkpointModel(language: language)
             do {
                 // A checkpoint of another version or recognizer does not resume.
                 checkpoint = try checkpoints.load(job.noteID)
-                try checkpoint?.validate(expected)
-                if checkpoint?.whistle != nil, recognizer != .whistle { return .failed(.checkpointMismatch) }
+                if let loaded = checkpoint {
+                    let prefix = loaded.committedPrefix.flatMap {
+                        LiveCAFReader.prefixExpectation(for: url, committedUnitCount: $0.committedUnitCount,
+                                                        clipsURL: checkpoints.clipsURL(for: job.noteID))
+                    }
+                    let expected = CheckpointState.Expected(source: note.audioFilename, signature: fileSignature,
+                                                            model: model, prefix: prefix)
+                    try loaded.validate(expected)
+                    if loaded.whistle != nil, recognizer != .whistle {
+                        throw CheckpointState.Mismatch.model
+                    }
+                }
             } catch {
-                return .failed(.checkpointMismatch)
+                // A stale, malformed, or mismatched internal precompute checkpoint silently falls back to full
+                // post-Stop decode and must never fail the user's job with CHECKPOINT_MISMATCH.
+                let isPrecompute = checkpoint?.isPrecompute == true
+                    || (error as? CheckpointLoadError)?.isPrecompute == true
+                if isPrecompute {
+                    try? checkpoints.discard(job.noteID)
+                    checkpoint = nil
+                } else {
+                    return .failed(.checkpointMismatch)
+                }
             }
             // A Parakeet checkpoint goes on from its window; one without it (none was written) starts over.
             if recognizer == .parakeet, checkpoint?.wordsComplete == false, checkpoint?.recognition == nil { checkpoint = nil }
@@ -270,8 +289,15 @@ public struct TranscriptionJob: TranscriptionJobRunning {
         if transcribes {
             var words = checkpoint
             if words?.wordsComplete != true {
-                let window = plan.windowSpeakers(context, restored: checkpoint?.speakers)
-                switch await decodeWords(context, from: checkpoint, speakers: window?.speakers) {
+                var window = plan.windowSpeakers(context, restored: checkpoint?.speakers)
+                var decodeResult = await decodeWords(context, from: checkpoint, speakers: window?.speakers)
+                if case .ended(.failed(.checkpointMismatch)) = decodeResult, checkpoint?.isPrecompute == true {
+                    try? checkpoints.discard(job.noteID)
+                    checkpoint = nil
+                    window = plan.windowSpeakers(context, restored: nil)
+                    decodeResult = await decodeWords(context, from: nil, speakers: window?.speakers)
+                }
+                switch decodeResult {
                 case .complete(let state, let segmentation): words = state; context.segmentation = segmentation
                 case .ended(let outcome): return outcome
                 }
@@ -365,9 +391,9 @@ public struct TranscriptionJob: TranscriptionJobRunning {
             base: checkpoint ?? CheckpointState(source: context.source, signature: context.signature,
                                                 model: context.recognizer.checkpointModel(language: context.language),
                                                 segments: [], doneMs: 0, totalMs: context.knownMs, elapsedMs: 0),
-            noteID: context.noteID, resumeDoneMs: resumeDoneMs, recognizer: context.recognizer,
-            language: context.wordsLanguage, limits: limits, checkpoints: checkpoints,
-            stop: context.stop, events: context.events, uptimeMs: uptimeMs)
+            noteID: context.noteID, resumeDoneMs: resumeDoneMs, finalizedSignature: context.signature,
+            recognizer: context.recognizer, language: context.wordsLanguage, limits: limits,
+            checkpoints: checkpoints, stop: context.stop, events: context.events, uptimeMs: uptimeMs)
         context.events(.stageChanged(.reading, startMs: 0, endMs: startMs))
         context.events(.stageChanged(.preparing))
         let resume = parakeet ? checkpoint?.recognition.map { TranscriptResume(recognition: $0, words: checkpoint?.words ?? []) } : nil

@@ -25,6 +25,15 @@ public final class NativeBudget: Sendable {
     /// Whether someone holds the budget now.
     public var isHeld: Bool { state.withLock { $0.held } }
 
+    /// Takes the budget immediately if free; returns false without waiting when another holder owns it.
+    public func tryAcquire() -> Bool {
+        state.withLock { state in
+            guard !state.held else { return false }
+            state.held = true
+            return true
+        }
+    }
+
     /// How many are waiting for it: lets a test wait until a waiter has queued instead of sleeping.
     var waiterCount: Int { state.withLock { $0.waiters.count } }
 

@@ -54,18 +54,22 @@ public final class RecordingController {
         /// The title of a recording started at the given time ("Voice note 8 Oct, 08:14").
         public var defaultTitle: @Sendable (Date) -> String
         public var timing: Timing
+        /// Optional read-only CAF prefix precomputer (`transcribeWhileRecording`); nil in tests/configs without one.
+        public var precompute: (any RecordingPrecomputing)?
 
         public init(ready: @escaping @MainActor () async -> Void, notes: any RecordingNotes, capture: any AudioCapture,
                     storage: any StorageProbe, audio: any AudioProcessing, settings: SettingsStore,
                     handoff: any RecordingHandoff, consent: ModelConsent? = nil, liveActivity: (any LiveActivityPort)? = nil,
                     notifier: (any Notifier)? = nil, clock: any AppClock,
-                    defaultTitle: @escaping @Sendable (Date) -> String, timing: Timing = Timing()) {
+                    defaultTitle: @escaping @Sendable (Date) -> String, timing: Timing = Timing(),
+                    precompute: (any RecordingPrecomputing)? = nil) {
             self.ready = ready; self.notes = notes; self.capture = capture; self.storage = storage; self.audio = audio
             self.settings = settings; self.handoff = handoff
             // Without a model check, only the recorded consent counts.
             self.consent = consent ?? ModelConsent { _, _ in settings.modelsConsentAt != nil }
             self.liveActivity = liveActivity; self.notifier = notifier
             self.clock = clock; self.defaultTitle = defaultTitle; self.timing = timing
+            self.precompute = precompute
         }
     }
 
@@ -82,8 +86,18 @@ public final class RecordingController {
     /// The title typed while the capture starts; the recording takes it once it runs.
     public private(set) var startingTitle: String?
 
-    /// Whether the app is on screen; an automatic stop in the background posts a notification.
-    @ObservationIgnored public var isAppActive = true
+    /// Whether the app is on screen; an automatic stop in the background posts a notification, and backgrounding
+    /// immediately yields any active recording-time precomputer.
+    @ObservationIgnored public var isAppActive = true {
+        didSet {
+            if !isAppActive {
+                if let precompute = parts.precompute { Task { await precompute.preempt() } }
+            } else if let active = state.activeRecording, active.pause == nil, let url = captureURL,
+                      parts.settings.transcriptionMode.allowsPrecomputeDuringRecording {
+                parts.precompute?.start(noteID: active.noteID, captureURL: url)
+            }
+        }
+    }
     /// The compression of a finished recording failed; its original audio stays the recording.
     @ObservationIgnored public var onCompressionFailed: (@MainActor (UUID) -> Void)?
 
@@ -154,6 +168,7 @@ public final class RecordingController {
     public func pause() {
         guard var active = state.activeRecording else { return }
         parts.capture.pause()
+        if let precompute = parts.precompute { Task { await precompute.preempt() } }
         active.pause = .user
         active.elapsed = parts.capture.elapsed
         setState(.active(active))
@@ -166,6 +181,9 @@ public final class RecordingController {
         active.pause = nil
         setState(.active(active))
         publishActivity()
+        if isAppActive, let url = captureURL, parts.settings.transcriptionMode.allowsPrecomputeDuringRecording {
+            parts.precompute?.start(noteID: active.noteID, captureURL: url)
+        }
     }
 
     /// Stops and saves. The request enters finishing synchronously; sealing stays serialized.
@@ -238,6 +256,9 @@ public final class RecordingController {
             }
             if !typed.isEmpty { scheduleTitleWrite(for: note.id) }
             startPolicy()
+            if isAppActive, parts.settings.transcriptionMode.allowsPrecomputeDuringRecording {
+                parts.precompute?.start(noteID: note.id, captureURL: url)
+            }
         } catch {
             if let created { try? await parts.notes.discard(created) }
             captureURL = nil

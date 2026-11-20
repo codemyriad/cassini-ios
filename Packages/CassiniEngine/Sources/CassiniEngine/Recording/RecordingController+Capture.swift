@@ -56,6 +56,7 @@ extension RecordingController {
             // A user pause stays a user pause; the end of the interruption does not resume.
             guard active.pause == nil else { return }
             parts.capture.pause()
+            if let precompute = parts.precompute { Task { await precompute.preempt() } }
             active.pause = event == .interrupted ? .otherApp : .routeLost
             active.elapsed = parts.capture.elapsed
             setState(.active(active))

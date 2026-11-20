@@ -22,10 +22,12 @@ public enum SettingsKeys {
     public static let trashLastPurgeAt = "trash.lastPurgeAt"
     /// Bumped by Forget everyone, so an analysis that started before keeps no voiceprints.
     public static let voicesGeneration = "voices.generation"
+    /// Non-UI `TranscriptionMode` policy (`recordOnly`, `afterStop`, `transcribeWhileRecording`).
+    public static let transcriptionMode = "transcriptionMode"
 
     public static let all: [String] = [
         speechLanguage, autoTranscribe, identifySpeakers, recogniseSavedVoices, automaticallyNameVoices,
         modelsConsentAt, modelsDeclinedAt, speakerModelsConsentAt, queueHold, recoveredAck,
-        notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration,
+        notificationsAsked, finalizationMs, trashLastPurgeAt, voicesGeneration, transcriptionMode,
     ]
 }

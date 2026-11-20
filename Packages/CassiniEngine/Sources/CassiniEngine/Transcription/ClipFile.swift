@@ -17,11 +17,14 @@ public final class ClipFile: ClipStore, @unchecked Sendable {
     public init(url: URL, keeping: Int?) throws {
         self.url = url
         let folder = url.deletingLastPathComponent()
+        let protection: [FileAttributeKey: Any] = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
         if !FileManager.default.fileExists(atPath: folder.path) {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false, attributes: protection)
         }
         if keeping == nil || !FileManager.default.fileExists(atPath: url.path) {
-            guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+            guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: protection) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
         }
         handle = try FileHandle(forUpdating: url)
         let bytes = try handle.seekToEnd()

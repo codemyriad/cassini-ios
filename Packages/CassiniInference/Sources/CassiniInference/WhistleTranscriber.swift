@@ -3,6 +3,58 @@ import CassiniEngine
 import CassiniNotebook
 import CassiniWhistle
 
+/// Shared binary-plist DSP state serialized into `WhistleCheckpoint.state` by both post-Stop
+/// `WhistleTranscriber` and recording-time `CAFPrefixPrecomputer`.
+struct WhistlePipelineState: Codable, Sendable {
+    let version: Int
+    let finished: Bool
+    let gate: WhistleSpeechGate
+    let fir: WhistleResampler.State
+    let vad: WhistleVAD.State
+    let raw: Data
+}
+
+/// Internal seam allowing unit tests to run the full `WhistleTranscriber` + `CAFPrefixPrecomputer`
+/// DSP/FIR/SpeechGate/checkpoint/resume pipeline deterministically without bundled ONNX weights.
+struct WhistleSessionBackend: Sendable {
+    struct VADHandle: @unchecked Sendable {
+        var probability: ([Float]) throws -> Float
+        var state: () -> WhistleVAD.State
+        var restore: (WhistleVAD.State) throws -> Void
+    }
+
+    var makeVAD: @Sendable (Bundle) throws -> VADHandle
+    var prepare: @Sendable (WhistleCapability, Bundle) async throws -> Void
+    var transcribe: @Sendable ([Float], WhistleCapability, Bundle, (@Sendable () -> Void)?, (@Sendable () async -> Void)?) async throws -> WhistleResult
+    var close: @Sendable () async -> Bool
+
+    static let live = WhistleSessionBackend(
+        makeVAD: { bundle in
+            guard let root = bundle.resourceURL?.appendingPathComponent("Whistle") else { throw WhistleError.unavailable }
+            let detector = try WhistleVAD(model: root.appendingPathComponent("silero-vad-6.2.1.onnx"))
+            return VADHandle(
+                probability: { try detector.probability($0) },
+                state: { detector.state },
+                restore: { try detector.restore($0) }
+            )
+        },
+        prepare: { acceptance, bundle in
+            try await WhistleRuntime.shared.prepare(acceptance: acceptance, bundle: bundle)
+        },
+        transcribe: { samples, acceptance, bundle, submitted, resultReady in
+            if let submitted, let resultReady {
+                return try await WhistleRuntime.shared.transcribe(
+                    samples, acceptance: acceptance, bundle: bundle, submitted: submitted, resultReady: resultReady
+                )
+            }
+            return try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle)
+        },
+        close: {
+            await WhistleRuntime.shared.close()
+        }
+    )
+}
+
 /// Bundled recognizer: bounded file streaming through the desktop FIR/HPF/Silero gate. The ASR branch stays raw.
 /// The job commits each batch's words with the DSP state needed to continue at its exact source frame.
 /// The private session budget prevents two callers interleaving model lifetime.
@@ -13,6 +65,8 @@ public struct WhistleTranscriber: Transcribing {
     private let memoryReport: (@Sendable (WhistleMemoryReport) -> Void)?
     private let availableMemory: @Sendable () -> Int64?
     private let trace: Trace?
+    private let backend: WhistleSessionBackend
+    private let skipBundleVerification: Bool
 
     struct Trace: Sendable {
         var read: @Sendable (Range<Int64>) -> Void
@@ -29,12 +83,14 @@ public struct WhistleTranscriber: Transcribing {
 
     init(acceptance: @escaping @Sendable () -> WhistleCapability, bundle: Bundle = .main,
          availableMemory: @escaping @Sendable () -> Int64?, memoryReport: (@Sendable (WhistleMemoryReport) -> Void)? = nil,
-         trace: Trace?) {
+         trace: Trace?, backend: WhistleSessionBackend = .live, skipBundleVerification: Bool = false) {
         self.acceptance = acceptance
         self.bundle = bundle
         self.availableMemory = availableMemory
         self.memoryReport = memoryReport
         self.trace = trace
+        self.backend = backend
+        self.skipBundleVerification = skipBundleVerification
     }
     public var recognizer: SpeechRecognizer { .whistle }
     public var assetInstallBytes: Int64 { 0 }
@@ -45,7 +101,7 @@ public struct WhistleTranscriber: Transcribing {
     public func modelName(locale: Locale) async -> String? { SpeechRecognizer.whistle.checkpointModel(language: "") }
     public func availability(locale: Locale) async -> SpeechAvailability {
         var capability = acceptance()
-        capability.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
+        capability.bundleVerified = skipBundleVerification ? true : await WhistleRuntime.verifyBundle(bundle)
         guard capability.available else { return SpeechAvailability(assets: .unsupported, failure: .model) }
         let free = availableMemory()
         let enough = free.map { $0 > 0 && UInt64($0) >= WhistleCapability.loadHeadroom } ?? false
@@ -59,19 +115,19 @@ public struct WhistleTranscriber: Transcribing {
     public func transcribe(_ request: TranscriptionRequest,
                            events: @escaping @Sendable (TranscriptionEvent) -> Void) async throws -> TranscriptionResult {
         var candidate = self.acceptance()
-        candidate.bundleVerified = await WhistleRuntime.verifyBundle(bundle)
+        candidate.bundleVerified = skipBundleVerification ? true : await WhistleRuntime.verifyBundle(bundle)
         let acceptance = candidate
         guard acceptance.available else { throw TranscriptionError.failed(.model) }
         return try await Self.sessions.withBudget {
             let measurement = WhistleMemoryMonitor()
             do {
-                let value = try await Session(acceptance: acceptance, bundle: bundle, memory: availableMemory, trace: trace)
+                let value = try await Session(acceptance: acceptance, bundle: bundle, memory: availableMemory, trace: trace, backend: backend)
                     .decode(request, events: events)
-                let released = await WhistleRuntime.shared.close()
+                let released = await backend.close()
                 memoryReport?(measurement.finish(succeeded: true, nativeModelReleased: released))
                 return value
             } catch {
-                let released = await WhistleRuntime.shared.close()
+                let released = await backend.close()
                 memoryReport?(measurement.finish(succeeded: false, nativeModelReleased: released))
                 if error is CancellationError || error is TranscriptionError { throw error }
                 if let e = error as? WhistleError {
@@ -87,23 +143,16 @@ public struct WhistleTranscriber: Transcribing {
         let bundle: Bundle
         let memory: @Sendable () -> Int64?
         let trace: Trace?
-        init(acceptance: WhistleCapability, bundle: Bundle, memory: @escaping @Sendable () -> Int64?, trace: Trace?) {
-            self.acceptance = acceptance; self.bundle = bundle; self.memory = memory; self.trace = trace
+        let backend: WhistleSessionBackend
+        init(acceptance: WhistleCapability, bundle: Bundle, memory: @escaping @Sendable () -> Int64?, trace: Trace?, backend: WhistleSessionBackend) {
+            self.acceptance = acceptance; self.bundle = bundle; self.memory = memory; self.trace = trace; self.backend = backend
         }
         private var raw: [Float] = []
         private var base = 0, totalSamples = 0, finalized = 0
         private var segments: [TranscriptSegment] = []
         private var gate = WhistleSpeechGate()
-        private var vad: WhistleVAD?
+        private var vad: WhistleSessionBackend.VADHandle?
         private static let maximumRawSamples = 240_128 + 16_000 + 5_120
-        private struct PipelineState: Codable {
-            let version: Int
-            let finished: Bool
-            let gate: WhistleSpeechGate
-            let fir: WhistleResampler.State
-            let vad: WhistleVAD.State
-            let raw: Data
-        }
         func headroom(_ required: UInt64) throws {
             guard let value = memory(), value > 0, UInt64(value) >= required else { throw TranscriptionError.failed(.memory) }
         }
@@ -131,10 +180,10 @@ public struct WhistleTranscriber: Transcribing {
                 let result: WhistleResult
                 if let trace {
                     let range = boundary.startSample..<boundary.endSample
-                    result = try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle,
-                        submitted: { trace.submitted(range) }, resultReady: { await trace.resultReady(range) })
+                    result = try await backend.transcribe(samples, acceptance, bundle,
+                        { trace.submitted(range) }, { await trace.resultReady(range) })
                 } else {
-                    result = try await WhistleRuntime.shared.transcribe(samples, acceptance: acceptance, bundle: bundle)
+                    result = try await backend.transcribe(samples, acceptance, bundle, nil, nil)
                 }
                 let words = result.words.map { TimedWord(text: $0.word, start: offset + $0.start, end: offset + $0.end) }
                 let segment = TranscriptSegment(text: result.text, start: offset, end: Double(boundary.endSample)/16000, words: words)
@@ -147,8 +196,8 @@ public struct WhistleTranscriber: Transcribing {
             let discard = min(raw.count, max(0, safe - base))
             raw.removeFirst(discard); base += discard
             guard raw.count <= Self.maximumRawSamples else { throw WhistleError.invalidInput }
-            let state = PipelineState(version: 1, finished: final, gate: gate, fir: resampler.state, vad: vad.state,
-                                      raw: raw.withUnsafeBufferPointer { Data(buffer: $0) })
+            let state = WhistlePipelineState(version: 1, finished: final, gate: gate, fir: resampler.state, vad: vad.state(),
+                                       raw: raw.withUnsafeBufferPointer { Data(buffer: $0) })
             let encoder = PropertyListEncoder()
             encoder.outputFormat = .binary
             let bytes = try encoder.encode(state)
@@ -161,10 +210,10 @@ public struct WhistleTranscriber: Transcribing {
         /// The prefix's finalized words are already held by the job. Restore only the raw audio for the
         /// open gate and its pre-roll, plus the FIR, HPF and Silero state used to derive the next boundary.
         func restore(_ checkpoint: WhistleCheckpoint, reader: WhistleAudioReader,
-                     resampler: inout WhistleResampler, vad: WhistleVAD) throws -> Bool {
+                     resampler: inout WhistleResampler, vad: WhistleSessionBackend.VADHandle) throws -> Bool {
             do {
                 guard checkpoint.valid else { throw WhistleError.invalidInput }
-                let state = try PropertyListDecoder().decode(PipelineState.self, from: checkpoint.state)
+                let state = try PropertyListDecoder().decode(WhistlePipelineState.self, from: checkpoint.state)
                 guard state.version == 1 else { throw WhistleError.invalidInput }
                 let inputCount = reader.inputFrames(through: reader.position)
                 let processed = checkpoint.processedSamples
@@ -207,8 +256,7 @@ public struct WhistleTranscriber: Transcribing {
             let outputCount = reader.rate == 16_000 ? inputCount : (inputCount + 2) / 3
             let duration = max(reader.duration, Double(outputCount) / 16_000)
             let result = { TranscriptionResult(segments: self.segments, segmentation: WhistleTranscriber.segmentationID) }
-            guard let root = bundle.resourceURL?.appendingPathComponent("Whistle") else { throw WhistleError.unavailable }
-            let detector = try WhistleVAD(model: root.appendingPathComponent("silero-vad-6.2.1.onnx"))
+            let detector = try backend.makeVAD(bundle)
             vad = detector
             defer { vad = nil }
             var resampler = try WhistleResampler(rate: reader.rate)
@@ -217,7 +265,7 @@ public struct WhistleTranscriber: Transcribing {
                 events(.progress(done: duration, total: duration))
                 return result()
             }
-            try await WhistleRuntime.shared.prepare(acceptance: acceptance, bundle: bundle)
+            try await backend.prepare(acceptance, bundle)
             events(.progress(done: Double(finalized) / 16_000, total: duration))
             while true {
                 try Task.checkCancellation()
