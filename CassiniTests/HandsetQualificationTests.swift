@@ -634,6 +634,30 @@ final class HandsetQualificationTests: XCTestCase {
             prints: []
         )
         XCTAssertEqual(Self.validateLongRunParakeetSpeakers(speakerAnalysisFailure: nil, analysis: fullRunSpeakers, totalDurationSeconds: 1800), [])
+
+        // 30-min published word coverage: an early timed prefix with an omitted tail must fail.
+        let earlyPrefixWords = [
+            ComparableWord(text: "hello", startMs: 0, endMs: 500, speaker: nil),
+            ComparableWord(text: "world", startMs: 119_500, endMs: 120_000, speaker: nil)
+        ]
+        let truncatedFailures = Self.validateLongRunPublishedWords(
+            words: earlyPrefixWords,
+            untimedNonblankSegments: 0,
+            totalDurationSeconds: 1800
+        )
+        XCTAssertFalse(truncatedFailures.isEmpty, "Early timed prefix with omitted tail must fail long-run word coverage")
+
+        let fullCoverageWords = [
+            ComparableWord(text: "hello", startMs: 0, endMs: 500, speaker: nil),
+            ComparableWord(text: "final", startMs: 1_795_000, endMs: 1_796_000, speaker: nil)
+        ]
+        XCTAssertEqual(
+            Self.validateLongRunPublishedWords(words: fullCoverageWords, untimedNonblankSegments: 0, totalDurationSeconds: 1800),
+            []
+        )
+        XCTAssertFalse(
+            Self.validateLongRunPublishedWords(words: fullCoverageWords, untimedNonblankSegments: 1, totalDurationSeconds: 1800).isEmpty
+        )
     }
 
     @MainActor
@@ -1442,8 +1466,12 @@ final class HandsetQualificationTests: XCTestCase {
         let saved = try XCTUnwrap(stored)
         let extractedLong = Self.extractComparableWords(from: saved.transcript, includeSpeaker: false)
         let wordCount = extractedLong.words.count
-        XCTAssertGreaterThan(wordCount, 0)
-        XCTAssertEqual(extractedLong.untimedNonblankSegments, 0, "30-min transcript must have zero nonblank segments missing word timings")
+        let wordFailures = Self.validateLongRunPublishedWords(
+            words: extractedLong.words,
+            untimedNonblankSegments: extractedLong.untimedNonblankSegments,
+            totalDurationSeconds: Double(totalSeconds)
+        )
+        XCTAssertEqual(wordFailures, [], "30-min transcript must publish timed words covering the full recording through its tail")
         if engine == .parakeet {
             let speakerFailures = Self.validateLongRunParakeetSpeakers(
                 speakerAnalysisFailure: saved.speakerAnalysisFailure,
@@ -2346,6 +2374,32 @@ final class HandsetQualificationTests: XCTestCase {
             let maxEnd = analysis.turns.map(\.end).max() ?? 0
             failures.append(
                 "30-min Parakeet Sortformer must produce >= 2 distinct speakers in the final 20% (>= \(Int(lateThreshold))s); got \(distinctLateSpeakers.count) (maxTurnEnd=\(String(format: "%.1f", maxEnd))s)"
+            )
+        }
+        return failures
+    }
+
+    private static func validateLongRunPublishedWords(
+        words: [ComparableWord],
+        untimedNonblankSegments: Int,
+        totalDurationSeconds: Double,
+        trailingToleranceSeconds: Double = 15.0
+    ) -> [String] {
+        var failures: [String] = []
+        if words.isEmpty {
+            failures.append("30-min transcript published zero timed words")
+        }
+        if untimedNonblankSegments > 0 {
+            failures.append("30-min transcript contains \(untimedNonblankSegments) nonblank segment(s) missing word timings")
+        }
+        let maxEndSeconds = Double(words.map(\.endMs).max() ?? 0) / 1000.0
+        let minRequiredEnd = max(0.0, totalDurationSeconds - trailingToleranceSeconds)
+        if !words.isEmpty && maxEndSeconds < minRequiredEnd {
+            failures.append(
+                String(
+                    format: "30-min published words ended early at %.1fs (expected >= %.1fs for %.0fs recording)",
+                    maxEndSeconds, minRequiredEnd, totalDurationSeconds
+                )
             )
         }
         return failures
