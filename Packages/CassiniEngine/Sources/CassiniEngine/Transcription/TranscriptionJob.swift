@@ -212,9 +212,11 @@ public struct TranscriptionJob: TranscriptionJobRunning {
                     }
                 }
             } catch {
-                // A stale or mismatched internal precompute checkpoint silently falls back to full post-Stop decode
-                // and must never fail the user's job with CHECKPOINT_MISMATCH.
-                if checkpoint?.isPrecompute == true {
+                // A stale, malformed, or mismatched internal precompute checkpoint silently falls back to full
+                // post-Stop decode and must never fail the user's job with CHECKPOINT_MISMATCH.
+                let isPrecompute = checkpoint?.isPrecompute == true
+                    || (error as? CheckpointLoadError)?.isPrecompute == true
+                if isPrecompute {
                     try? checkpoints.discard(job.noteID)
                     checkpoint = nil
                 } else {

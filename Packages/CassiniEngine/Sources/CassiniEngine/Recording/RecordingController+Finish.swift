@@ -23,12 +23,12 @@ extension RecordingController {
         policy?.cancel(); policy = nil
         titleWrite?.cancel(); await titleWrite?.value; titleWrite = nil
         let id = current.noteID
-        await parts.precompute?.stop(noteID: id)
         let elapsed = parts.capture.elapsed
         let duration = (try? await parts.capture.stop().duration) ?? elapsed
         let url = captureURL
         captureURL = nil
         endActivity()
+        await parts.precompute?.stop(noteID: id)
 
         guard let url, Self.hasAudio(at: url) else {
             try? await parts.notes.discard(id)

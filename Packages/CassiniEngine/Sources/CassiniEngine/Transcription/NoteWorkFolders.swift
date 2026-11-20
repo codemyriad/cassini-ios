@@ -20,16 +20,23 @@ public struct NoteWorkFolders: JobCheckpoints {
     /// as missing so it silently falls back to full post-Stop decoding.
     public func status(of noteID: UUID) async -> CheckpointStatus {
         let checkpoint: CheckpointState?
-        do { checkpoint = try files.load(noteID) } catch { return .mismatch }
+        do {
+            checkpoint = try files.load(noteID)
+        } catch let error as CheckpointLoadError where error.isPrecompute {
+            return .missing
+        } catch {
+            return .mismatch
+        }
         guard let checkpoint else { return .missing }
         let audio = root.appendingPathComponent(noteID.uuidString, isDirectory: true)
             .appendingPathComponent(checkpoint.source)
         let signature = CheckpointState.signature(of: audio)
-        if signature != checkpoint.signature {
-            guard let prefix = checkpoint.committedPrefix,
-                  let expectedPrefix = LiveCAFReader.prefixExpectation(
-                      for: audio, committedUnitCount: prefix.committedUnitCount, clipsURL: files.clipsURL(for: noteID)),
-                  (try? checkpoint.validate(.init(source: checkpoint.source, signature: signature,
+        if signature != checkpoint.signature || checkpoint.committedPrefix != nil {
+            let expectedPrefix = checkpoint.committedPrefix.flatMap {
+                LiveCAFReader.prefixExpectation(
+                    for: audio, committedUnitCount: $0.committedUnitCount, clipsURL: files.clipsURL(for: noteID))
+            }
+            guard (try? checkpoint.validate(.init(source: checkpoint.source, signature: signature,
                                                   model: checkpoint.model, prefix: expectedPrefix))) != nil else {
                 return checkpoint.isPrecompute ? .missing : .mismatch
             }

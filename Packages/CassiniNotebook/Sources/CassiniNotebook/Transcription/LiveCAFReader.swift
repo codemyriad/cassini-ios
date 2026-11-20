@@ -105,25 +105,55 @@ public final class LiveCAFReader: @unchecked Sendable {
         return Self.decodePCM16LEToFloats(bytes)
     }
 
+    /// Incremental SHA-256 hasher over `[0 ..< hashedFrames)` of a growing CAF `data` chunk.
+    /// Advances strictly over newly committed delta frames so repeated checkpoint commits stay O(N) overall,
+    /// finalizing a value-type copy of `CryptoKit.SHA256` at each commit boundary without resetting state.
+    public struct IncrementalPrefixHasher {
+        private var hasher = SHA256()
+        public private(set) var hashedFrames: UInt64 = 0
+        public private(set) var totalBytesHashed: UInt64 = 0
+
+        public init() {}
+
+        /// Advances the running SHA-256 state to `committedFrames` and returns the lowercase 64-hex digest
+        /// of `[0 ..< committedFrames)` without mutating the continuing hash state.
+        public mutating func advance(
+            to committedFrames: UInt64,
+            using reader: LiveCAFReader,
+            isCancelled: () -> Bool = { false }
+        ) throws -> String {
+            guard committedFrames > 0, committedFrames >= hashedFrames else { throw LiveCAFReader.Error.outOfRange }
+            if committedFrames > hashedFrames {
+                let available = try reader.availableFrames()
+                guard committedFrames <= available else { throw LiveCAFReader.Error.outOfRange }
+                let bytesPerFrame = UInt64(reader.layout.bytesPerFrame)
+                let chunkBytes = 65_536 - (65_536 % Int(bytesPerFrame))
+                var remainingFrames = committedFrames - hashedFrames
+                try reader.handle.seek(toOffset: reader.layout.dataStartOffset + hashedFrames * bytesPerFrame)
+                while remainingFrames > 0 {
+                    if isCancelled() || Task.isCancelled { throw CancellationError() }
+                    let toReadBytes = Int(min(remainingFrames * bytesPerFrame, UInt64(chunkBytes)))
+                    guard let chunk = try reader.handle.read(upToCount: toReadBytes), chunk.count == toReadBytes else {
+                        throw LiveCAFReader.Error.shortRead
+                    }
+                    hasher.update(data: chunk)
+                    let framesReadNow = UInt64(toReadBytes) / bytesPerFrame
+                    hashedFrames += framesReadNow
+                    totalBytesHashed += UInt64(toReadBytes)
+                    remainingFrames -= framesReadNow
+                }
+            }
+            if isCancelled() || Task.isCancelled { throw CancellationError() }
+            let snapshot = hasher
+            return snapshot.finalize().map { String(format: "%02x", $0) }.joined()
+        }
+    }
+
     /// Computes lowercase 64-hex SHA-256 over raw PCM16LE bytes `[0 ..< committedFrames * bytesPerFrame)`
     /// inside the CAF `data` chunk, streaming in bounded chunks (64 KiB) to avoid large allocations.
-    public func prefixSHA256(committedFrames: UInt64) throws -> String {
-        guard committedFrames > 0 else { throw Error.outOfRange }
-        let available = try availableFrames()
-        guard committedFrames <= available else { throw Error.outOfRange }
-        var remaining = committedFrames * UInt64(layout.bytesPerFrame)
-        try handle.seek(toOffset: layout.dataStartOffset)
-        var hasher = SHA256()
-        let chunkSize = 65_536
-        while remaining > 0 {
-            let toRead = Int(min(remaining, UInt64(chunkSize)))
-            guard let chunk = try handle.read(upToCount: toRead), chunk.count == toRead else {
-                throw Error.shortRead
-            }
-            hasher.update(data: chunk)
-            remaining -= UInt64(toRead)
-        }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    public func prefixSHA256(committedFrames: UInt64, isCancelled: () -> Bool = { false }) throws -> String {
+        var hasher = IncrementalPrefixHasher()
+        return try hasher.advance(to: committedFrames, using: self, isCancelled: isCancelled)
     }
 
     /// Inspects a finalized (or growing) CAF file read-only and returns its layout and frame count.

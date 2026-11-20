@@ -160,6 +160,124 @@ import CassiniNotebook
         }
     }
 
+    @Test func incrementalPrefixHasherScalesLinearlyMatchesFullDigestAndChecksCancellation() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("capture.caf")
+
+        let n = 10
+        let totalSeconds = 2 * n
+        let framesPerSecond: UInt64 = 48_000
+        let totalFrames = UInt64(totalSeconds) * framesPerSecond
+        var pcm = Data(capacity: Int(totalFrames) * 2)
+        for i in 0..<Int(totalFrames) {
+            var sample = Int16(truncatingIfNeeded: (i &* 31) ^ (i >> 3)).littleEndian
+            withUnsafeBytes(of: &sample) { pcm.append(contentsOf: $0) }
+        }
+        try Self.writeCAF(to: url, sampleRate: 48_000, pcm: pcm, declaredSize: -1)
+
+        let reader = try LiveCAFReader(url: url)
+        defer { reader.close() }
+
+        var hasher = LiveCAFReader.IncrementalPrefixHasher()
+        var bytesAtN: UInt64 = 0
+        for sec in 1...totalSeconds {
+            let committed = UInt64(sec) * framesPerSecond
+            let digest = try hasher.advance(to: committed, using: reader)
+            if sec == 1 || sec == n || sec == totalSeconds {
+                let fullDigest = try reader.prefixSHA256(committedFrames: committed)
+                #expect(digest == fullDigest, "Incremental digest at \(sec)s must match full prefix SHA-256")
+            }
+            if sec == n { bytesAtN = hasher.totalBytesHashed }
+        }
+        let bytesAt2N = hasher.totalBytesHashed
+        #expect(bytesAtN == UInt64(n) * framesPerSecond * 2)
+        #expect(bytesAt2N == 2 * bytesAtN, "Total bytes hashed across 2N commits must scale strictly linearly (O(N))")
+
+        // Cancellation mid-advance throws CancellationError and preserves resumable incremental state.
+        var cancelledHasher = LiveCAFReader.IncrementalPrefixHasher()
+        var checks = 0
+        #expect(throws: CancellationError.self) {
+            _ = try cancelledHasher.advance(to: framesPerSecond * 4, using: reader) {
+                checks += 1
+                return checks > 1
+            }
+        }
+        #expect(cancelledHasher.hashedFrames > 0 && cancelledHasher.hashedFrames < framesPerSecond * 4)
+        let resumedDigest = try cancelledHasher.advance(to: framesPerSecond * 4, using: reader)
+        #expect(resumedDigest == (try reader.prefixSHA256(committedFrames: framesPerSecond * 4)))
+    }
+
+    @Test func checkpointValidateRequiresClipsSidecarExistenceAndSize() throws {
+        let sha = String(repeating: "a", count: 64)
+        let speakers = SpeakerCheckpoint(
+            prefix: "spk_",
+            failed: false,
+            diarizer: nil,
+            clipSamples: 16_000,
+            voiceClips: ["spk_1": [PrintWindow(0, 16_000)]]
+        )
+        let cp = CheckpointState(
+            source: "capture.caf",
+            signature: "old:0",
+            model: "parakeet-model",
+            segments: [],
+            doneMs: 1_000,
+            totalMs: 0,
+            elapsedMs: 10,
+            speakers: speakers,
+            origin: .precompute,
+            recognitionSampleCount: 16_000,
+            committedPrefix: CommittedPrefix(
+                kind: .cafPcm16LeFrames,
+                sourceSampleRateHz: 48_000,
+                committedUnitCount: 48_048,
+                prefixSha256: sha
+            )
+        )
+
+        // Missing clips.pcm (clipsBytes == nil) must fail validation when clipSamples > 0.
+        let missingClips = CheckpointState.PrefixExpectation(
+            prefixKind: .cafPcm16LeFrames,
+            sourceSampleRateHz: 48_000,
+            resamplerLookaheadFrames: 48,
+            finalizedUnitCount: 96_000,
+            prefixSha256: sha,
+            workFiles: .init(clipsBytes: nil)
+        )
+        #expect(throws: CheckpointState.Mismatch.speakers) {
+            try cp.validate(.init(source: "capture.caf", signature: "new:1", model: "parakeet-model", prefix: missingClips))
+        }
+        #expect(throws: CheckpointState.Mismatch.speakers) {
+            try cp.validate(.init(source: "capture.caf", signature: "old:0", model: "parakeet-model", prefix: missingClips))
+        }
+
+        // Truncated clips.pcm (< clipSamples * 4 bytes) must fail validation.
+        let truncatedClips = CheckpointState.PrefixExpectation(
+            prefixKind: .cafPcm16LeFrames,
+            sourceSampleRateHz: 48_000,
+            resamplerLookaheadFrames: 48,
+            finalizedUnitCount: 96_000,
+            prefixSha256: sha,
+            workFiles: .init(clipsBytes: 63_996)
+        )
+        #expect(throws: CheckpointState.Mismatch.speakers) {
+            try cp.validate(.init(source: "capture.caf", signature: "new:1", model: "parakeet-model", prefix: truncatedClips))
+        }
+
+        // Intact clips.pcm (>= clipSamples * 4 bytes) passes validation.
+        let intactClips = CheckpointState.PrefixExpectation(
+            prefixKind: .cafPcm16LeFrames,
+            sourceSampleRateHz: 48_000,
+            resamplerLookaheadFrames: 48,
+            finalizedUnitCount: 96_000,
+            prefixSha256: sha,
+            workFiles: .init(clipsBytes: 64_000)
+        )
+        try cp.validate(.init(source: "capture.caf", signature: "new:1", model: "parakeet-model", prefix: intactClips))
+    }
+
     private static func writeCAF(to url: URL, sampleRate: Double, pcm: Data, declaredSize: Int64) throws {
         var out = Data()
         // File header: 'caff', version 1, flags 0

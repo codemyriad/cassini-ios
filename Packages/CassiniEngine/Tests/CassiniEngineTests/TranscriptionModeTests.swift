@@ -198,6 +198,165 @@ import CassiniNotebook
         #expect(statusStale == .missing)
     }
 
+    @Test func stopHaltsCaptureBeforePrecomputeDrainReturns() async throws {
+        final class BlockingPrecomputer: RecordingPrecomputing, @unchecked Sendable {
+            private let enteredStream: AsyncStream<Void>
+            private let enteredContinuation: AsyncStream<Void>.Continuation
+            private let releaseLock = Mutex<CheckedContinuation<Void, Never>?>(nil)
+            private let releasedEarly = Mutex(false)
+
+            init() {
+                (enteredStream, enteredContinuation) = AsyncStream.makeStream(of: Void.self)
+            }
+
+            func start(noteID: UUID, captureURL: URL) {}
+
+            func stop(noteID: UUID) async {
+                enteredContinuation.yield()
+                enteredContinuation.finish()
+                await withCheckedContinuation { continuation in
+                    let alreadyReleased = releaseLock.withLock { slot -> Bool in
+                        if releasedEarly.withLock({ $0 }) { return true }
+                        slot = continuation
+                        return false
+                    }
+                    if alreadyReleased { continuation.resume() }
+                }
+            }
+
+            func preempt() async {}
+            func hasPrecomputeCheckpoint(for noteID: UUID) -> Bool { true }
+
+            func waitForStopEntered() async {
+                for await _ in enteredStream { break }
+            }
+
+            func releaseStop() {
+                let continuation = releaseLock.withLock { slot -> CheckedContinuation<Void, Never>? in
+                    releasedEarly.withLock { $0 = true }
+                    defer { slot = nil }
+                    return slot
+                }
+                continuation?.resume()
+            }
+        }
+
+        let blocking = BlockingPrecomputer()
+        let h = try RecordingHarness()
+        defer { h.tearDown() }
+        h.settings.transcriptionMode = .transcribeWhileRecording
+        let controller = RecordingController(parts: .init(
+            ready: {}, notes: h.notes, capture: h.capture, storage: h.storage, audio: h.audio,
+            settings: h.settings, handoff: h.handoff, clock: h.clock, defaultTitle: { _ in "Voice note" },
+            precompute: blocking
+        ))
+
+        #expect(controller.start())
+        await controller.operations?.value
+        let id = try #require(controller.state.activeRecording?.noteID)
+        h.capture.elapsed = 15
+
+        controller.finish()
+        await blocking.waitForStopEntered()
+
+        // While precompute shutdown is still held open (simulating an in-flight native decode),
+        // microphone capture must already be stopped so zero extra audio enters the saved note,
+        // and file inspection/compression must not have begun yet.
+        #expect(h.capture.stops == 1, "capture must stop before precompute drain returns")
+        #expect(controller.finalizing.isEmpty, "inspection/compression must wait for precompute drain")
+        #expect(h.handoff.handedOff.isEmpty)
+
+        blocking.releaseStop()
+        await controller.settle()
+
+        #expect(h.handoff.handedOff == [id])
+        let note = try #require(await h.note(id))
+        #expect(note.status == .queued)
+    }
+
+    @Test func malformedAndUnsupportedVersionPrecomputeCheckpointsPreserveOriginAndReportMissing() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = try NoteStore(root: root)
+        let work = NoteWorkFolders(notes: store)
+
+        // Case A: Unsupported version on precompute checkpoint, no backup.
+        do {
+            let note = Note(title: "PrecomputeBadVersion", audioFilename: "capture.caf")
+            try await store.save(note)
+            let folder = work.files.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let json = #"{"version":99,"origin":"precompute","source":"capture.caf"}"#
+            try Data(json.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+
+            do {
+                _ = try work.files.load(note.id)
+                Issue.record("Expected CheckpointFiles.load to throw on unsupported version")
+            } catch let error as CheckpointLoadError {
+                #expect(error.isPrecompute)
+            }
+            #expect(await work.status(of: note.id) == .missing)
+        }
+
+        // Case B: Malformed typed field on precompute checkpoint with an unreadable/corrupt backup.
+        do {
+            let note = Note(title: "PrecomputeMalformed", audioFilename: "capture.caf")
+            try await store.save(note)
+            let folder = work.files.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let mainJSON = #"{"version":1,"origin":"precompute","source":"capture.caf","signature":"1:2","model":"m","segments":[],"doneMs":"not-an-int","totalMs":0,"elapsedMs":0,"inferenceMs":0,"resumedFromMs":0,"wordsComplete":false}"#
+            try Data(mainJSON.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+            try Data("{truncated".utf8).write(to: folder.appendingPathComponent(CheckpointFiles.backupFilename))
+
+            do {
+                _ = try work.files.load(note.id)
+                Issue.record("Expected CheckpointFiles.load to throw on malformed field")
+            } catch let error as CheckpointLoadError {
+                #expect(error.isPrecompute)
+            }
+            #expect(await work.status(of: note.id) == .missing)
+        }
+
+        // Case C: Truncated main JSON, unsupported-version precompute backup.
+        do {
+            let note = Note(title: "PrecomputeTruncatedMain", audioFilename: "capture.caf")
+            try await store.save(note)
+            let folder = work.files.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data("{".utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+            let bakJSON = #"{"version":99,"origin":"precompute","source":"capture.caf"}"#
+            try Data(bakJSON.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.backupFilename))
+
+            do {
+                _ = try work.files.load(note.id)
+                Issue.record("Expected CheckpointFiles.load to throw")
+            } catch let error as CheckpointLoadError {
+                #expect(error.isPrecompute)
+            }
+            #expect(await work.status(of: note.id) == .missing)
+        }
+
+        // Case D: Batch checkpoint (omitted origin) with unsupported version still reports `.mismatch`.
+        do {
+            let note = Note(title: "BatchBadVersion", audioFilename: "capture.caf")
+            try await store.save(note)
+            let folder = work.files.directory(for: note.id)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let json = #"{"version":99,"source":"capture.caf"}"#
+            try Data(json.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+
+            do {
+                _ = try work.files.load(note.id)
+                Issue.record("Expected CheckpointFiles.load to throw")
+            } catch let error as CheckpointLoadError {
+                #expect(!error.isPrecompute)
+            }
+            #expect(await work.status(of: note.id) == .mismatch)
+        }
+    }
+
     private static func writeCAF(to url: URL, sampleRate: Double, pcm: Data, declaredSize: Int64) throws {
         var out = Data()
         out.append(contentsOf: "caff".utf8)

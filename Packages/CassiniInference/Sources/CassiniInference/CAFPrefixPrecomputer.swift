@@ -342,6 +342,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
 
         var framesRead: UInt64 = 0
         var reportedMs: Int64 = 0
+        var prefixHasher = LiveCAFReader.IncrementalPrefixHasher()
 
         while !cancel.isSet && !pressure.shouldYield() {
             guard let safeThrough = try? reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames) else { return }
@@ -370,8 +371,17 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
                         resamplerLookaheadFrames: lookahead
                     )
                     let committedFrames = max(framesRead, minRequired)
-                    if committedFrames <= safeThrough,
-                       let sha = try? reader.prefixSHA256(committedFrames: committedFrames) {
+                    if committedFrames <= safeThrough {
+                        let sha: String
+                        do {
+                            sha = try prefixHasher.advance(to: committedFrames, using: reader) {
+                                cancel.isSet || pressure.shouldYield()
+                            }
+                        } catch is CancellationError {
+                            return
+                        } catch {
+                            continue
+                        }
                         reportedMs = transcript.doneMs
                         let lastEnd = st.words.map(\.endMs).max() ?? 0
                         let doneMs = max(recognition.doneMs, lastEnd)
@@ -509,6 +519,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         var reportedLanguage: String?
         let maximumRawSamples = 240_128 + 16_000 + 5_120
         let startedAt = TranscriptionJob.uptimeMs()
+        var prefixHasher = LiveCAFReader.IncrementalPrefixHasher()
 
         while !cancel.isSet && !pressure.shouldYield(minMemoryBytes: Int64(WhistleCapability.windowHeadroom)) {
             guard let safeThrough = try? reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames) else { return }
@@ -576,8 +587,17 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
                     resamplerLookaheadFrames: lookahead
                 )
                 let committedFrames = max(framesRead, minRequired)
-                if committedFrames <= safeThrough,
-                   let sha = try? reader.prefixSHA256(committedFrames: committedFrames) {
+                if committedFrames <= safeThrough {
+                    let sha: String
+                    do {
+                        sha = try prefixHasher.advance(to: committedFrames, using: reader) {
+                            cancel.isSet || pressure.shouldYield(minMemoryBytes: Int64(WhistleCapability.windowHeadroom))
+                        }
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        continue
+                    }
                     let now = TranscriptionJob.uptimeMs()
                     var checkpoint = CheckpointState(
                         source: captureURL.lastPathComponent,

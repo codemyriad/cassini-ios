@@ -153,8 +153,11 @@ public struct CheckpointState: Hashable, Sendable {
             if let decoded = prefix.decodedPcmSha256 {
                 guard expectedPrefix.decodedPcmSha256 == decoded else { throw .signature }
             }
-            if let speakers, speakers.clipSamples > 0, let clipsBytes = expectedPrefix.workFiles.clipsBytes {
-                guard clipsBytes >= Int64(speakers.clipSamples) * 4 else { throw .speakers }
+        }
+        if let speakers, speakers.clipSamples > 0, let expectedPrefix = expected.prefix {
+            guard let clipsBytes = expectedPrefix.workFiles.clipsBytes,
+                  clipsBytes >= Int64(speakers.clipSamples) * 4 else {
+                throw .speakers
             }
         }
         guard (0...limit).contains(doneMs), (0...limit).contains(totalMs), totalMs == 0 || doneMs <= totalMs,
@@ -307,6 +310,16 @@ extension CheckpointState: Codable {
 
     public static func decode(_ data: Data) throws -> CheckpointState {
         try JSONDecoder().decode(CheckpointState.self, from: data)
+    }
+
+    /// Best-effort origin inspection from raw checkpoint JSON bytes when full decoding fails (e.g. unsupported
+    /// `version` or malformed typed fields). Returns `.precompute` or `.batch` for any parseable JSON object,
+    /// and `nil` when `data` is not a valid JSON object (e.g. truncated bytes).
+    public static func sniffOrigin(from data: Data) -> CheckpointOrigin? {
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return nil
+        }
+        return (object["origin"] as? String) == CheckpointOrigin.precompute.rawValue ? .precompute : .batch
     }
 }
 

@@ -225,6 +225,72 @@ import Testing
         #expect(alteredRun.postStopEarliestFrameRead == 0, "Fallback must decode cleanly from frame 0")
     }
 
+    @Test func malformedPrecomputeCheckpointsDiscardAndDecodeCleanlyThroughJob() async throws {
+        let fullPCM = Self.make48kPCM16LE(seconds: 6)
+
+        // Case A: Unsupported version in precompute checkpoint with no backup -> discard & clean decode.
+        let unsupported = try await runWhistleJobWithRawCheckpoint(
+            fullPCM: fullPCM,
+            mainJSON: #"{"version":99,"origin":"precompute","source":"capture.caf"}"#,
+            backupJSON: nil
+        )
+        #expect(unsupported.outcome == .done)
+        #expect(unsupported.earliestFrameRead == 0)
+        #expect(!unsupported.note.transcript.isEmpty)
+
+        // Case B: Malformed typed field in precompute checkpoint with corrupt backup -> discard & clean decode.
+        let malformed = try await runWhistleJobWithRawCheckpoint(
+            fullPCM: fullPCM,
+            mainJSON: #"{"version":1,"origin":"precompute","source":"capture.caf","signature":"1:2","model":"m","segments":[],"doneMs":"bad","totalMs":0,"elapsedMs":0,"inferenceMs":0,"resumedFromMs":0,"wordsComplete":false}"#,
+            backupJSON: "{corrupt"
+        )
+        #expect(malformed.outcome == .done)
+        #expect(malformed.earliestFrameRead == 0)
+        #expect(!malformed.note.transcript.isEmpty)
+
+        // Case C: Non-precompute (batch) unsupported version with no backup -> still fails with CHECKPOINT_MISMATCH.
+        let batchMismatch = try await runWhistleJobWithRawCheckpoint(
+            fullPCM: fullPCM,
+            mainJSON: #"{"version":99,"source":"capture.caf"}"#,
+            backupJSON: nil
+        )
+        #expect(batchMismatch.outcome == .failed(.checkpointMismatch))
+    }
+
+    @Test func deletedOrTruncatedClipsSidecarDiscardsPrecomputeAndPreservesVoiceprints() async throws {
+        let fullPCM = Self.make48kPCM16LE(seconds: 65)
+        let prefixPCM = fullPCM.prefix(35 * 48_000 * 2)
+
+        let baseline = try await runParakeetLane(fullPCM: fullPCM, growingPrefixPCM: nil)
+        #expect(!baseline.appliedPrints.isEmpty)
+
+        // Case A: Deleted work/clips.pcm after precompute -> must discard precompute and decode afresh, preserving voiceprints.
+        let deleted = try await runParakeetLane(fullPCM: fullPCM, growingPrefixPCM: prefixPCM) { clipsURL in
+            try FileManager.default.removeItem(at: clipsURL)
+        }
+        #expect(deleted.precomputeCheckpointsSaved >= 1)
+        #expect(deleted.postStopDecodeCalls == baseline.postStopDecodeCalls,
+                "Deleted clips.pcm must discard precompute and run a full decode instead of dropping voice identification")
+        #expect(deleted.appliedPrints.count == baseline.appliedPrints.count)
+        for (a, b) in zip(deleted.appliedPrints, baseline.appliedPrints) {
+            #expect(a.vector == b.vector)
+            #expect(a.speechSeconds == b.speechSeconds)
+        }
+
+        // Case B: Truncated work/clips.pcm after precompute -> must discard precompute and decode afresh, preserving voiceprints.
+        let truncated = try await runParakeetLane(fullPCM: fullPCM, growingPrefixPCM: prefixPCM) { clipsURL in
+            try Data(repeating: 0, count: 4).write(to: clipsURL)
+        }
+        #expect(truncated.precomputeCheckpointsSaved >= 1)
+        #expect(truncated.postStopDecodeCalls == baseline.postStopDecodeCalls,
+                "Truncated clips.pcm must discard precompute and run a full decode")
+        #expect(truncated.appliedPrints.count == baseline.appliedPrints.count)
+        for (a, b) in zip(truncated.appliedPrints, baseline.appliedPrints) {
+            #expect(a.vector == b.vector)
+            #expect(a.speechSeconds == b.speechSeconds)
+        }
+    }
+
     @Test func thermalMemoryBackgroundBudgetPreemptionAndNonPrecomputeModesAllocateZeroModels() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -328,7 +394,11 @@ import Testing
         let postStopDecodeCalls: Int
     }
 
-    private func runParakeetLane(fullPCM: Data, growingPrefixPCM: Data?) async throws -> ParakeetLaneResult {
+    private func runParakeetLane(
+        fullPCM: Data,
+        growingPrefixPCM: Data?,
+        tamperClipsAfterPrecompute: ((URL) throws -> Void)? = nil
+    ) async throws -> ParakeetLaneResult {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -373,6 +443,9 @@ import Testing
                 onCheckpointSaved: { _, _ in savedCount.withLock { $0 += 1 } }
             )
             await pre.runOnce(noteID: note.id, captureURL: cafURL)
+            if let tamperClipsAfterPrecompute, let clipsURL = checkpoints.clipsURL(for: note.id) {
+                try tamperClipsAfterPrecompute(clipsURL)
+            }
         }
 
         // Stop finalizes the full CAF file (changing file length + mtime + data chunk header).
@@ -497,6 +570,68 @@ import Testing
             precomputeCheckpointsSaved: savedCount.withLock { $0 },
             postStopEarliestFrameRead: earliestRead.withLock { $0 ?? 0 }
         )
+    }
+
+    private func runWhistleJobWithRawCheckpoint(
+        fullPCM: Data,
+        mainJSON: String,
+        backupJSON: String?
+    ) async throws -> (outcome: JobOutcome, note: Note, earliestFrameRead: Int64) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let store = try NoteStore(root: dir.appendingPathComponent("notes", isDirectory: true))
+        var note = Note(title: "WhistleRaw", audioFilename: "capture.caf")
+        note.duration = Double(fullPCM.count / 2) / 48_000.0
+        try await store.save(note)
+        let cafURL = store.audioURL(for: note)
+        try Self.writeCAF(to: cafURL, pcm: fullPCM, finalized: true)
+
+        let checkpoints = CheckpointFiles(notes: store)
+        let folder = checkpoints.directory(for: note.id)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data(mainJSON.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.filename))
+        if let backupJSON {
+            try Data(backupJSON.utf8).write(to: folder.appendingPathComponent(CheckpointFiles.backupFilename))
+        }
+
+        let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, cpuSupported: true,
+                                           bundleVerified: true, pipelineAccepted: true, deviceAccepted: true)
+        let backend = Self.deterministicWhistleBackend()
+        let earliestRead = Mutex<Int64?>(nil)
+        let trace = WhistleTranscriber.Trace(
+            read: { range in
+                earliestRead.withLock { current in
+                    current = current.map { min($0, range.lowerBound) } ?? range.lowerBound
+                }
+            },
+            submitted: { _ in },
+            resultReady: { _ in }
+        )
+        let transcriber = WhistleTranscriber(
+            acceptance: { capability },
+            availableMemory: { 2 << 30 },
+            trace: trace,
+            backend: backend,
+            skipBundleVerification: true
+        )
+        let jobRunner = TranscriptionJob(
+            notes: store,
+            transcriber: transcriber,
+            analyzer: NoSpeakersAnalyzer(),
+            checkpoints: checkpoints,
+            provenance: ProvenanceFiles(notes: store),
+            host: TestJobHost(store: store, identifySpeakers: false) { _ in },
+            clock: SystemClock(),
+            budget: NativeBudget(),
+            availableMemory: { 2 << 30 }
+        )
+
+        let job = Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, language: "", enqueuedAt: Date())
+        let outcome = await jobRunner.run(job, stop: StopSignal()) { _ in }
+        let finalNote = try #require(await store.note(note.id))
+        return (outcome, finalNote, earliestRead.withLock { $0 ?? 0 })
     }
 
     private static func deterministicWhistleBackend() -> WhistleSessionBackend {
