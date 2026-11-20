@@ -197,6 +197,7 @@ def extract_reports(df, run_arn: str, out_dir: Path) -> list[dict]:
 KNOWN_TEST_METHODS = frozenset({
     "testQualificationHarnessAndTelemetryContract",
     "testWordErrorRateEdgeCases",
+    "testCanonicalSpeakerSlotAndVoiceMapComparison",
     "testContinuousCaptureContinuityRejectsEarlyPause",
     "test01RealCAFLiveReaderAndInterruptionLifecycle",
     "test02PairedEquivalenceAnd5MinMetrics",

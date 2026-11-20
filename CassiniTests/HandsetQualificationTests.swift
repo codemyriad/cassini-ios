@@ -329,6 +329,36 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertEqual(Self.wordErrorRate(reference: [w("hello"), w("world")], hypothesis: [w("hello"), w("mars")]), 0.5)
     }
 
+    func testCanonicalSpeakerSlotAndVoiceMapComparison() {
+        let prefixA = WindowSpeakers.freshPrefix()
+        let prefixB = WindowSpeakers.freshPrefix()
+        XCTAssertNotEqual(prefixA, prefixB)
+
+        let rawTurnsA = [
+            DiarizerTurn(0, 2_000, 0).speakerTurn(prefix: prefixA),
+            DiarizerTurn(2_500, 5_000, 2).speakerTurn(prefix: prefixA)
+        ]
+        let rawTurnsB = [
+            DiarizerTurn(0, 2_000, 0).speakerTurn(prefix: prefixB),
+            DiarizerTurn(2_500, 5_000, 2).speakerTurn(prefix: prefixB)
+        ]
+        XCTAssertEqual(Self.canonicalizeSpeakerTurns(rawTurnsA), Self.canonicalizeSpeakerTurns(rawTurnsB))
+
+        let shiftedTurns = [
+            DiarizerTurn(0, 2_100, 0).speakerTurn(prefix: prefixB),
+            DiarizerTurn(2_500, 5_000, 2).speakerTurn(prefix: prefixB)
+        ]
+        XCTAssertNotEqual(Self.canonicalizeSpeakerTurns(rawTurnsA), Self.canonicalizeSpeakerTurns(shiftedTurns))
+
+        let voicesA = ["\(prefixA)1": "Alice", "\(prefixA)3": "Carla"]
+        let voicesB = ["\(prefixB)1": "Alice", "\(prefixB)3": "Carla"]
+        let swappedVoices = ["\(prefixB)1": "Carla", "\(prefixB)3": "Alice"]
+        XCTAssertEqual(Self.canonicalizeVoiceMap(voicesA), Self.canonicalizeVoiceMap(voicesB))
+        XCTAssertEqual(Self.canonicalizeVoiceMap(voicesA), ["1": "Alice", "3": "Carla"])
+        XCTAssertNotEqual(Self.canonicalizeVoiceMap(voicesA), Self.canonicalizeVoiceMap(swappedVoices))
+        XCTAssertEqual(Self.canonicalSpeakerSlot("S1"), "S1")
+    }
+
     @MainActor
     func testContinuousCaptureContinuityRejectsEarlyPause() async throws {
         final class EarlyPauseRecorder: CaptureRecorder {
@@ -751,12 +781,18 @@ final class HandsetQualificationTests: XCTestCase {
                            "Production Parakeet CAM++ saved-voice matches must match across M4A vs CAF finalization")
 
             // Strict identical-audio checkpoint equivalence (D109 §1.3: zero drift from CAF prefix resume).
+            let parakeetControlProv = try XCTUnwrap(parakeetCafControl.speechProvenance,
+                                                    "Identical-CAF Parakeet export must include provenance.speechToText")
+            XCTAssertEqual(parakeetControlProv["engine"]?.string, TranscriptProvenance.parakeetEngine,
+                           "Parakeet provenance.speechToText must identify Parakeet TDT engine")
+            XCTAssertEqual(parakeetHeadStart.speechProvenance, parakeetControlProv,
+                           "Identical-CAF Parakeet deterministic provenance.speechToText must match (D109 §1.3)")
             XCTAssertEqual(parakeetHeadStart.opusSha256, parakeetCafControl.opusSha256, "Identical-CAF Parakeet .opus payload must match")
             XCTAssertEqual(parakeetHeadStart.words, parakeetCafControl.words, "Identical-CAF Parakeet words & timings must match")
             XCTAssertEqual(parakeetHeadStart.speakerTurns, parakeetCafControl.speakerTurns, "Identical-CAF Parakeet raw Sortformer turns must match")
             XCTAssertEqual(parakeetHeadStart.matchedVoiceNames, parakeetCafControl.matchedVoiceNames, "Identical-CAF Parakeet CAM++ saved-voice matches must match")
             XCTAssertEqual(parakeetHeadStart.matchedVoicesBySpeaker, parakeetCafControl.matchedVoicesBySpeaker,
-                           "Identical-CAF Parakeet CAM++ speakerID -> voiceName assignments must match")
+                           "Identical-CAF Parakeet CAM++ slot -> voiceName assignments must match")
             XCTAssertGreaterThan(parakeetHeadStart.precomputeCheckpointsSaved, 0)
             XCTAssertLessThan(parakeetHeadStart.postStopWindowsDecoded, parakeetBaseline.postStopWindowsDecoded,
                               "Head-start must decode fewer post-Stop windows than afterStop")
@@ -771,11 +807,13 @@ final class HandsetQualificationTests: XCTestCase {
                 injectPressureAtWindow: 2,
                 preserveCAFWithoutCheckpoint: false
             )
+            XCTAssertEqual(parakeetPressure.speechProvenance, parakeetControlProv,
+                           "Parakeet pressure-yield deterministic provenance.speechToText must match identical-CAF afterStop")
             XCTAssertEqual(parakeetPressure.words, parakeetCafControl.words, "Parakeet pressure-yield tail recovery must match identical-CAF afterStop")
             XCTAssertEqual(parakeetPressure.speakerTurns, parakeetCafControl.speakerTurns)
             XCTAssertEqual(parakeetPressure.matchedVoiceNames, parakeetCafControl.matchedVoiceNames)
             XCTAssertEqual(parakeetPressure.matchedVoicesBySpeaker, parakeetCafControl.matchedVoicesBySpeaker,
-                           "Parakeet pressure-yield CAM++ speakerID -> voiceName assignments must match identical-CAF afterStop")
+                           "Parakeet pressure-yield CAM++ slot -> voiceName assignments must match identical-CAF afterStop")
 
             report["parakeet"] = [
                 "equivalencePassed": true,
@@ -838,6 +876,12 @@ final class HandsetQualificationTests: XCTestCase {
                                      "Production Whistle afterStop (M4A) vs transcribeWhileRecording (CAF) WER must be <= 2%")
 
             // Strict identical-audio checkpoint equivalence (D109 §1.3).
+            let whistleControlProv = try XCTUnwrap(whistleCafControl.speechProvenance,
+                                                   "Identical-CAF Whistle export must include provenance.speechToText")
+            XCTAssertEqual(whistleControlProv["engine"]?.string, "Whistle",
+                           "Whistle provenance.speechToText must identify Whistle engine")
+            XCTAssertEqual(whistleHeadStart.speechProvenance, whistleControlProv,
+                           "Identical-CAF Whistle deterministic provenance.speechToText must match (D109 §1.3)")
             XCTAssertEqual(whistleHeadStart.opusSha256, whistleCafControl.opusSha256, "Identical-CAF Whistle .opus payload must match")
             XCTAssertEqual(whistleHeadStart.words, whistleCafControl.words, "Identical-CAF Whistle words & timings must match")
             XCTAssertGreaterThan(whistleHeadStart.precomputeCheckpointsSaved, 0)
@@ -851,6 +895,8 @@ final class HandsetQualificationTests: XCTestCase {
                 injectPressureAtCheckpoint: 3,
                 preserveCAFWithoutCheckpoint: false
             )
+            XCTAssertEqual(whistlePressure.speechProvenance, whistleControlProv,
+                           "Whistle pressure-yield deterministic provenance.speechToText must match identical-CAF afterStop")
             XCTAssertEqual(whistlePressure.words, whistleCafControl.words, "Whistle pressure-yield tail recovery must match identical-CAF afterStop")
 
             report["whistle"] = [
@@ -1123,6 +1169,7 @@ final class HandsetQualificationTests: XCTestCase {
     private struct PairedLaneResult {
         let audioFilename: String
         let exportVerified: Bool
+        let speechProvenance: JSONObject?
         let exportedDurationSeconds: Double
         let opusSha256: String
         let words: [ComparableWord]
@@ -1369,23 +1416,18 @@ final class HandsetQualificationTests: XCTestCase {
         let words = saved.transcript.flatMap { seg in
             seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: seg.speaker) }
         }
-        let turns = host.recordedTurns.map { turn in
-            ComparableTurn(
-                speaker: turn.speakerID,
-                startMs: Int64((turn.start * 1000).rounded()),
-                endMs: Int64((turn.end * 1000).rounded())
-            )
-        }
+        let turns = Self.canonicalizeSpeakerTurns(host.recordedTurns)
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
             exportVerified: doc.state == DocumentState.ok,
+            speechProvenance: Self.deterministicSpeechProvenance(from: doc),
             exportedDurationSeconds: exportedDuration,
             opusSha256: opusSha,
             words: words,
             speakerTurns: turns,
             speakerCount: saved.speakers?.count ?? 0,
             matchedVoiceNames: host.matchedNames.sorted(),
-            matchedVoicesBySpeaker: host.matchedVoicesBySpeaker,
+            matchedVoicesBySpeaker: Self.canonicalizeVoiceMap(host.matchedVoicesBySpeaker),
             precomputeCheckpointsSaved: precomputeSaved,
             postStopWindowsDecoded: postStopWindows.withLock { $0 },
             postStopSegmentsDecoded: 0,
@@ -1543,6 +1585,7 @@ final class HandsetQualificationTests: XCTestCase {
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
             exportVerified: doc.state == DocumentState.ok,
+            speechProvenance: Self.deterministicSpeechProvenance(from: doc),
             exportedDurationSeconds: exportedDuration,
             opusSha256: opusSha,
             words: words,
@@ -1903,6 +1946,53 @@ final class HandsetQualificationTests: XCTestCase {
             )
         }
         return failures
+    }
+
+    /// Strips a leading `WindowSpeakers.freshPrefix()` (`<UUID>_`) while preserving the Sortformer slot suffix.
+    private static func canonicalSpeakerSlot(_ speakerID: String) -> String {
+        if let underscore = speakerID.firstIndex(of: "_") {
+            let prefix = String(speakerID[..<underscore])
+            if UUID(uuidString: prefix) != nil {
+                return String(speakerID[speakerID.index(after: underscore)...])
+            }
+        }
+        return speakerID
+    }
+
+    private static func canonicalizeSpeakerTurns(_ turns: [SpeakerTurn]) -> [ComparableTurn] {
+        turns.map { turn in
+            ComparableTurn(
+                speaker: canonicalSpeakerSlot(turn.speakerID),
+                startMs: Int64((turn.start * 1000).rounded()),
+                endMs: Int64((turn.end * 1000).rounded())
+            )
+        }
+    }
+
+    private static func canonicalizeVoiceMap(_ map: [String: String]) -> [String: String] {
+        var out: [String: String] = [:]
+        for (speakerID, voiceName) in map {
+            out[canonicalSpeakerSlot(speakerID)] = voiceName
+        }
+        return out
+    }
+
+    /// Extracts deterministic `provenance.speechToText` fields from an exported `CassiniDocument`,
+    /// excluding run-specific timing and resume-offset measurements (`x-inferenceMs`, `x-resumedFromMs`,
+    /// and `x-speakerDiarization.elapsedMs`).
+    private static func deterministicSpeechProvenance(from doc: CassiniDocument) -> JSONObject? {
+        guard let speechToText = doc.manifest?["provenance"]?.object?["speechToText"]?.object,
+              let firstEntry = speechToText.pairs.first?.value.object else {
+            return nil
+        }
+        var normalized = firstEntry
+        normalized["x-inferenceMs"] = nil
+        normalized["x-resumedFromMs"] = nil
+        if var diar = normalized["x-speakerDiarization"]?.object {
+            diar["elapsedMs"] = nil
+            normalized["x-speakerDiarization"] = .object(diar)
+        }
+        return normalized
     }
 
     private static func wordErrorRate(reference: [ComparableWord], hypothesis: [ComparableWord]) -> Double {
