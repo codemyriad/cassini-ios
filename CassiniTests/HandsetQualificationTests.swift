@@ -378,7 +378,9 @@ final class HandsetQualificationTests: XCTestCase {
             matchedVoicesBySpeaker: [String: String] = ["1": "Alice", "3": "Carla"],
             speechProvenance: JSONObject? = baseProv,
             precomputeCheckpointsSaved: Int = 2,
-            postStopWindowsDecoded: Int = 1
+            checkpointsAtPressureInjection: Int? = nil,
+            postStopWindowsDecoded: Int = 1,
+            postStopSegmentsDecoded: Int = 0
         ) -> PairedLaneResult {
             PairedLaneResult(
                 audioFilename: audioFilename,
@@ -392,8 +394,9 @@ final class HandsetQualificationTests: XCTestCase {
                 matchedVoiceNames: ["Alice", "Carla"],
                 matchedVoicesBySpeaker: matchedVoicesBySpeaker,
                 precomputeCheckpointsSaved: precomputeCheckpointsSaved,
+                checkpointsAtPressureInjection: checkpointsAtPressureInjection,
                 postStopWindowsDecoded: postStopWindowsDecoded,
-                postStopSegmentsDecoded: 0,
+                postStopSegmentsDecoded: postStopSegmentsDecoded,
                 stopToPublishedSeconds: 1.0,
                 telemetry: snap,
                 precomputeTelemetry: nil
@@ -403,7 +406,7 @@ final class HandsetQualificationTests: XCTestCase {
         let baseline = makeLane(audioFilename: RecordingController.compressedFilename, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
         let control = makeLane(precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
         let headStart = makeLane(precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
-        let pressure = makeLane(precomputeCheckpointsSaved: 2, postStopWindowsDecoded: 2)
+        let pressure = makeLane(precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
 
         let passing = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: pressure)
         XCTAssertTrue(passing.equivalencePassed)
@@ -421,10 +424,35 @@ final class HandsetQualificationTests: XCTestCase {
             ("backend", .string("other-backend")),
             ("language", .string("und"))
         ])
-        let badProvPressure = makeLane(speechProvenance: wrongProv, precomputeCheckpointsSaved: 2, postStopWindowsDecoded: 2)
+        let badProvPressure = makeLane(speechProvenance: wrongProv, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
         let badProvEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: badProvPressure)
         XCTAssertTrue(badProvEval.equivalencePassed)
         XCTAssertFalse(badProvEval.pressureRecoveryPassed, "Provenance mismatch must set pressureRecoveryPassed = false")
+
+        // Parakeet: matching output with two extra checkpoints after pressure injection must fail pressureRecoveryPassed.
+        let parakeetIgnoredPressure = makeLane(precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 1)
+        let parakeetIgnoredEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: parakeetIgnoredPressure)
+        XCTAssertTrue(parakeetIgnoredEval.equivalencePassed)
+        XCTAssertFalse(parakeetIgnoredEval.pressureRecoveryPassed, "Parakeet ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
+
+        // Whistle: matching output with <=1 extra checkpoint passes; two extra checkpoints after pressure injection must fail pressureRecoveryPassed.
+        let whistleProv = JSONObject([
+            ("engine", .string("Whistle")),
+            ("backend", .string("Needle C API (CPU, on-device)")),
+            ("language", .string("en"))
+        ])
+        let whistleBaseline = makeLane(audioFilename: RecordingController.compressedFilename, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleControl = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleHeadStart = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
+        let whistlePressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
+        let whistlePassing = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistlePressure)
+        XCTAssertTrue(whistlePassing.equivalencePassed)
+        XCTAssertTrue(whistlePassing.pressureRecoveryPassed)
+
+        let whistleIgnoredPressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 5, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 10)
+        let whistleIgnoredEval = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistleIgnoredPressure)
+        XCTAssertTrue(whistleIgnoredEval.equivalencePassed)
+        XCTAssertFalse(whistleIgnoredEval.pressureRecoveryPassed, "Whistle ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
     }
 
     @MainActor
@@ -725,7 +753,10 @@ final class HandsetQualificationTests: XCTestCase {
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workDir) }
 
-        let (speechPCM, speakerSamples16k) = try Self.makeMultiSpeakerSpeech48kPCM16LE(totalSeconds: config.shortSeconds)
+        let shortSeconds = config.shortSeconds
+        let (speechPCM, speakerSamples16k) = try await Task.detached(priority: .userInitiated) {
+            try Self.makeMultiSpeakerSpeech48kPCM16LE(totalSeconds: shortSeconds)
+        }.value
 
         var report: [String: Any] = [
             "test": "test02PairedEquivalenceAnd5MinMetrics",
@@ -783,9 +814,11 @@ final class HandsetQualificationTests: XCTestCase {
         if config.runParakeet {
             try XCTSkipUnless(SherpaRuntime.isLinked, "built without SherpaRuntime")
             let modelsRoot = try await Self.ensurePinnedModelsInstalled(in: workDir)
-            // Enroll >= 3 distinct saved voices using real CAM++ voiceprint extraction.
+            // Enroll >= 3 distinct saved voices using real CAM++ voiceprint extraction off the main actor.
             let campplusURL = URL(fileURLWithPath: ModelCatalog.voiceprint.path(in: modelsRoot, ModelCatalog.voiceprintModel.name))
-            let enrolledVoices = try Self.extractEnrolledVoices(campplusURL: campplusURL, speakerSamples16k: speakerSamples16k)
+            let enrolledVoices = try await Task.detached(priority: .userInitiated) {
+                try Self.extractEnrolledVoices(campplusURL: campplusURL, speakerSamples16k: speakerSamples16k)
+            }.value
             XCTAssertGreaterThanOrEqual(enrolledVoices.count, 3, "D-1126 requires >= 3 enrolled saved voices")
             report["enrolledVoiceCount"] = enrolledVoices.count
 
@@ -1265,6 +1298,7 @@ final class HandsetQualificationTests: XCTestCase {
         let matchedVoiceNames: [String]
         let matchedVoicesBySpeaker: [String: String]
         let precomputeCheckpointsSaved: Int
+        let checkpointsAtPressureInjection: Int?
         let postStopWindowsDecoded: Int
         let postStopSegmentsDecoded: Int
         let stopToPublishedSeconds: Double
@@ -1516,6 +1550,7 @@ final class HandsetQualificationTests: XCTestCase {
             matchedVoiceNames: host.matchedNames.sorted(),
             matchedVoicesBySpeaker: Self.canonicalizeVoiceMap(host.matchedVoicesBySpeaker),
             precomputeCheckpointsSaved: precomputeSaved,
+            checkpointsAtPressureInjection: countAtInjection.withLock { $0 },
             postStopWindowsDecoded: postStopWindows.withLock { $0 },
             postStopSegmentsDecoded: 0,
             stopToPublishedSeconds: elapsed,
@@ -1681,6 +1716,7 @@ final class HandsetQualificationTests: XCTestCase {
             matchedVoiceNames: [],
             matchedVoicesBySpeaker: [:],
             precomputeCheckpointsSaved: precomputeSaved,
+            checkpointsAtPressureInjection: countAtInjection.withLock { $0 },
             postStopWindowsDecoded: 0,
             postStopSegmentsDecoded: postStopSegs.withLock { $0 },
             stopToPublishedSeconds: elapsed,
@@ -2074,9 +2110,14 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.matchedVoicesBySpeaker == cafControl.matchedVoicesBySpeaker &&
             headStart.precomputeCheckpointsSaved > 0 &&
             headStart.postStopWindowsDecoded < baseline.postStopWindowsDecoded
+        let pressureYieldedOK: Bool = {
+            guard let injectedAt = pressure.checkpointsAtPressureInjection, injectedAt >= 1 else { return false }
+            return pressure.precomputeCheckpointsSaved <= injectedAt + 1
+        }()
         let pressureOK =
             controlAnchorOK &&
             controlProv != nil &&
+            pressureYieldedOK &&
             pressure.speechProvenance == controlProv &&
             pressure.words == cafControl.words &&
             pressure.speakerTurns == cafControl.speakerTurns &&
@@ -2111,9 +2152,14 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.words == cafControl.words &&
             headStart.precomputeCheckpointsSaved > 0 &&
             headStart.postStopSegmentsDecoded < baseline.postStopSegmentsDecoded
+        let pressureYieldedOK: Bool = {
+            guard let injectedAt = pressure.checkpointsAtPressureInjection, injectedAt >= 1 else { return false }
+            return pressure.precomputeCheckpointsSaved <= injectedAt + 1
+        }()
         let pressureOK =
             controlProv != nil &&
             controlProv?["engine"]?.string == "Whistle" &&
+            pressureYieldedOK &&
             pressure.speechProvenance == controlProv &&
             pressure.words == cafControl.words
         return PairedEvaluation(
