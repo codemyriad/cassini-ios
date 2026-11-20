@@ -904,6 +904,9 @@ final class HandsetQualificationTests: XCTestCase {
             }
         }
         try writerHandle.close()
+        // Measure Stop-to-published-transcript latency from capture end (covering CAF finalization,
+        // microphone stop, precomputer stop, and post-Stop TranscriptionJob completion).
+        let stopStart = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
         // Finalize the CAF header just as AVAudioRecorder.stop() does.
         try Self.finalizeCAFHeader(at: speechCAF, pcmBytes: UInt64(speechPCM.count))
 
@@ -914,7 +917,26 @@ final class HandsetQualificationTests: XCTestCase {
         await precomputer.stop(noteID: note.id)
         let recordingSnap = monitor.finish()
 
-        // Inspect hardware mic CAF for dropped frames / continuity.
+        // Ensure recording-time precomputation saved at least one checkpoint before starting the post-Stop job.
+        let precomputeCheckpointsSaved = savedCheckpoints.withLock { $0 }
+        XCTAssertGreaterThanOrEqual(
+            precomputeCheckpointsSaved, 1,
+            "30-min transcribeWhileRecording lane (\(engine.rawValue)) must save at least one recording-time checkpoint before Stop"
+        )
+
+        // Now run the post-Stop TranscriptionJob using the precompute checkpoint.
+        let postStopMonitor = HandsetTelemetryMonitor.start()
+        let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
+                                   checkpoints: checkpoints, provenance: provenance,
+                                   host: StaticJobHost(identifySpeakers: engine == .parakeet, voices: []),
+                                   clock: SystemClock(), budget: budget)
+        let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
+                                    stop: StopSignal()) { _ in }
+        let stopToPublished = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - stopStart) / 1_000_000_000.0
+        let postStopSnap = postStopMonitor.finish()
+        XCTAssertEqual(outcome, JobOutcome.done)
+
+        // Inspect hardware mic CAF for dropped frames / continuity (outside the Stop-to-published timer).
         var micFrames: Int64 = 0
         var micDuration: Double = 0
         var droppedFrameDriftSeconds: Double = 0
@@ -927,19 +949,6 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertLessThan(droppedFrameDriftSeconds, 0.5, "Zero dropped AVAudioRecorder buffers over continuous capture")
         }
 
-        // Now measure Stop-to-published-transcript latency using the precompute checkpoint.
-        let postStopMonitor = HandsetTelemetryMonitor.start()
-        let stopStart = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
-        let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
-                                   checkpoints: checkpoints, provenance: provenance,
-                                   host: StaticJobHost(identifySpeakers: engine == .parakeet, voices: []),
-                                   clock: SystemClock(), budget: budget)
-        let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
-                                    stop: StopSignal()) { _ in }
-        let stopToPublished = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - stopStart) / 1_000_000_000.0
-        let postStopSnap = postStopMonitor.finish()
-        XCTAssertEqual(outcome, JobOutcome.done)
-
         let stored = await notes.note(note.id)
         let saved = try XCTUnwrap(stored)
         let wordCount = saved.transcript.flatMap(\.draftWords).count
@@ -949,7 +958,7 @@ final class HandsetQualificationTests: XCTestCase {
             "test": "runThirtyMinuteContinuousCapture",
             "engine": engine.rawValue,
             "audioSeconds": totalSeconds,
-            "precomputeCheckpointsSaved": savedCheckpoints.withLock { $0 },
+            "precomputeCheckpointsSaved": precomputeCheckpointsSaved,
             "stopToPublishedSeconds": stopToPublished,
             "wordCount": wordCount,
             "micStarted": micStarted,

@@ -25,9 +25,9 @@ Empirical physical-handset qualification of `transcribeWhileRecording` vs. `afte
 
 Audio: 300 s 48 kHz mono PCM16LE 3-speaker real speech (bundled `WhistleTests/jfk.wav` at 1.00×, 0.86×, 1.16× pitch/rate profiles with 0.6 s silence gaps). Saved-voice store populated with **3 real CAM++-enrolled voices** (`Alice`, `Bruno`, `Carla`).
 
-*Note: The empirical table below was captured from the identical-CAF paired qualification pass (verifying `D109` §1.3 zero-drift checkpoint resume). Following cross-model review, `HandsetQualificationTests` was updated to also drive both modes through production `RecordingController.finishAudio` (`afterStop` → `audio.m4a` vs. `transcribeWhileRecording` → `capture.caf`) and `PortableExportService.export` (`.opus` `CassiniDocument` verification), verified in the always-on contract test.*
+*Note: The empirical table below was captured from the identical-CAF paired qualification pass (verifying `D109` §1.3 zero-drift checkpoint resume); its latency figures represent post-`precomputer.stop` transcription-job latency until remeasured. Following cross-model review, `HandsetQualificationTests` was updated to also drive both modes through production `RecordingController.finishAudio` (`afterStop` → `audio.m4a` vs. `transcribeWhileRecording` → `capture.caf`) and `PortableExportService.export` (`.opus` `CassiniDocument` verification) with timing starting at capture stop, verified in the always-on contract test.*
 
-| Handset (OS) | Engine | Mode | Stop-to-Published (s) | Speedup | Post-Stop Units | Words / Speakers / Matched Voices | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Peak Thermal | CPU Time (s) | Equivalence |
+| Handset (OS) | Engine | Mode | Transcription-Job Latency (s, post-`precomputer.stop`) | Speedup | Post-Stop Units | Words / Speakers / Matched Voices | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Peak Thermal | CPU Time (s) | Equivalence |
 | --- | --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- | ---: | --- |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | `recordOnly` | control | 0.03 | — | 0 | 0 / 0 / — | 113.8 | 2,039.8 | 0 | `nominal` | 0.01 | N/A |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer + CAM++** | `afterStop` | **75.10** | 1.00× | 5 windows | 571 / 3 / `Alice, Carla` | 1,299.8 | 798.2 | 0 | `nominal` | 126.76 | baseline |
@@ -46,7 +46,9 @@ Audio: 300 s 48 kHz mono PCM16LE 3-speaker real speech (bundled `WhistleTests/jf
 
 Real-time paced 48 kHz `.caf` growth (`2 s` written and `fsync`'d every `2 s` for `1,800 s`) with live `CAFPrefixPrecomputer` under `transcribeWhileRecording`, followed by CAF finalization and immediate `TranscriptionJob` tail finalization.
 
-| Handset (OS) | Engine | Checkpoints Saved | Stop-to-Published (s) | Words Published | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Thermal Trajectory (61 × 30 s) | Recording CPU (s) | Post-Stop CPU (s) | Battery (USB-powered) |
+*Note: The latency figures below reflect transcription-job latency (post-`precomputer.stop`) from the initial Device Farm pass; `runThirtyMinuteContinuousCapture` has since been updated to start its Stop-to-published timer at capture end (before CAF finalization, microphone stop, and `await precomputer.stop(...)`) for subsequent remeasurements.*
+
+| Handset (OS) | Engine | Checkpoints Saved | Transcription-Job Latency (s, post-`precomputer.stop`) | Words Published | Peak Footprint (MiB) | Min Free RAM (MiB) | Memory Warnings | Thermal Trajectory (61 × 30 s) | Recording CPU (s) | Post-Stop CPU (s) | Battery (USB-powered) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
 | **iPhone 11** (iOS 18.6.2, 4 GB) | **Parakeet + Sortformer** | 68 | **12.34** | 3,392 | 1,587.6 | **511.1** | 0 | 61/61 `nominal` | 962.9 (~0.53 core avg) | 18.6 | 100% → 95% (`charging`) |
 | **iPhone 14 Pro** (iOS 27.0, 6 GB) | **Whistle** | 1,797 | **0.40** | 3,426 | 257.0 (rec) / 415.8 (post) | **2,811.7** | 0 | 3× `nominal` → 58× `fair` | 199.5 (~0.11 core avg) | 0.68 | 100% → 95% (`charging`) |
@@ -73,7 +75,7 @@ Real-time paced 48 kHz `.caf` growth (`2 s` written and `fsync`'d every `2 s` fo
 2. **Thermal yield threshold (`ProcessInfo.ThermalState >= .serious`) — keep unchanged.**
    - Neither handset reached `.serious` during 30 minutes of continuous precomputation (`nominal` throughout on iPhone 11; steady `fair` on iPhone 14 Pro). Injected `.serious` yielded cleanly within 1 window/segment.
 3. **Default mode & energy trade-off — keep `afterStop` default until unplugged battery pass + user mode setting.**
-   - Continuous 30-min Parakeet + Sortformer consumed `962.9 s` CPU (~0.53 core avg) on A13 and dropped battery `100% → 95%` even while USB-connected. Whistle was ~5× lighter (`199.5 s` CPU, ~0.11 core avg on A16, `257 MiB` peak footprint, `0.40 s` Stop-to-transcript).
+   - Continuous 30-min Parakeet + Sortformer consumed `962.9 s` CPU (~0.53 core avg) on A13 and dropped battery `100% → 95%` even while USB-connected. Whistle was ~5× lighter (`199.5 s` CPU, ~0.11 core avg on A16, `257 MiB` peak footprint, `0.40 s` post-`precomputer.stop` transcription-job latency).
    - Recommendation: expose the planned **Battery saving** (`recordOnly` / `afterStop`) vs. **Transcription speed** (`transcribeWhileRecording`) setting; if enabling `transcribeWhileRecording` by default later, **Whistle** is ready immediately on all supported devices, while **Parakeet** on 4 GB / A13 devices should await unplugged battery `%` delta verification.
 4. **Optional follow-up optimization (non-blocking):**
    - `CAFPrefixPrecomputer` wrote `1,797` Whistle checkpoints over 30 minutes (~1/s). Throttling Whistle checkpoint persistence to every 10 s (matching Parakeet's checkpoint cadence) will reduce flash writes and background CPU on long recordings.
