@@ -933,7 +933,7 @@ final class HandsetQualificationTests: XCTestCase {
         let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
                                    checkpoints: checkpoints, provenance: provenance,
                                    host: StaticJobHost(identifySpeakers: engine == .parakeet, voices: []),
-                                   clock: FakeClock(), budget: budget)
+                                   clock: SystemClock(), budget: budget)
         let outcome = await job.run(Job(noteID: note.id, seq: 1, kind: .transcribe, state: .running, enqueuedAt: Date()),
                                     stop: StopSignal()) { _ in }
         let stopToPublished = Double(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - stopStart) / 1_000_000_000.0
@@ -1015,7 +1015,7 @@ final class HandsetQualificationTests: XCTestCase {
         let provenance = ProvenanceFiles(notes: notes)
         let recordingNotes = CountingRecordingNotes(store: notes)
         let handoff = FakeRecordingHandoff()
-        let clock = FakeClock()
+        let clock = PermitClock(now: Date(timeIntervalSince1970: 1_791_366_060))
         let suite = "io.codemyriad.cassini.qual.contract.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -1088,7 +1088,7 @@ final class HandsetQualificationTests: XCTestCase {
 
         let recordingNotes = CountingRecordingNotes(store: notes)
         let handoff = FakeRecordingHandoff()
-        let clock = FakeClock()
+        let clock = SystemClock()
         let suite = "io.codemyriad.cassini.qual.parakeet.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -1173,7 +1173,7 @@ final class HandsetQualificationTests: XCTestCase {
         let transcriber = ParakeetTranscriber(models: parakeetModels, runtime: SherpaRuntime.speech)
         let job = TranscriptionJob(notes: notes, transcriber: transcriber, analyzer: analyzer,
                                    checkpoints: checkpoints, provenance: provenance, host: host,
-                                   clock: FakeClock(), budget: budget)
+                                   clock: clock, budget: budget)
 
         let postMon = HandsetTelemetryMonitor.start()
         let started = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)
@@ -1247,7 +1247,7 @@ final class HandsetQualificationTests: XCTestCase {
 
         let recordingNotes = CountingRecordingNotes(store: notes)
         let handoff = FakeRecordingHandoff()
-        let clock = FakeClock()
+        let clock = SystemClock()
         let suite = "io.codemyriad.cassini.qual.whistle.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -1321,7 +1321,7 @@ final class HandsetQualificationTests: XCTestCase {
         let job = TranscriptionJob(notes: notes, transcriber: countingTranscriber, analyzer: FakeAnalyzer(),
                                    checkpoints: checkpoints, provenance: provenance,
                                    host: StaticJobHost(identifySpeakers: false, voices: []),
-                                   clock: FakeClock(), budget: budget)
+                                   clock: clock, budget: budget)
 
         let postMon = HandsetTelemetryMonitor.start()
         let started = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW)

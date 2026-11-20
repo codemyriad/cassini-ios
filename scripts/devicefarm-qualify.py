@@ -5,7 +5,7 @@ Usage:
   AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \
       --device-arn <ARN> --name d1126-iphone11-5min --profile short --filter HandsetQualificationTests/test02PairedEquivalenceAnd5MinMetrics
 
-Enforces the D89 $120/month deny ceiling before scheduling any new run.
+Enforces the D89 $160/month deny ceiling before scheduling any new run.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ARN = "arn:aws:devicefarm:us-west-2:613912634239:project:6c67e094-43ab-4c2a-af51-f93bd2b1bfac"
 RATE_PER_MINUTE = 0.17
-MONTHLY_DENY_USD = 120.0
+MONTHLY_DENY_USD = 160.0
 
 
 def run(cmd: list[str], cwd: Path = ROOT) -> None:

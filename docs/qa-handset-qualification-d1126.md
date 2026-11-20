@@ -96,7 +96,7 @@ AWS Device Farm handsets run in USB-powered server racks under headless `XCTest`
 # Fast deterministic contract test on Simulator (always enabled in scripts/test.sh app):
 scripts/test.sh app -only-testing:CassiniTests/HandsetQualificationTests
 
-# 5-min paired qualification on a physical iPhone (AWS Device Farm, D89 $120/mo budget guard):
+# 5-min paired qualification on a physical iPhone (AWS Device Farm, D89 $160/mo budget guard):
 AWS_PROFILE=cassini-devicefarm uv run --with boto3 python3 scripts/devicefarm-qualify.py \
   --device-arn <DEVICE_ARN> \
   --pool-name d1126-iphone14pro-27.0 \

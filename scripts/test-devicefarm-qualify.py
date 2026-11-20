@@ -41,7 +41,7 @@ class FakeDeviceFarm:
 class DeviceFarmBudgetGuardTests(unittest.TestCase):
     def test_budget_guard_follows_next_token_and_denies_when_later_page_crosses_limit(self) -> None:
         now = dt.datetime(2026, 11, 20, 12, 0, tzinfo=dt.timezone.utc)
-        # Page 1: 100 metered min ($17.00); Page 2: 700 metered min ($119.00) -> total $136.00 >= $120.00.
+        # Page 1: 100 metered min ($17.00); Page 2: 900 metered min ($153.00) -> total $170.00 >= $160.00.
         df = FakeDeviceFarm(
             run_pages=[
                 {
@@ -49,13 +49,13 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
                     "nextToken": "1",
                 },
                 {
-                    "runs": [{"created": now, "deviceMinutes": {"metered": 700.0}}],
+                    "runs": [{"created": now, "deviceMinutes": {"metered": 900.0}}],
                 },
             ]
         )
         with self.assertRaises(SystemExit) as ctx:
             MOD.check_budget(df, now=now)
-        self.assertIn("136.00", str(ctx.exception))
+        self.assertIn("170.00", str(ctx.exception))
         self.assertEqual(len(df.list_runs_calls), 2)
         self.assertNotIn("nextToken", df.list_runs_calls[0])
         self.assertEqual(df.list_runs_calls[1].get("nextToken"), "1")
@@ -85,6 +85,7 @@ class DeviceFarmBudgetGuardTests(unittest.TestCase):
         self.assertEqual(len(df.list_runs_calls), 2)
 
     def test_budget_guard_denies_at_exact_ceiling(self) -> None:
+        self.assertEqual(MOD.MONTHLY_DENY_USD, 160.0)
         now = dt.datetime(2026, 11, 20, 12, 0, tzinfo=dt.timezone.utc)
         exact_minutes = MOD.MONTHLY_DENY_USD / MOD.RATE_PER_MINUTE
         df = FakeDeviceFarm(
