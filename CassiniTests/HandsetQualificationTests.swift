@@ -360,6 +360,74 @@ final class HandsetQualificationTests: XCTestCase {
     }
 
     @MainActor
+    func testPairedEvaluationRejectsSwappedVoicesAndProvenanceMismatch() {
+        let snap = HandsetTelemetryMonitor.start().finish()
+        let baseProv = JSONObject([
+            ("engine", .string(TranscriptProvenance.parakeetEngine)),
+            ("backend", .string(TranscriptProvenance.sherpaBackend)),
+            ("language", .string("und"))
+        ])
+        let words = [ComparableWord(text: "hello", startMs: 0, endMs: 500, speaker: "S1")]
+        let turns = [
+            ComparableTurn(speaker: "1", startMs: 0, endMs: 1_000),
+            ComparableTurn(speaker: "2", startMs: 1_500, endMs: 2_500),
+            ComparableTurn(speaker: "3", startMs: 3_000, endMs: 4_000)
+        ]
+        func makeLane(
+            audioFilename: String = RecordingController.captureFilename,
+            matchedVoicesBySpeaker: [String: String] = ["1": "Alice", "3": "Carla"],
+            speechProvenance: JSONObject? = baseProv,
+            precomputeCheckpointsSaved: Int = 2,
+            postStopWindowsDecoded: Int = 1
+        ) -> PairedLaneResult {
+            PairedLaneResult(
+                audioFilename: audioFilename,
+                exportVerified: true,
+                speechProvenance: speechProvenance,
+                exportedDurationSeconds: 10.0,
+                opusSha256: "abc123",
+                words: words,
+                speakerTurns: turns,
+                speakerCount: 3,
+                matchedVoiceNames: ["Alice", "Carla"],
+                matchedVoicesBySpeaker: matchedVoicesBySpeaker,
+                precomputeCheckpointsSaved: precomputeCheckpointsSaved,
+                postStopWindowsDecoded: postStopWindowsDecoded,
+                postStopSegmentsDecoded: 0,
+                stopToPublishedSeconds: 1.0,
+                telemetry: snap,
+                precomputeTelemetry: nil
+            )
+        }
+
+        let baseline = makeLane(audioFilename: RecordingController.compressedFilename, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
+        let control = makeLane(precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
+        let headStart = makeLane(precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
+        let pressure = makeLane(precomputeCheckpointsSaved: 2, postStopWindowsDecoded: 2)
+
+        let passing = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: pressure)
+        XCTAssertTrue(passing.equivalencePassed)
+        XCTAssertTrue(passing.pressureRecoveryPassed)
+
+        // Swapping Alice and Carla across slots while keeping matchedVoiceNames == ["Alice", "Carla"] must fail equivalence.
+        let swappedHeadStart = makeLane(matchedVoicesBySpeaker: ["1": "Carla", "3": "Alice"], precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
+        let swappedEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: swappedHeadStart, pressure: pressure)
+        XCTAssertFalse(swappedEval.equivalencePassed, "Swapped speaker-to-voice assignment must set equivalencePassed = false")
+        XCTAssertTrue(swappedEval.pressureRecoveryPassed)
+
+        // Mismatched deterministic provenance on the pressure lane must fail pressureRecoveryPassed.
+        let wrongProv = JSONObject([
+            ("engine", .string(TranscriptProvenance.parakeetEngine)),
+            ("backend", .string("other-backend")),
+            ("language", .string("und"))
+        ])
+        let badProvPressure = makeLane(speechProvenance: wrongProv, precomputeCheckpointsSaved: 2, postStopWindowsDecoded: 2)
+        let badProvEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: badProvPressure)
+        XCTAssertTrue(badProvEval.equivalencePassed)
+        XCTAssertFalse(badProvEval.pressureRecoveryPassed, "Provenance mismatch must set pressureRecoveryPassed = false")
+    }
+
+    @MainActor
     func testContinuousCaptureContinuityRejectsEarlyPause() async throws {
         final class EarlyPauseRecorder: CaptureRecorder {
             var delegate: (any AVAudioRecorderDelegate)?
@@ -652,24 +720,17 @@ final class HandsetQualificationTests: XCTestCase {
         guard let config = QualConfig.load() else {
             throw XCTSkip("opt-in physical handset qualification (set CASSINI_HANDSET_QUAL=1 or bundle CassiniHandsetQual.json)")
         }
-        try XCTSkipUnless(SherpaRuntime.isLinked, "built without SherpaRuntime")
 
         let workDir = FileManager.default.temporaryDirectory.appendingPathComponent("qual-5min-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workDir) }
 
-        let modelsRoot = try await Self.ensurePinnedModelsInstalled(in: workDir)
         let (speechPCM, speakerSamples16k) = try Self.makeMultiSpeakerSpeech48kPCM16LE(totalSeconds: config.shortSeconds)
-
-        // Enroll >= 3 distinct saved voices using real CAM++ voiceprint extraction.
-        let campplusURL = URL(fileURLWithPath: ModelCatalog.voiceprint.path(in: modelsRoot, ModelCatalog.voiceprintModel.name))
-        let enrolledVoices = try Self.extractEnrolledVoices(campplusURL: campplusURL, speakerSamples16k: speakerSamples16k)
-        XCTAssertGreaterThanOrEqual(enrolledVoices.count, 3, "D-1126 requires >= 3 enrolled saved voices")
 
         var report: [String: Any] = [
             "test": "test02PairedEquivalenceAnd5MinMetrics",
             "audioSeconds": config.shortSeconds,
-            "enrolledVoiceCount": enrolledVoices.count,
+            "enrolledVoiceCount": 0,
             "device": HandsetTelemetryMonitor.machineIdentifier(),
             "os": ProcessInfo.processInfo.operatingSystemVersionString
         ]
@@ -720,6 +781,14 @@ final class HandsetQualificationTests: XCTestCase {
         // Parakeet + Sortformer + CAM++ paired run (production afterStop M4A, identical-CAF control,
         // production transcribeWhileRecording CAF, and pressure injection).
         if config.runParakeet {
+            try XCTSkipUnless(SherpaRuntime.isLinked, "built without SherpaRuntime")
+            let modelsRoot = try await Self.ensurePinnedModelsInstalled(in: workDir)
+            // Enroll >= 3 distinct saved voices using real CAM++ voiceprint extraction.
+            let campplusURL = URL(fileURLWithPath: ModelCatalog.voiceprint.path(in: modelsRoot, ModelCatalog.voiceprintModel.name))
+            let enrolledVoices = try Self.extractEnrolledVoices(campplusURL: campplusURL, speakerSamples16k: speakerSamples16k)
+            XCTAssertGreaterThanOrEqual(enrolledVoices.count, 3, "D-1126 requires >= 3 enrolled saved voices")
+            report["enrolledVoiceCount"] = enrolledVoices.count
+
             let parakeetBaseline = try await runParakeetPairedLane(
                 root: workDir.appendingPathComponent("parakeet-afterStop-m4a", isDirectory: true),
                 modelsRoot: modelsRoot,
@@ -815,15 +884,24 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertEqual(parakeetPressure.matchedVoicesBySpeaker, parakeetCafControl.matchedVoicesBySpeaker,
                            "Parakeet pressure-yield CAM++ slot -> voiceName assignments must match identical-CAF afterStop")
 
+            let parakeetEval = Self.evaluateParakeetPaired(
+                baseline: parakeetBaseline,
+                cafControl: parakeetCafControl,
+                headStart: parakeetHeadStart,
+                pressure: parakeetPressure
+            )
+            XCTAssertTrue(parakeetEval.equivalencePassed, "Parakeet paired equivalence checks must all pass")
+            XCTAssertTrue(parakeetEval.pressureRecoveryPassed, "Parakeet pressure-recovery checks must all pass")
+
             report["parakeet"] = [
-                "equivalencePassed": true,
+                "equivalencePassed": parakeetEval.equivalencePassed,
                 "productionFinalizationChecked": true,
                 "productionAfterStopAudioFilename": parakeetBaseline.audioFilename,
                 "productionHeadStartAudioFilename": parakeetHeadStart.audioFilename,
                 "productionM4aVsCafWER": parakeetProductionWER,
                 "productionM4aVsCafExactWords": (parakeetHeadStart.words == parakeetBaseline.words),
                 "productionM4aVsCafDurationDeltaSeconds": abs(parakeetHeadStart.exportedDurationSeconds - parakeetBaseline.exportedDurationSeconds),
-                "pressureRecoveryPassed": true,
+                "pressureRecoveryPassed": parakeetEval.pressureRecoveryPassed,
                 "wordCount": parakeetBaseline.words.count,
                 "speakerCount": parakeetBaseline.speakerCount,
                 "matchedVoices": parakeetBaseline.matchedVoiceNames,
@@ -899,15 +977,24 @@ final class HandsetQualificationTests: XCTestCase {
                            "Whistle pressure-yield deterministic provenance.speechToText must match identical-CAF afterStop")
             XCTAssertEqual(whistlePressure.words, whistleCafControl.words, "Whistle pressure-yield tail recovery must match identical-CAF afterStop")
 
+            let whistleEval = Self.evaluateWhistlePaired(
+                baseline: whistleBaseline,
+                cafControl: whistleCafControl,
+                headStart: whistleHeadStart,
+                pressure: whistlePressure
+            )
+            XCTAssertTrue(whistleEval.equivalencePassed, "Whistle paired equivalence checks must all pass")
+            XCTAssertTrue(whistleEval.pressureRecoveryPassed, "Whistle pressure-recovery checks must all pass")
+
             report["whistle"] = [
-                "equivalencePassed": true,
+                "equivalencePassed": whistleEval.equivalencePassed,
                 "productionFinalizationChecked": true,
                 "productionAfterStopAudioFilename": whistleBaseline.audioFilename,
                 "productionHeadStartAudioFilename": whistleHeadStart.audioFilename,
                 "productionM4aVsCafWER": whistleProductionWER,
                 "productionM4aVsCafExactWords": (whistleHeadStart.words == whistleBaseline.words),
                 "productionM4aVsCafDurationDeltaSeconds": abs(whistleHeadStart.exportedDurationSeconds - whistleBaseline.exportedDurationSeconds),
-                "pressureRecoveryPassed": true,
+                "pressureRecoveryPassed": whistleEval.pressureRecoveryPassed,
                 "wordCount": whistleBaseline.words.count,
                 "afterStopStopToPublishedSeconds": whistleBaseline.stopToPublishedSeconds,
                 "headStartStopToPublishedSeconds": whistleHeadStart.stopToPublishedSeconds,
@@ -1406,13 +1493,13 @@ final class HandsetQualificationTests: XCTestCase {
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
 
         let doc = CassiniDocument.read(opusURL)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
+        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration
+        // off the main actor using chunked streaming SHA-256.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
-        try OpusAudio.decode(opusURL, to: decodedOpusCAF)
-        let decodedFile = try AVAudioFile(forReading: decodedOpusCAF)
-        let exportedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
-        let opusSha = SHA256.hash(data: try Data(contentsOf: decodedOpusCAF)).map { String(format: "%02x", $0) }.joined()
-        try? FileManager.default.removeItem(at: decodedOpusCAF)
+        let (exportedDuration, opusSha) = try await Self.decodeOpusDurationAndSHA256(
+            opusURL: opusURL,
+            scratchCAFURL: decodedOpusCAF
+        )
         let words = saved.transcript.flatMap { seg in
             seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: seg.speaker) }
         }
@@ -1572,13 +1659,13 @@ final class HandsetQualificationTests: XCTestCase {
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
 
         let doc = CassiniDocument.read(opusURL)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration.
+        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration
+        // off the main actor using chunked streaming SHA-256.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
-        try OpusAudio.decode(opusURL, to: decodedOpusCAF)
-        let decodedFile = try AVAudioFile(forReading: decodedOpusCAF)
-        let exportedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
-        let opusSha = SHA256.hash(data: try Data(contentsOf: decodedOpusCAF)).map { String(format: "%02x", $0) }.joined()
-        try? FileManager.default.removeItem(at: decodedOpusCAF)
+        let (exportedDuration, opusSha) = try await Self.decodeOpusDurationAndSHA256(
+            opusURL: opusURL,
+            scratchCAFURL: decodedOpusCAF
+        )
         let words = saved.transcript.flatMap { seg in
             seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: nil) }
         }
@@ -1946,6 +2033,111 @@ final class HandsetQualificationTests: XCTestCase {
             )
         }
         return failures
+    }
+
+    private struct PairedEvaluation: Equatable {
+        let equivalencePassed: Bool
+        let pressureRecoveryPassed: Bool
+    }
+
+    private static func evaluateParakeetPaired(
+        baseline: PairedLaneResult,
+        cafControl: PairedLaneResult,
+        headStart: PairedLaneResult,
+        pressure: PairedLaneResult
+    ) -> PairedEvaluation {
+        let productionWER = wordErrorRate(reference: baseline.words, hypothesis: headStart.words)
+        let controlProv = cafControl.speechProvenance
+        let productionOK =
+            baseline.audioFilename == RecordingController.compressedFilename &&
+            headStart.audioFilename == RecordingController.captureFilename &&
+            baseline.exportVerified &&
+            headStart.exportVerified &&
+            abs(headStart.exportedDurationSeconds - baseline.exportedDurationSeconds) < 0.15 &&
+            productionWER <= 0.02 &&
+            headStart.speakerCount == baseline.speakerCount &&
+            headStart.matchedVoiceNames == baseline.matchedVoiceNames
+        let controlAnchorOK =
+            !cafControl.speakerTurns.isEmpty &&
+            cafControl.speakerCount == 3 &&
+            Set(cafControl.speakerTurns.map(\.speaker)).count == 3 &&
+            cafControl.matchedVoiceNames == ["Alice", "Carla"] &&
+            cafControl.matchedVoicesBySpeaker.count == 2 &&
+            controlProv?["engine"]?.string == TranscriptProvenance.parakeetEngine
+        let headStartIdenticalOK =
+            controlProv != nil &&
+            headStart.speechProvenance == controlProv &&
+            headStart.opusSha256 == cafControl.opusSha256 &&
+            headStart.words == cafControl.words &&
+            headStart.speakerTurns == cafControl.speakerTurns &&
+            headStart.matchedVoiceNames == cafControl.matchedVoiceNames &&
+            headStart.matchedVoicesBySpeaker == cafControl.matchedVoicesBySpeaker &&
+            headStart.precomputeCheckpointsSaved > 0 &&
+            headStart.postStopWindowsDecoded < baseline.postStopWindowsDecoded
+        let pressureOK =
+            controlAnchorOK &&
+            controlProv != nil &&
+            pressure.speechProvenance == controlProv &&
+            pressure.words == cafControl.words &&
+            pressure.speakerTurns == cafControl.speakerTurns &&
+            pressure.matchedVoiceNames == cafControl.matchedVoiceNames &&
+            pressure.matchedVoicesBySpeaker == cafControl.matchedVoicesBySpeaker
+        return PairedEvaluation(
+            equivalencePassed: productionOK && controlAnchorOK && headStartIdenticalOK,
+            pressureRecoveryPassed: pressureOK
+        )
+    }
+
+    private static func evaluateWhistlePaired(
+        baseline: PairedLaneResult,
+        cafControl: PairedLaneResult,
+        headStart: PairedLaneResult,
+        pressure: PairedLaneResult
+    ) -> PairedEvaluation {
+        let productionWER = wordErrorRate(reference: baseline.words, hypothesis: headStart.words)
+        let controlProv = cafControl.speechProvenance
+        let productionOK =
+            baseline.audioFilename == RecordingController.compressedFilename &&
+            headStart.audioFilename == RecordingController.captureFilename &&
+            baseline.exportVerified &&
+            headStart.exportVerified &&
+            abs(headStart.exportedDurationSeconds - baseline.exportedDurationSeconds) < 0.15 &&
+            productionWER <= 0.02
+        let headStartIdenticalOK =
+            controlProv != nil &&
+            controlProv?["engine"]?.string == "Whistle" &&
+            headStart.speechProvenance == controlProv &&
+            headStart.opusSha256 == cafControl.opusSha256 &&
+            headStart.words == cafControl.words &&
+            headStart.precomputeCheckpointsSaved > 0 &&
+            headStart.postStopSegmentsDecoded < baseline.postStopSegmentsDecoded
+        let pressureOK =
+            controlProv != nil &&
+            controlProv?["engine"]?.string == "Whistle" &&
+            pressure.speechProvenance == controlProv &&
+            pressure.words == cafControl.words
+        return PairedEvaluation(
+            equivalencePassed: productionOK && headStartIdenticalOK,
+            pressureRecoveryPassed: pressureOK
+        )
+    }
+
+    /// Decodes an exported `.opus` file and computes its decoded duration and streaming SHA-256 off the main actor.
+    private static func decodeOpusDurationAndSHA256(opusURL: URL, scratchCAFURL: URL) async throws -> (duration: Double, sha256: String) {
+        try await Task.detached(priority: .userInitiated) {
+            try OpusAudio.decode(opusURL, to: scratchCAFURL)
+            defer { try? FileManager.default.removeItem(at: scratchCAFURL) }
+            let decodedFile = try AVAudioFile(forReading: scratchCAFURL)
+            let duration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
+            let handle = try FileHandle(forReadingFrom: scratchCAFURL)
+            defer { try? handle.close() }
+            var hasher = SHA256()
+            while let chunk = try handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                hasher.update(data: chunk)
+            }
+            let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+            return (duration, digest)
+        }.value
     }
 
     /// Strips a leading `WindowSpeakers.freshPrefix()` (`<UUID>_`) while preserving the Sortformer slot suffix.

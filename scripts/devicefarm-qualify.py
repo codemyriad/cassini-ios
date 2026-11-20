@@ -198,6 +198,7 @@ KNOWN_TEST_METHODS = frozenset({
     "testQualificationHarnessAndTelemetryContract",
     "testWordErrorRateEdgeCases",
     "testCanonicalSpeakerSlotAndVoiceMapComparison",
+    "testPairedEvaluationRejectsSwappedVoicesAndProvenanceMismatch",
     "testContinuousCaptureContinuityRejectsEarlyPause",
     "test01RealCAFLiveReaderAndInterruptionLifecycle",
     "test02PairedEquivalenceAnd5MinMetrics",
