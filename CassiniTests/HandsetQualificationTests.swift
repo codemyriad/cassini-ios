@@ -490,8 +490,8 @@ final class HandsetQualificationTests: XCTestCase {
 
         let whistleEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
         let whistleEmptyControl = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
-        let whistleEmptyHeadStart = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
-        let whistleEmptyPressure = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
+        let whistleEmptyHeadStart = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopResumedFromMs: 120_000, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
+        let whistleEmptyPressure = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopResumedFromMs: 120_000, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
         let whistleEmptyEval = Self.evaluateWhistlePaired(
             baseline: whistleEmptyBaseline,
             cafControl: whistleEmptyControl,
@@ -503,8 +503,8 @@ final class HandsetQualificationTests: XCTestCase {
 
         let parakeetEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: extractedParakeetUntimed, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
         let parakeetEmptyControl = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
-        let parakeetEmptyHeadStart = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
-        let parakeetEmptyPressure = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
+        let parakeetEmptyHeadStart = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, postStopResumedFromMs: 120_000, postStopWindowsDecoded: 1)
+        let parakeetEmptyPressure = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopResumedFromMs: 120_000, postStopWindowsDecoded: 2)
         let parakeetEmptyEval = Self.evaluateParakeetPaired(
             baseline: parakeetEmptyBaseline,
             cafControl: parakeetEmptyControl,
