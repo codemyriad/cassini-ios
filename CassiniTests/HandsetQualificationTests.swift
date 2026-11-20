@@ -254,24 +254,33 @@ final class HandsetQualificationTests: XCTestCase {
                        try finalReader.prefixSHA256(committedFrames: prefixFrames))
 
         // 3. Simulated AVAudioSession interruption & route-change hooks on AVCaptureAdapter.
+        let recordGate = CountGate()
         final class FakeCaptureRecorder: CaptureRecorder {
             var delegate: (any AVAudioRecorderDelegate)?
             var isMeteringEnabled = false
             var currentTime: TimeInterval = 1.5
             let url: URL
+            let onRecord: () -> Void
             var pauseCount = 0
             var stopCount = 0
-            init(url: URL) { self.url = url }
-            func record() -> Bool { true }
+            init(url: URL, onRecord: @escaping () -> Void) {
+                self.url = url
+                self.onRecord = onRecord
+            }
+            func record() -> Bool {
+                onRecord()
+                return true
+            }
             func pause() { pauseCount += 1 }
             func stop() { stopCount += 1 }
             func updateMeters() {}
             func averagePower(forChannel channelNumber: Int) -> Float { -12 }
         }
-        let fakeRec = FakeCaptureRecorder(url: finalURL)
+        let fakeRec = FakeCaptureRecorder(url: finalURL, onRecord: { recordGate.signal() })
         let session = CaptureSession(requestPermission: { true }, prepare: {}, activate: {}, deactivate: {})
         let adapter = AVCaptureAdapter(session: session, makeRecorder: { _ in fakeRec })
         _ = try await adapter.start(url: finalURL)
+        try await recordGate.waitFor(count: 1, timeout: .seconds(5))
 
         let eventGate = CaptureEventGate(stream: adapter.events)
         defer { eventGate.cancel() }
@@ -282,6 +291,7 @@ final class HandsetQualificationTests: XCTestCase {
         )
         try await eventGate.waitFor("interrupted", count: 1, timeout: .seconds(5))
         try adapter.resume()
+        try await recordGate.waitFor(count: 2, timeout: .seconds(5))
         NotificationCenter.default.post(
             name: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
@@ -594,27 +604,37 @@ final class HandsetQualificationTests: XCTestCase {
             let liveSha1 = try liveReader.prefixSHA256(committedFrames: safeFrames1)
             liveReader.close()
 
+            let recordGate = CountGate()
             final class LifecycleRecorder: CaptureRecorder {
                 var delegate: (any AVAudioRecorderDelegate)?
                 var isMeteringEnabled = false
                 var currentTime: TimeInterval = 4.0
                 let url: URL
+                let onRecord: () -> Void
                 var pauses = 0
-                init(url: URL) { self.url = url }
-                func record() -> Bool { true }
+                init(url: URL, onRecord: @escaping () -> Void) {
+                    self.url = url
+                    self.onRecord = onRecord
+                }
+                func record() -> Bool {
+                    onRecord()
+                    return true
+                }
                 func pause() { pauses += 1 }
                 func stop() {}
                 func updateMeters() {}
                 func averagePower(forChannel channelNumber: Int) -> Float { -10 }
             }
-            let fakeRec = LifecycleRecorder(url: cafURL)
+            let fakeRec = LifecycleRecorder(url: cafURL, onRecord: { recordGate.signal() })
             let fakeSession = CaptureSession(requestPermission: { true }, prepare: {}, activate: {}, deactivate: {})
             let lifecycleAdapter = AVCaptureAdapter(session: fakeSession, makeRecorder: { _ in fakeRec })
             _ = try await lifecycleAdapter.start(url: cafURL)
+            try await recordGate.waitFor(count: 1, timeout: .seconds(5))
             let eventGate = CaptureEventGate(stream: lifecycleAdapter.events)
             defer { eventGate.cancel() }
             lifecycleAdapter.pause()
             try lifecycleAdapter.resume()
+            try await recordGate.waitFor(count: 2, timeout: .seconds(5))
             NotificationCenter.default.post(
                 name: AVAudioSession.interruptionNotification,
                 object: AVAudioSession.sharedInstance(),
@@ -622,6 +642,7 @@ final class HandsetQualificationTests: XCTestCase {
             )
             try await eventGate.waitFor("interrupted", count: 1, timeout: .seconds(5))
             try lifecycleAdapter.resume()
+            try await recordGate.waitFor(count: 3, timeout: .seconds(5))
             NotificationCenter.default.post(
                 name: AVAudioSession.routeChangeNotification,
                 object: AVAudioSession.sharedInstance(),
@@ -637,9 +658,8 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertEqual(liveSha1, finalSha1)
 
             let opusURL = dir.appendingPathComponent("published.opus")
-            try OpusAudio.encode(cafURL, to: opusURL)
-            let opusBytes = try Data(contentsOf: opusURL)
-            XCTAssertGreaterThan(opusBytes.count, 0)
+            let opusByteCount = try await Self.encodeOpusOffMainActor(from: cafURL, to: opusURL)
+            XCTAssertGreaterThan(opusByteCount, 0)
 
             let observedEvents = eventGate.observedEvents
             XCTAssertTrue(observedEvents.contains("interrupted"))
@@ -649,7 +669,7 @@ final class HandsetQualificationTests: XCTestCase {
             report["finalFrames"] = try finalReader.availableFrames()
             report["prefix1Matched"] = (liveSha1 == finalSha1)
             report["observedEvents"] = observedEvents
-            report["opusBytes"] = opusBytes.count
+            report["opusBytes"] = opusByteCount
             report["telemetry"] = try Self.asDictionary(snap)
             emitReport(name: "test01-caf-lifecycle", report: report)
             return
@@ -746,16 +766,14 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertEqual(liveSha1, finalSha1, "Live CAF prefix 1 must match finalized CAF bit-for-bit after AVAudioRecorder.stop()")
         XCTAssertEqual(liveSha2, finalSha2, "Live CAF prefix 2 must match finalized CAF bit-for-bit after AVAudioRecorder.stop()")
 
-        let avFile = try AVAudioFile(forReading: cafURL)
-        let fileDuration = Double(avFile.length) / avFile.fileFormat.sampleRate
-        XCTAssertGreaterThan(avFile.length, 0)
+        let (avFileLength, fileDuration) = try await Self.audioFileLengthAndDurationOffMainActor(url: cafURL)
+        XCTAssertGreaterThan(avFileLength, 0)
         XCTAssertLessThan(abs(fileDuration - finalElapsed), 0.5, "Finalized CAF frame count must match active recording duration")
 
-        // Verify Opus publication succeeds on the finalized CAF.
+        // Verify Opus publication succeeds on the finalized CAF (encoded off MainActor).
         let opusURL = dir.appendingPathComponent("published.opus")
-        try OpusAudio.encode(cafURL, to: opusURL)
-        let opusBytes = try Data(contentsOf: opusURL)
-        XCTAssertGreaterThan(opusBytes.count, 0)
+        let opusByteCount = try await Self.encodeOpusOffMainActor(from: cafURL, to: opusURL)
+        XCTAssertGreaterThan(opusByteCount, 0)
 
         let observedEvents = eventGate.observedEvents
         XCTAssertTrue(observedEvents.contains("interrupted"))
@@ -771,7 +789,7 @@ final class HandsetQualificationTests: XCTestCase {
         report["prefix1Matched"] = (liveSha1 == finalSha1)
         report["prefix2Matched"] = (liveSha2 == finalSha2)
         report["observedEvents"] = observedEvents
-        report["opusBytes"] = opusBytes.count
+        report["opusBytes"] = opusByteCount
         report["telemetry"] = try Self.asDictionary(snap)
         emitReport(name: "test01-caf-lifecycle", report: report)
     }
@@ -1265,9 +1283,9 @@ final class HandsetQualificationTests: XCTestCase {
         var micDuration: Double = 0
         var droppedFrameDriftSeconds: Double = 0
         if micStarted {
-            let avFile = try AVAudioFile(forReading: micCAF)
-            micFrames = avFile.length
-            micDuration = Double(avFile.length) / avFile.fileFormat.sampleRate
+            let (frames, duration) = try await Self.audioFileLengthAndDurationOffMainActor(url: micCAF)
+            micFrames = frames
+            micDuration = duration
             droppedFrameDriftSeconds = abs(micDuration - micMonotonicElapsed)
             let continuityFailures = Self.validateContinuousMicCapture(
                 recordedDurationSeconds: micDuration,
@@ -1392,16 +1410,12 @@ final class HandsetQualificationTests: XCTestCase {
         let exportDir = root.appendingPathComponent("export", isDirectory: true)
         let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
         let exportedURL = try await exporter.export(saved, original: playableURL, playable: playableURL, into: exportDir, filename: "published")
-        let doc = CassiniDocument.read(exportedURL)
         let decodedCAF = root.appendingPathComponent("decoded-export.caf")
-        try OpusAudio.decode(exportedURL, to: decodedCAF)
-        defer { try? FileManager.default.removeItem(at: decodedCAF) }
-        let decodedFile = try AVAudioFile(forReading: decodedCAF)
-        let decodedDuration = Double(decodedFile.length) / decodedFile.fileFormat.sampleRate
+        let inspected = try await Self.inspectExportedOpus(opusURL: exportedURL, scratchCAFURL: decodedCAF)
         return ProductionExportContractResult(
             audioFilename: saved.audioFilename,
-            exportVerified: doc.state == DocumentState.ok,
-            exportedDurationSeconds: decodedDuration
+            exportVerified: inspected.exportVerified,
+            exportedDurationSeconds: inspected.durationSeconds
         )
     }
 
@@ -1558,11 +1572,9 @@ final class HandsetQualificationTests: XCTestCase {
         let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
 
-        let doc = CassiniDocument.read(opusURL)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration
-        // off the main actor using chunked streaming SHA-256.
+        // Verify exported CassiniDocument, extract deterministic provenance, and decode/hash PCM off MainActor.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
-        let (exportedDuration, opusSha) = try await Self.decodeOpusDurationAndSHA256(
+        let inspected = try await Self.inspectExportedOpus(
             opusURL: opusURL,
             scratchCAFURL: decodedOpusCAF
         )
@@ -1570,10 +1582,10 @@ final class HandsetQualificationTests: XCTestCase {
         let turns = Self.canonicalizeSpeakerTurns(host.recordedTurns)
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
-            exportVerified: doc.state == DocumentState.ok,
-            speechProvenance: Self.deterministicSpeechProvenance(from: doc),
-            exportedDurationSeconds: exportedDuration,
-            opusSha256: opusSha,
+            exportVerified: inspected.exportVerified,
+            speechProvenance: inspected.speechProvenance,
+            exportedDurationSeconds: inspected.durationSeconds,
+            opusSha256: inspected.pcmSha256,
             words: words,
             speakerTurns: turns,
             speakerCount: saved.speakers?.count ?? 0,
@@ -1723,21 +1735,19 @@ final class HandsetQualificationTests: XCTestCase {
         let exporter = PortableExportService(audio: LocalAudioProcessing(), provenance: provenance, unassignedLabel: "Unassigned")
         let opusURL = try await exporter.export(saved, original: finalAudioURL, playable: finalAudioURL, into: exportDir, filename: "published")
 
-        let doc = CassiniDocument.read(opusURL)
-        // Ogg Opus headers include a per-encode random serial number, so compare the decoded PCM payload digest & duration
-        // off the main actor using chunked streaming SHA-256.
+        // Verify exported CassiniDocument, extract deterministic provenance, and decode/hash PCM off MainActor.
         let decodedOpusCAF = root.appendingPathComponent("decoded-opus.caf")
-        let (exportedDuration, opusSha) = try await Self.decodeOpusDurationAndSHA256(
+        let inspected = try await Self.inspectExportedOpus(
             opusURL: opusURL,
             scratchCAFURL: decodedOpusCAF
         )
         let words = Self.extractComparableWords(from: saved.transcript, includeSpeaker: false)
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
-            exportVerified: doc.state == DocumentState.ok,
-            speechProvenance: Self.deterministicSpeechProvenance(from: doc),
-            exportedDurationSeconds: exportedDuration,
-            opusSha256: opusSha,
+            exportVerified: inspected.exportVerified,
+            speechProvenance: inspected.speechProvenance,
+            exportedDurationSeconds: inspected.durationSeconds,
+            opusSha256: inspected.pcmSha256,
             words: words,
             speakerTurns: [],
             speakerCount: 0,
@@ -2215,9 +2225,20 @@ final class HandsetQualificationTests: XCTestCase {
         )
     }
 
-    /// Decodes an exported `.opus` file and computes its decoded duration and streaming SHA-256 off the main actor.
-    private static func decodeOpusDurationAndSHA256(opusURL: URL, scratchCAFURL: URL) async throws -> (duration: Double, sha256: String) {
+    private struct ExportedOpusInspection: Sendable {
+        let exportVerified: Bool
+        let speechProvenance: JSONObject?
+        let durationSeconds: Double
+        let pcmSha256: String
+    }
+
+    /// Reads and verifies an exported `.opus` `CassiniDocument`, decodes it to CAF, and computes its
+    /// decoded duration and streaming SHA-256 completely off `@MainActor`.
+    private static func inspectExportedOpus(opusURL: URL, scratchCAFURL: URL) async throws -> ExportedOpusInspection {
         try await Task.detached(priority: .userInitiated) {
+            let doc = CassiniDocument.read(opusURL)
+            let verified = (doc.state == DocumentState.ok)
+            let provenance = Self.deterministicSpeechProvenance(from: doc)
             try OpusAudio.decode(opusURL, to: scratchCAFURL)
             defer { try? FileManager.default.removeItem(at: scratchCAFURL) }
             let decodedFile = try AVAudioFile(forReading: scratchCAFURL)
@@ -2229,8 +2250,77 @@ final class HandsetQualificationTests: XCTestCase {
                 hasher.update(data: chunk)
             }
             let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
-            return (duration, digest)
+            return ExportedOpusInspection(
+                exportVerified: verified,
+                speechProvenance: provenance,
+                durationSeconds: duration,
+                pcmSha256: digest
+            )
         }.value
+    }
+
+    /// Encodes a CAF to `.opus` off `@MainActor` and returns the encoded file size in bytes.
+    private static func encodeOpusOffMainActor(from cafURL: URL, to opusURL: URL) async throws -> Int {
+        try await Task.detached(priority: .userInitiated) {
+            try OpusAudio.encode(cafURL, to: opusURL)
+            return try opusURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        }.value
+    }
+
+    /// Reads an audio file's frame length and duration off `@MainActor`.
+    private static func audioFileLengthAndDurationOffMainActor(url: URL) async throws -> (frames: Int64, duration: Double) {
+        try await Task.detached(priority: .userInitiated) {
+            let avFile = try AVAudioFile(forReading: url)
+            return (avFile.length, Double(avFile.length) / avFile.fileFormat.sampleRate)
+        }.value
+    }
+
+    /// Event-driven counter gate with bounded timeout (zero fixed sleeps when signaled immediately).
+    private final class CountGate: @unchecked Sendable {
+        private struct State {
+            var count = 0
+            var waiters: [(id: UUID, target: Int, continuation: CheckedContinuation<Void, any Error>)] = []
+        }
+
+        private let state = Mutex(State())
+
+        func signal() {
+            let ready = state.withLock { s -> [CheckedContinuation<Void, any Error>] in
+                s.count += 1
+                var matched: [CheckedContinuation<Void, any Error>] = []
+                s.waiters.removeAll { waiter in
+                    if s.count >= waiter.target {
+                        matched.append(waiter.continuation)
+                        return true
+                    }
+                    return false
+                }
+                return matched
+            }
+            for cont in ready { cont.resume() }
+        }
+
+        func waitFor(count target: Int, timeout: Duration) async throws {
+            let waiterID = UUID()
+            let timeoutTask = Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                guard !Task.isCancelled, let self else { return }
+                let expired = self.state.withLock { s -> CheckedContinuation<Void, any Error>? in
+                    guard let idx = s.waiters.firstIndex(where: { $0.id == waiterID }) else { return nil }
+                    return s.waiters.remove(at: idx).continuation
+                }
+                expired?.resume(throwing: TimeoutError(message: "Timed out after \(timeout) waiting for recorder.record() count >= \(target)"))
+            }
+            defer { timeoutTask.cancel() }
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, any Error>) in
+                let satisfied = state.withLock { s -> Bool in
+                    if s.count >= target { return true }
+                    s.waiters.append((waiterID, target, cont))
+                    return false
+                }
+                if satisfied { cont.resume() }
+            }
+        }
     }
 
     /// Strips a leading `WindowSpeakers.freshPrefix()` (`<UUID>_`) while preserving the Sortformer slot suffix.
