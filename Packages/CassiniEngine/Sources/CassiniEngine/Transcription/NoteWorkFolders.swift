@@ -16,14 +16,24 @@ public struct NoteWorkFolders: JobCheckpoints {
     }
 
     /// The numbers of the note's checkpoint. One that cannot be read, or that no longer fits the note's audio file
-    /// (its name or `length:mtime`), is a mismatch; the job checks the language when it runs.
+    /// (its name or `length:mtime`, or its `committedPrefix`), is a mismatch; a stale precompute checkpoint is treated
+    /// as missing so it silently falls back to full post-Stop decoding.
     public func status(of noteID: UUID) async -> CheckpointStatus {
         let checkpoint: CheckpointState?
         do { checkpoint = try files.load(noteID) } catch { return .mismatch }
         guard let checkpoint else { return .missing }
         let audio = root.appendingPathComponent(noteID.uuidString, isDirectory: true)
             .appendingPathComponent(checkpoint.source)
-        guard CheckpointState.signature(of: audio) == checkpoint.signature else { return .mismatch }
+        let signature = CheckpointState.signature(of: audio)
+        if signature != checkpoint.signature {
+            guard let prefix = checkpoint.committedPrefix,
+                  let expectedPrefix = LiveCAFReader.prefixExpectation(
+                      for: audio, committedUnitCount: prefix.committedUnitCount, clipsURL: files.clipsURL(for: noteID)),
+                  (try? checkpoint.validate(.init(source: checkpoint.source, signature: signature,
+                                                  model: checkpoint.model, prefix: expectedPrefix))) != nil else {
+                return checkpoint.isPrecompute ? .missing : .mismatch
+            }
+        }
         return .saved(doneMs: checkpoint.doneMs, totalMs: checkpoint.totalMs, words: checkpoint.draftWords.count)
     }
 

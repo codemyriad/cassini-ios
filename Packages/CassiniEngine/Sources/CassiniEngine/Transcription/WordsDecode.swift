@@ -70,11 +70,21 @@ final class WordsDecode: Sendable {
     /// The language the word body is counted with: the one the run's words are written with.
     private let language: String
 
-    init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, recognizer: SpeechRecognizer = .appleSpeech,
-         language: String = "", limits: TranscriptionJob.Limits, checkpoints: any CheckpointStoring, stop: StopSignal,
-         events: @escaping @Sendable (JobEvent) -> Void, uptimeMs: @escaping @Sendable () -> Int64) {
+    init(base: CheckpointState, noteID: UUID, resumeDoneMs: Int64, finalizedSignature: String? = nil,
+         recognizer: SpeechRecognizer = .appleSpeech, language: String = "", limits: TranscriptionJob.Limits,
+         checkpoints: any CheckpointStoring, stop: StopSignal, events: @escaping @Sendable (JobEvent) -> Void,
+         uptimeMs: @escaping @Sendable () -> Int64) {
         var resumed = base
-        if resumeDoneMs > 0 { resumed.resumedFromMs = resumeDoneMs }
+        if base.isPrecompute {
+            // Once post-Stop batch transcription takes over, subsequent checkpoints are whole-file batch checkpoints
+            // anchored to the finalized file signature (never surfacing internal precompute as a user resume).
+            if let finalizedSignature { resumed.signature = finalizedSignature }
+            resumed.origin = nil
+            resumed.committedPrefix = nil
+            resumed.recognitionSampleCount = nil
+        } else if resumeDoneMs > 0 {
+            resumed.resumedFromMs = resumeDoneMs
+        }
         self.base = base
         self.noteID = noteID; self.resumeDoneMs = resumeDoneMs; self.limits = limits; self.checkpoints = checkpoints
         self.recognizer = recognizer; self.language = language

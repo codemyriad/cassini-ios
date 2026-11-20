@@ -31,6 +31,7 @@ import CassiniNotebook
         var notices: NoticeCenter
         var router: Router
         var ready: @MainActor () async -> Void
+        var precompute: (any RecordingPrecomputing)? = nil
     }
 
     init(_ parts: Parts) {
@@ -43,7 +44,8 @@ import CassiniNotebook
             consent: .recorded(settings: parts.settings, speech: environment.transcriber, speakers: environment.analyzer,
                                   parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) }),
             liveActivity: environment.liveActivity, notifier: environment.notifier, clock: environment.recordingClock ?? environment.clock,
-            defaultTitle: { RecordingCopy.defaultTitle(RecordingTitles.dateTime($0, locale: locale, timeZone: timeZone)) }))
+            defaultTitle: { RecordingCopy.defaultTitle(RecordingTitles.dateTime($0, locale: locale, timeZone: timeZone)) },
+            precompute: parts.precompute))
         let transcriber = environment.transcriber, settings = parts.settings
         screen = RecordingScreenModel(controller: controller, ports: .init(
             permission: environment.microphone,

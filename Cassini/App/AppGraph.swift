@@ -1,6 +1,10 @@
 import SwiftUI
+import Synchronization
 import CassiniEngine
+import CassiniInference
 import CassiniNotebook
+import CassiniSherpa
+import CassiniWhistle
 
 /// The stores of one app run, built from an `AppEnvironment`, and the launch work that makes them ready.
 @MainActor final class AppGraph {
@@ -18,6 +22,8 @@ import CassiniNotebook
     let playback: PlaybackStore
     let processing: ProcessingStore
     let recording: RecordingStore
+    let precomputer: (any RecordingPrecomputing)?
+    private let appActiveFlag = AppActiveFlag()
     let imports: ImportStore
     let trash: TrashService
     let exports: ExportStore
@@ -53,11 +59,45 @@ import CassiniNotebook
             note.playbackPosition = position
             return note.transcriptPreview?.display
         })
+        let activeFlag = appActiveFlag
+        let settingsStore = settings
+        let precomputer: (any RecordingPrecomputing)? = library.noteStore.map { notes in
+            let checkpoints = CheckpointFiles(notes: notes)
+            let modelsRoot = environment.models
+            let speechModels = environment.speechModels
+            let transcriber = environment.transcriber
+            let analyzer = environment.analyzer
+            return CAFPrefixPrecomputer(
+                checkpoints: checkpoints,
+                budget: .shared,
+                mode: { settingsStore.currentTranscriptionMode },
+                engine: {
+                    switch transcriber.recognizer {
+                    case .parakeet:
+                        guard SherpaRuntime.isLinked else { return .none }
+                        return .parakeet(.init(
+                            models: ParakeetTranscriber.Models(root: modelsRoot),
+                            runtime: SherpaRuntime.speech,
+                            speakerEngines: { await analyzer.streamingEngines() },
+                            identifySpeakers: { settingsStore.currentIdentifySpeakers },
+                            printsReady: { await analyzer.printsReady() }
+                        ))
+                    case .whistle:
+                        guard let speechModels else { return .none }
+                        return .whistle(.init(acceptance: { speechModels.whistleCapability }))
+                    case .appleSpeech:
+                        return .none
+                    }
+                },
+                pressure: PrecomputePressure(isAppActive: { activeFlag.isActive })
+            )
+        }
+        self.precomputer = precomputer
         processing = Self.processing(environment: environment, library: library, voices: voices, settings: settings,
-                                     notices: noticeCenter)
+                                     notices: noticeCenter, precomputer: precomputer)
         recording = RecordingStore(.init(environment: environment, library: library, processing: processing,
                                          playback: playback, settings: settings, notices: noticeCenter, router: router,
-                                         ready: { [startup] in _ = await startup.ready() }))
+                                         ready: { [startup] in _ = await startup.ready() }, precompute: precomputer))
         voiceEnrollment = VoiceEnrollmentAdapter(makeCapture: { AVCaptureAdapter() }, analyzer: environment.analyzer,
             settings: settings, playback: playback, recording: recording,
             root: environment.exports.appendingPathComponent("VoiceEnrollment"))
@@ -105,7 +145,12 @@ import CassiniNotebook
                     downloadTranscriber: environment.downloadTranscriber, speechOnly: true)
             }
             speechModels.onDownload = { [weak router] in router?.push(.parakeetDownload) }
-            speechModels.onChange = { [weak processing] in Task { await processing?.models.refresh() } }
+            speechModels.onChange = { [weak processing, precomputer] in
+                Task {
+                    await precomputer?.preempt()
+                    await processing?.models.refresh()
+                }
+            }
         }
         settingsPorts = SettingsAdapter(settings: settings, library: library, voices: voices, processing: processing,
                                         notices: noticeCenter, transcriber: environment.transcriber,
@@ -134,12 +179,19 @@ import CassiniNotebook
 
     /// The transcription queue and the job it runs, over the library's notes. Without a library there is no queue.
     private static func processing(environment: AppEnvironment, library: LibraryStore, voices: VoicesStore,
-                                   settings: SettingsStore, notices: NoticeCenter) -> ProcessingStore {
+                                   settings: SettingsStore, notices: NoticeCenter,
+                                   precomputer: (any RecordingPrecomputing)? = nil) -> ProcessingStore {
         let progress = JobProgress(battery: UIDeviceBattery(), uptimeMs: environment.transcriptionUptimeMs, onFinalization: { [settings] in settings.recordFinalization($0) })
         let checkpoints: any CheckpointStoring = library.noteStore.map { CheckpointFiles(notes: $0) } ?? NoLibraryWork()
         let drafts = library.noteStore.map { DraftNamesStore(notes: $0) }
         voices.drafts = drafts
         settings.bindDraftNames(drafts)
+        let preemptPrecompute: (@MainActor @Sendable () async -> Void)?
+        if let pre = precomputer {
+            preemptPrecompute = { await pre.preempt() }
+        } else {
+            preemptPrecompute = nil
+        }
         let coordinator = library.noteStore.map { notes in
             let job = TranscriptionJob(notes: notes, transcriber: environment.transcriber, analyzer: environment.analyzer,
                                        checkpoints: checkpoints, provenance: ProvenanceFiles(notes: notes),
@@ -165,7 +217,8 @@ import CassiniNotebook
                         parakeetReady: { [models = environment.models] in ModelCatalog.parakeet.ready(in: models) })
                 },
                 fallbackRecognizer: { job, _ in await SpeechFallback.recognizer(for: job, transcriber: environment.transcriber) },
-                eventUptimeMs: environment.launch.marksLaunchFinished ? environment.transcriptionUptimeMs : nil)
+                eventUptimeMs: environment.launch.marksLaunchFinished ? environment.transcriptionUptimeMs : nil,
+                onPreemptPrecompute: preemptPrecompute)
             return TranscriptionCoordinator(parts, settings: settings)
         }
         let models = ModelInstalls(transcriber: environment.downloadTranscriber ?? environment.transcriber, analyzer: environment.analyzer,
@@ -254,6 +307,7 @@ import CassiniNotebook
     /// (`EnqueueRules.resumesOnActivation`). The returned task ends once both are done.
     @discardableResult
     func becameActive() -> Task<Void, Never> {
+        appActiveFlag.set(true)
         libraryScreen.clockChanged()
         return Task { [noticeCenter, processing, platform = environment.platform] in
             await noticeCenter.refresh()
@@ -263,6 +317,8 @@ import CassiniNotebook
 
     /// Saves the playback position and keeps the app awake until every pending write has landed.
     func enterBackground() {
+        appActiveFlag.set(false)
+        if let precomputer { Task { await precomputer.preempt() } }
         let token = environment.background.begin(title: String(localized: "Saving your recordings", table: "Recording"), onExpire: {})
         playback.savePosition()
         Task { [playback, library, background = environment.background] in
@@ -310,6 +366,13 @@ import CassiniNotebook
             await Task.detached(priority: .utility) { ModelRepository.prune(root: models) }.value
         }
     }
+}
+
+/// Thread-safe app foreground flag shared with `CAFPrefixPrecomputer` off the main actor.
+private final class AppActiveFlag: Sendable {
+    private let flag = Mutex(true)
+    var isActive: Bool { flag.withLock { $0 } }
+    func set(_ value: Bool) { flag.withLock { $0 = value } }
 }
 
 /// The saved progress of the notes when the library could not be opened: there is none.

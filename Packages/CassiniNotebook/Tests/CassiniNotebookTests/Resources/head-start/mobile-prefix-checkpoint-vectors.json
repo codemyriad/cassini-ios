@@ -1,0 +1,1394 @@
+{
+  "schema": "cassini.head-start.mobile-prefix-checkpoint-vectors.v1",
+  "validPrefixKinds": [
+    "cafPcm16LeFrames",
+    "oggOpusCommittedBytes"
+  ],
+  "cafResamplerDefaults": {
+    "sourceSampleRateHz": 48000,
+    "recognitionSampleRateHz": 16000,
+    "firLookaheadFrames": 48,
+    "minRequiredRule": "((consumed16kSamples - 1) * sourceSampleRateHz + 15999) // 16000 + resamplerLookaheadFrames + 1"
+  },
+  "cases": [
+    {
+      "id": "ios-caf-grown-file-clean-prefix-match",
+      "platform": "ios",
+      "description": "120 s iOS 48 kHz Parakeet precompute resumes on 150 s finalized .caf when 5,760,048 CAF source frames (120 s + 48-frame FIR lookahead) match while 16 kHz recognitionSampleCount (1,920,000) stays separate.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-exact-fir-lookahead-boundary-match",
+      "platform": "ios",
+      "description": "120 s iOS 48 kHz precompute at exact cassini-fir-48k-16k-v1 minimum (5,760,046 frames) resumes even when the very next unconsumed frame (5,760,046) differs.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760046,
+          "prefixSha256": "543215b9ea446b9cf53bed1a9ab678d2e7a01de0915f97d76112fc1f8b9f7eae"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "543215b9ea446b9cf53bed1a9ab678d2e7a01de0915f97d76112fc1f8b9f7eae",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ],
+        "mutations": [
+          {
+            "frameIndex": 5760046,
+            "delta": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-tail-mutation-after-committed-prefix-resumes",
+      "platform": "ios",
+      "description": "Mutating PCM at second 130 (strictly after the 120 s + lookahead committed prefix) leaves prefixSha256 unchanged and resumes.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ],
+        "mutations": [
+          {
+            "frameIndex": 6240000,
+            "delta": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-whistle-grown-file-clean-prefix-match",
+      "platform": "ios",
+      "description": "120 s iOS 48 kHz Whistle precompute (doneMs without separate Parakeet recognitionSampleCount) resumes when both 48 kHz CAF prefix SHA-256 (including FIR lookahead) and decoded 16 kHz PCM SHA-256 match.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+          "decodedPcmSha256": "6b7e882caf582eabb4cc7d0c0647aab1bc724325cb43b7cc8e4e72997b92837c"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        },
+        "decodedPcmSha256": "6b7e882caf582eabb4cc7d0c0647aab1bc724325cb43b7cc8e4e72997b92837c"
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-16khz-no-resampler-clean-prefix-match",
+      "platform": "ios",
+      "description": "120 s 16 kHz CAF source (no resampling, resamplerLookaheadFrames=0) requires 1,920,000 source frames and resumes cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "3844096:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 16000,
+          "committedUnitCount": 1920000,
+          "prefixSha256": "a57702444af972fff8872b069d0b900fdd3a9dd36dc5c4742de54a31b8c3dd22"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "4804096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 16000,
+        "resamplerLookaheadFrames": 0,
+        "finalizedUnitCount": 2400000,
+        "prefixSha256": "a57702444af972fff8872b069d0b900fdd3a9dd36dc5c4742de54a31b8c3dd22",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 16000,
+        "bytesPerFrame": 2,
+        "totalFrames": 2400000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "android-ogg-opus-grown-file-clean-prefix-match",
+      "platform": "android",
+      "description": "Android Parakeet precompute resumes after trailing pages and EOS page are appended at Stop.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "android-ogg-opus-whistle-grown-file-clean-prefix-match",
+      "platform": "android",
+      "description": "Android Whistle precompute resumes when committed Ogg bytes and decoded PCM prefix match.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+          "decodedPcmSha256": "6b7e882caf582eabb4cc7d0c0647aab1bc724325cb43b7cc8e4e72997b92837c"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        },
+        "decodedPcmSha256": "6b7e882caf582eabb4cc7d0c0647aab1bc724325cb43b7cc8e4e72997b92837c"
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "committedPrefix",
+        "reason": null,
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "whole-file-signature-match-resumes-directly",
+      "platform": "ios",
+      "description": "Unchanged whole-file signature resumes directly without requiring prefix comparison.",
+      "checkpoint": {
+        "origin": "batch",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": null,
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "resume",
+        "matchMode": "wholeFile",
+        "reason": null,
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "ios-caf-buggy-16khz-cursor-as-caf-frames-rejected",
+      "platform": "ios",
+      "description": "Equating 48 kHz CAF committedUnitCount with 16 kHz RecognitionCheckpoint.position (1,920,000 = only 40 s of 48 kHz audio) is rejected with prefixCoverageInsufficient even when those 40 s hash identically.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 1920000,
+          "prefixSha256": "a57702444af972fff8872b069d0b900fdd3a9dd36dc5c4742de54a31b8c3dd22"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "a57702444af972fff8872b069d0b900fdd3a9dd36dc5c4742de54a31b8c3dd22",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixCoverageInsufficient",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-missing-fir-lookahead-frames-rejected",
+      "platform": "ios",
+      "description": "Omitting the 48-frame FIR right-halo lookahead (committedUnitCount=5,760,000 < 5,760,046) is rejected with prefixCoverageInsufficient.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760000,
+          "prefixSha256": "e28d2528461e67d730534548a4882a0e13b0557614a2dfc05c5d32864a062da6"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "e28d2528461e67d730534548a4882a0e13b0557614a2dfc05c5d32864a062da6",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixCoverageInsufficient",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-truncated-at-60s-beyond-first-third-discards-cleanly",
+      "platform": "ios",
+      "description": "Finalized 48 kHz .caf truncated at second 60 (2,880,000 frames: beyond the 40 s first third, yet short of 5,760,048) -> silent discardAndFullDecode (prefixTruncated).",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "5764096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 2880000,
+        "prefixSha256": null,
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixTruncated",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 2880000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-repair-truncated-lookahead-frame-discards-cleanly",
+      "platform": "ios",
+      "description": "CAFRepair truncated finalized 48 kHz .caf by 1 frame inside the FIR lookahead tail (5,760,047 < 5,760,048) -> silent discardAndFullDecode (never CHECKPOINT_MISMATCH).",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11524190:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 5760047,
+        "prefixSha256": null,
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixTruncated",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 5760047,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-mutated-at-60s-beyond-first-third-discards-cleanly",
+      "platform": "ios",
+      "description": "Mutating PCM at second 60 (frame 2,880,000: beyond the 40 s first third of the 120 s consumed prefix) changes prefixSha256 -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "9b38617c4bc0db4dd72983cc11ddedf8abe22dfc7fb82457ec6465b6f07931be",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixDigestMismatch",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ],
+        "mutations": [
+          {
+            "frameIndex": 2880000,
+            "delta": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-mutated-inside-fir-lookahead-tail-discards-cleanly",
+      "platform": "ios",
+      "description": "Mutating PCM at frame 5,760,045 (the exact final source frame tapped by cassini-fir-48k-16k-v1 for y[1,919,999]) changes prefixSha256 -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "f099ac3fcc7d2abdb10008d39c9b9f9913cceae8e2589ab4fb51e2c84972bdb5",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixDigestMismatch",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ],
+        "mutations": [
+          {
+            "frameIndex": 5760045,
+            "delta": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-repair-mutated-prefix-byte-discards-cleanly",
+      "platform": "ios",
+      "description": "CAFRepair patched a sample inside the early committed 48 kHz PCM16LE prefix (frame 100) -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "1f716b50a18b4324408606477608d6da947f28165ce699580929339cf6546a04",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixDigestMismatch",
+        "failUserJob": false
+      },
+      "cafAudioSpec": {
+        "sampleRateHz": 48000,
+        "bytesPerFrame": 2,
+        "totalFrames": 7200000,
+        "fillPatternS16Le": [
+          123,
+          -456,
+          789,
+          -1011
+        ],
+        "mutations": [
+          {
+            "frameIndex": 100,
+            "delta": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "ios-caf-source-sample-rate-mismatch-discards-cleanly",
+      "platform": "ios",
+      "description": "Mismatched sourceSampleRateHz between checkpoint (48 kHz) and finalized CAF (44.1 kHz) -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 44100,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "sourceSampleRateMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "android-ogg-reencoded-prefix-discards-cleanly",
+      "platform": "android",
+      "description": "Re-encoded or header-rewritten Ogg Opus prefix changes prefixSha256 -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "9c4a2336667dad3f924cd1536fb2f0c626694a143940eb57b32642b0c11d0eb7",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixDigestMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "android-aac-api26-container-mismatch-discards-cleanly",
+      "platform": "android",
+      "description": "API 26-28 AacCapture finalized container cannot match oggOpusCommittedBytes -> silent discardAndFullDecode.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "aacM4a",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "prefixKindMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-model-switch-parakeet-to-whistle-discards-cleanly",
+      "platform": "ios",
+      "description": "Switching model between recording and Stop discards precompute checkpoint cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "modelMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-speakers-identity-changed-discards-cleanly",
+      "platform": "android",
+      "description": "Changed Sortformer speaker-model identity discards precompute checkpoint cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "speakersMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-schema-version-mismatch-discards-cleanly",
+      "platform": "android",
+      "description": "Legacy checkpoint schema version 1 is rejected per D51.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "versionMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-source-mismatch-discards-cleanly",
+      "platform": "ios",
+      "description": "Checkpoint from a different source audio file is rejected cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "other-note.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 5760048,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "sourceMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-decoded-pcm-prefix-mismatch-discards-cleanly",
+      "platform": "android",
+      "description": "Whistle decoded 16 kHz PCM prefix mismatch discards precompute checkpoint cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+          "decodedPcmSha256": "6b7e882caf582eabb4cc7d0c0647aab1bc724325cb43b7cc8e4e72997b92837c"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "whistle@b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+        "speakers": "",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        },
+        "decodedPcmSha256": "ea627a248e9651a00204e06daef4e8ec95e15edd196f88de709c7c3bffd71645"
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "decodedPrefixMismatch",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-invalid-zero-committed-units-discards-cleanly",
+      "platform": "ios",
+      "description": "Zero committedUnitCount is malformed and discarded cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "cafPcm16LeFrames",
+          "sourceSampleRateHz": 48000,
+          "committedUnitCount": 0,
+          "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d"
+        },
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "invalidPrefixDescriptor",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "mobile-truncated-work-file-discards-cleanly",
+      "platform": "android",
+      "description": "Truncated words.log sidecar discards precompute checkpoint cleanly.",
+      "checkpoint": {
+        "origin": "precompute",
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "320000:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": {
+          "kind": "oggOpusCommittedBytes",
+          "committedUnitCount": 318400,
+          "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed"
+        },
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 4096,
+          "audioBytes": 318400
+        }
+      },
+      "expectedFile": {
+        "version": 2,
+        "source": "file:///data/user/0/io.codemyriad.cassini.talk/files/audio.opus",
+        "signature": "412512:1795070035000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "oggOpusCommittedBytes",
+        "finalizedUnitCount": 412512,
+        "prefixSha256": "8effb37a40fe690d9a5ffc373bf0e03aa7781c44a91c6e426cbfcae8d7046fed",
+        "workFiles": {
+          "clipsBytes": 64000,
+          "wordLogBytes": 2048,
+          "audioBytes": 318400
+        }
+      },
+      "expectedDecision": {
+        "decision": "discardAndFullDecode",
+        "matchMode": null,
+        "reason": "workFileTruncated",
+        "failUserJob": false
+      }
+    },
+    {
+      "id": "batch-checkpoint-without-prefix-on-changed-file-rejects-batch",
+      "platform": "ios",
+      "description": "Non-precompute batch checkpoint without committedPrefix preserves rejectBatchCheckpoint on modified source.",
+      "checkpoint": {
+        "origin": "batch",
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "11526016:1795070000000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "doneMs": 120000,
+        "recognitionSampleCount": 1920000,
+        "totalMs": 0,
+        "resumedFromMs": 0,
+        "committedPrefix": null,
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedFile": {
+        "version": 1,
+        "source": "recording.caf",
+        "signature": "14404096:1795070030000",
+        "model": "parakeet-ultra-0.6b-int8-v2@50c15b94ea9cb1c2f8dbcdcbc0f15b450169154deeb206923cb5388f60892366",
+        "speakers": "d4e5f6a7b8c90123456789abcdef0123456789abcdef0123456789abcdef0123",
+        "prefixKind": "cafPcm16LeFrames",
+        "sourceSampleRateHz": 48000,
+        "resamplerLookaheadFrames": 48,
+        "finalizedUnitCount": 7200000,
+        "prefixSha256": "40250a3c77d3a1d126734461616db89fcbb096db06512e38cb509fc0e8b2929d",
+        "workFiles": {
+          "clipsBytes": 64000
+        }
+      },
+      "expectedDecision": {
+        "decision": "rejectBatchCheckpoint",
+        "matchMode": null,
+        "reason": "signatureMismatch",
+        "failUserJob": true
+      }
+    }
+  ]
+}

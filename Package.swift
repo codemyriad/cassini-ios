@@ -69,7 +69,7 @@ let package = Package(
         .testTarget(name: "CassiniCoreTests", dependencies: ["CassiniCore"], resources: [.copy("Resources/zip")]),
         .target(name: "CassiniNotebook", dependencies: ["CassiniCore"], path: "Packages/CassiniNotebook/Sources/CassiniNotebook"),
         .testTarget(name: "CassiniNotebookTests", dependencies: ["CassiniNotebook", "CassiniCore"], path: "Packages/CassiniNotebook/Tests/CassiniNotebookTests",
-                    resources: [.copy("Resources/export"), .copy("Resources/interjections"), .copy("Resources/markdown"), .copy("Resources/status-badges")]),
+                    resources: [.copy("Resources/export"), .copy("Resources/head-start"), .copy("Resources/interjections"), .copy("Resources/markdown"), .copy("Resources/status-badges")]),
         .target(name: "CassiniEngine", dependencies: ["CassiniCore", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngine", resources: [.copy("Resources/import-types.json")]),
         .target(name: "CassiniEngineTesting", dependencies: ["CassiniCore", "CassiniEngine", "CassiniNotebook"], path: "Packages/CassiniEngine/Sources/CassiniEngineTesting"),
         .testTarget(name: "CassiniEngineTests", dependencies: ["CassiniAudio", "CassiniCore", "CassiniEngine", "CassiniEngineTesting", "CassiniNotebook"], path: "Packages/CassiniEngine/Tests/CassiniEngineTests",

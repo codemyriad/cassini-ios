@@ -51,16 +51,30 @@ public struct CheckpointState: Hashable, Sendable {
     public var reportedLanguage: String?
     /// Whistle DSP state at the same commit boundary as the segments.
     public var whistle: WhistleCheckpoint?
+    /// Origin of this checkpoint (`.precompute` for recording-time precomputation; nil/omitted defaults to `.batch`).
+    public var origin: CheckpointOrigin?
+    /// Optional 16 kHz recognition sample count processed so far (distinct from CAF source-rate frames).
+    public var recognitionSampleCount: Int64?
+    /// Optional committed-prefix descriptor allowing resume after recording finalizes the container header/tail.
+    public var committedPrefix: CommittedPrefix?
+
+    /// True when this checkpoint was written by recording-time precomputation.
+    public var isPrecompute: Bool { origin == .precompute }
 
     public init(source: String, signature: String, model: String, segments: [TranscriptSegment], doneMs: Int64,
                 totalMs: Int64, elapsedMs: Int64, inferenceMs: Int64 = 0, resumedFromMs: Int64 = 0,
-                wordsComplete: Bool = false, recognition: RecognitionCheckpoint? = nil, speakers: SpeakerCheckpoint? = nil) {
+                wordsComplete: Bool = false, recognition: RecognitionCheckpoint? = nil, speakers: SpeakerCheckpoint? = nil,
+                origin: CheckpointOrigin? = nil, recognitionSampleCount: Int64? = nil,
+                committedPrefix: CommittedPrefix? = nil) {
         self.source = source; self.signature = signature; self.model = model; self.segments = segments
         self.doneMs = doneMs; self.totalMs = totalMs; self.elapsedMs = elapsedMs; self.inferenceMs = inferenceMs
         self.resumedFromMs = resumedFromMs; self.wordsComplete = wordsComplete; self.recognition = recognition
         self.speakers = speakers
         self.reportedLanguage = nil
         self.whistle = nil
+        self.origin = origin
+        self.recognitionSampleCount = recognitionSampleCount
+        self.committedPrefix = committedPrefix
     }
 
     /// The `model` of an Apple Speech run in `language` (BCP-47): the words of another language do not resume.
@@ -77,8 +91,10 @@ public struct CheckpointState: Hashable, Sendable {
         public var source: String
         public var signature: String
         public var model: String
-        public init(source: String, signature: String, model: String) {
-            self.source = source; self.signature = signature; self.model = model
+        /// Optional finalized-file prefix expectation used when whole-file `signature` differs after recording stops.
+        public var prefix: PrefixExpectation?
+        public init(source: String, signature: String, model: String, prefix: PrefixExpectation? = nil) {
+            self.source = source; self.signature = signature; self.model = model; self.prefix = prefix
         }
     }
 
@@ -97,11 +113,55 @@ public struct CheckpointState: Hashable, Sendable {
     /// The rules a checkpoint must pass before a run resumes from it.
     public func validate(_ expected: Expected) throws(Mismatch) {
         guard source == expected.source else { throw .source }
-        guard signature == expected.signature else { throw .signature }
         guard model == expected.model else { throw .model }
         let limit = Int64(Limits.maxTranscribeDuration * 1000)
+        if signature != expected.signature {
+            guard let prefix = committedPrefix,
+                  let expectedPrefix = expected.prefix,
+                  prefix.isValidDescriptor,
+                  prefix.kind == expectedPrefix.prefixKind else {
+                throw .signature
+            }
+            if prefix.kind == .cafPcm16LeFrames {
+                guard let prefixRate = prefix.sourceSampleRateHz,
+                      let expectedRate = expectedPrefix.sourceSampleRateHz,
+                      prefixRate > 0, prefixRate == expectedRate,
+                      expectedPrefix.resamplerLookaheadFrames >= 0 else {
+                    throw .signature
+                }
+                guard (0...limit).contains(doneMs) else { throw .counters }
+                if let recognitionSampleCount {
+                    guard recognitionSampleCount >= doneMs * 16, recognitionSampleCount <= limit * 16 else {
+                        throw .counters
+                    }
+                }
+                let consumed16k = max(
+                    UInt64(doneMs) * 16,
+                    UInt64(max(0, recognitionSampleCount ?? recognition?.position ?? Int64(whistle?.processedSamples ?? 0)))
+                )
+                let minRequired = CommittedPrefix.minRequiredCafSourceFrames(
+                    consumed16kSamples: consumed16k,
+                    sourceSampleRateHz: prefixRate,
+                    resamplerLookaheadFrames: expectedPrefix.resamplerLookaheadFrames
+                )
+                guard prefix.committedUnitCount >= minRequired else { throw .signature }
+            }
+            guard expectedPrefix.finalizedUnitCount >= prefix.committedUnitCount,
+                  expectedPrefix.prefixSha256 == prefix.prefixSha256 else {
+                throw .signature
+            }
+            if let decoded = prefix.decodedPcmSha256 {
+                guard expectedPrefix.decodedPcmSha256 == decoded else { throw .signature }
+            }
+            if let speakers, speakers.clipSamples > 0, let clipsBytes = expectedPrefix.workFiles.clipsBytes {
+                guard clipsBytes >= Int64(speakers.clipSamples) * 4 else { throw .speakers }
+            }
+        }
         guard (0...limit).contains(doneMs), (0...limit).contains(totalMs), totalMs == 0 || doneMs <= totalMs,
               elapsedMs >= 0, inferenceMs >= 0, (0...doneMs).contains(resumedFromMs) else { throw .counters }
+        if let recognitionSampleCount {
+            guard recognitionSampleCount >= doneMs * 16, recognitionSampleCount <= limit * 16 else { throw .counters }
+        }
         guard segments.allSatisfy({ Self.ms($0.end) <= doneMs }) else { throw .wordsPastDone }
         if let recognition {
             guard recognition.valid, recognition.doneMs <= doneMs else { throw .recognition }
@@ -190,6 +250,7 @@ extension CheckpointState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version, source, signature, model, segments, doneMs, totalMs, elapsedMs, inferenceMs, resumedFromMs
         case wordsComplete, recognition, speakers, reportedLanguage, whistle
+        case origin, recognitionSampleCount, committedPrefix
     }
 
     public init(from decoder: any Decoder) throws {
@@ -210,6 +271,9 @@ extension CheckpointState: Codable {
         speakers = try c.decodeIfPresent(SpeakerCheckpoint.self, forKey: .speakers)
         reportedLanguage = try c.decodeIfPresent(String.self, forKey: .reportedLanguage)
         whistle = try c.decodeIfPresent(WhistleCheckpoint.self, forKey: .whistle)
+        origin = try c.decodeIfPresent(CheckpointOrigin.self, forKey: .origin)
+        recognitionSampleCount = try c.decodeIfPresent(Int64.self, forKey: .recognitionSampleCount)
+        committedPrefix = try c.decodeIfPresent(CommittedPrefix.self, forKey: .committedPrefix)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -229,6 +293,9 @@ extension CheckpointState: Codable {
         try c.encodeIfPresent(speakers, forKey: .speakers)
         try c.encodeIfPresent(reportedLanguage, forKey: .reportedLanguage)
         try c.encodeIfPresent(whistle, forKey: .whistle)
+        try c.encodeIfPresent(origin, forKey: .origin)
+        try c.encodeIfPresent(recognitionSampleCount, forKey: .recognitionSampleCount)
+        try c.encodeIfPresent(committedPrefix, forKey: .committedPrefix)
     }
 
     /// Compact JSON with sorted members.

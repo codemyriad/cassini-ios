@@ -23,6 +23,7 @@ extension RecordingController {
         policy?.cancel(); policy = nil
         titleWrite?.cancel(); await titleWrite?.value; titleWrite = nil
         let id = current.noteID
+        await parts.precompute?.stop(noteID: id)
         let elapsed = parts.capture.elapsed
         let duration = (try? await parts.capture.stop().duration) ?? elapsed
         let url = captureURL
@@ -64,23 +65,25 @@ extension RecordingController {
 
     /// After a saved recording: transcription with consent (recorded, or nothing to download), else the consent
     /// question or audio only. A recording longer than one transcription takes stays audio only, as does every one
-    /// while automatic transcription is off.
+    /// while automatic transcription is off or `transcriptionMode` is `.recordOnly`.
     func next(tooLong: Bool) async -> AfterFinish {
         let settings = parts.settings
-        guard !tooLong, settings.autoTranscribe else { return .audioOnly }
+        guard !tooLong, settings.autoTranscribe, settings.transcriptionMode.autoEnqueueOnStop else { return .audioOnly }
         guard await parts.consent.unavailability(.transcribe, settings.speechLanguage) == nil else { return .audioOnly }
         if await parts.consent.allows(.transcribe, settings.speechLanguage) { return .transcribe }
         return settings.modelsDeclinedAt != nil ? .audioOnly : .askConsent
     }
 
-    /// Reads the waveform, compresses the capture to M4A and hands the note to transcription.
+    /// Reads the waveform, compresses the capture to M4A (unless a precompute checkpoint will resume from the finalized
+    /// CAF) and hands the note to transcription.
     func compress(_ id: UUID, _ capture: URL, thenTranscribe transcribe: Bool) {
         setFinalizing(id, true)
         parts.handoff.audioFinalizing(id)
+        let preserveCAFForResume = transcribe && (parts.precompute?.hasPrecomputeCheckpoint(for: id) ?? false)
         compressions[id] = Task { [weak self] in
             guard let self else { return }
             defer { compressions[id] = nil } // Last, so `settle()` waits for the hand-off too.
-            let readable = await finishAudio(id, capture)
+            let readable = await finishAudio(id, capture, preserveCAF: preserveCAFForResume)
             setFinalizing(id, false)
             parts.handoff.audioReady(id)
             // Cancelled while compressing ("Waiting to transcribe" shows Cancel): the user's choice stands.
@@ -93,13 +96,14 @@ extension RecordingController {
     }
 
     /// False when the capture cannot be read; its note then shows that the audio could not be read.
-    func finishAudio(_ id: UUID, _ capture: URL) async -> Bool {
+    func finishAudio(_ id: UUID, _ capture: URL, preserveCAF: Bool = false) async -> Bool {
         let notes = parts.notes
         guard let summary = try? await parts.audio.inspect(capture) else {
             _ = try? await notes.update(id) { $0.failure = .audio }
             return false
         }
         _ = try? await notes.update(id) { $0.duration = summary.duration; $0.waveform = summary.waveform }
+        if preserveCAF { return true }
         let compressed = capture.deletingLastPathComponent().appendingPathComponent(Self.compressedFilename)
         do {
             try await parts.audio.compress(capture, to: compressed)

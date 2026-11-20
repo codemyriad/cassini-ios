@@ -76,15 +76,18 @@ public struct CheckpointFiles: CheckpointStoring {
     public func save(_ state: CheckpointState, for noteID: UUID) throws {
         let folder = directory(for: noteID)
         do {
+            let protection: [FileAttributeKey: Any] = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             if !FileManager.default.fileExists(atPath: folder.path) {
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false, attributes: protection)
             }
             let main = folder.appendingPathComponent(Self.filename)
             let backup = folder.appendingPathComponent(Self.backupFilename)
             let temporary = folder.appendingPathComponent(Self.filename + ".tmp")
             try DurableFile.writeSynced(state.encoded(), to: temporary)
+            try? FileManager.default.setAttributes(protection, ofItemAtPath: temporary.path)
             if FileManager.default.fileExists(atPath: main.path) { try DurableFile.rename(main, to: backup) }
             try DurableFile.rename(temporary, to: main)
+            try? FileManager.default.setAttributes(protection, ofItemAtPath: main.path)
             DurableFile.syncDirectory(folder)
         } catch {
             if Self.isOutOfSpace(error) || availableBytes(noteDirectory(noteID)) < Self.minFreeBytes {
