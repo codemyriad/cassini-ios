@@ -65,7 +65,8 @@ Real-time paced 48 kHz `.caf` growth (`2 s` written and `fsync`'d every `2 s` fo
 | Parakeet words, word timings (`startMs`/`endMs`), transcript-derived speaker turns & matched voice names (`>= 3` voices) | **PASS** (historical) | **PASS** (historical) | Exact 571/571 words, 3 speakers, identical `["Alice", "Carla"]` matched voice names (historical pass checked transcript-derived turns & voice name lists) |
 | Raw Sortformer `analysis.turns` (slot-normalized), per-speaker slot-to-voice map, and `provenance.speechToText` equivalence (Parakeet & Whistle) | **Pending physical re-run** | **Pending physical re-run** | Stricter assertions added to `HandsetQualificationTests` after initial Device Farm runs; slot/map canonicalization verified in always-on unit test (`testCanonicalSpeakerSlotAndVoiceMapComparison`) |
 | Whistle words & word timings (`startMs`/`endMs`) | **PASS** | **PASS** | Exact 576/576 words; post-Stop decoded segments dropped 86 → 5 |
-| Injected thermal `.serious` + low-memory (`10 MiB`) + backgrounding yield & tail recovery | **PASS** | **PASS** | Paused within 1 window/segment; post-Stop `TranscriptionJob` produced identical final output for both engines |
+| Simulated `PrecomputePressure` thermal (`.serious`) + low-memory (`10 MiB`) + backgrounding yield (foregrounded) & tail recovery | **PASS** | **PASS** | Paused within 1 window/segment via injected `PrecomputePressure` signals; post-Stop `TranscriptionJob` resumed from checkpoint and produced identical final output for both engines |
+| Real OS backgrounding / screen-lock capture continuity (`>= 5 min`) | **Pending manual handset pass** | **Pending manual handset pass** | Automated `activeInjected` flips simulate `PrecomputePressure` while foregrounded; real OS screen-lock/backgrounding audio-session continuity requires a manual handset pass |
 | Pause → Resume, simulated call interruption (`AVAudioSession.interruptionNotification`), simulated BT route loss (`oldDeviceUnavailable`) | **PASS** (`testQualificationHarnessAndTelemetryContract`) | **PASS** (`test01RealCAFLiveReaderAndInterruptionLifecycle`) | `AVCaptureAdapter` paused cleanly, emitted `.interrupted` / `.routeLost`, resumed cleanly with 0 errors |
 
 ---
@@ -90,6 +91,7 @@ AWS Device Farm handsets run in USB-powered server racks under headless `XCTest`
 
 - **Unplugged battery `%` delta:** Both 30-min runs reported `batteryState = charging` (`100% → 95%`). A quick unplugged 30-min battery `%` comparison (`recordOnly` vs. `transcribeWhileRecording`) on a personal iPhone is still needed before flipping any default on battery.
 - **Physical microphone `AVAudioRecorder` 30-min capture under live mic permission:** `AVAudioApplication.shared.recordPermission` was `.undetermined` on headless Device Farm, so `test01`/`test03`/`test04` exercised `LiveCAFReader` + `AVCaptureAdapter` lifecycle without triggering the blocking modal alert. Verify one live-mic 30-min recording on a personal iPhone with Microphone permission granted.
+- **Real OS backgrounding / screen-lock capture continuity (`>= 5 min`):** Automated pressure tests flip `PrecomputePressure.isAppActive` while foregrounded; verify one `>= 5 min` recording with the screen locked / app backgrounded on a personal iPhone to confirm iOS audio-session capture continuity and clean precompute yield/resume.
 - **Physical Bluetooth headset connect/disconnect & real carrier call:** Simulated `AVAudioSession` notifications passed; verify once with real AirPods/BT headset and a real carrier call.
 
 ---

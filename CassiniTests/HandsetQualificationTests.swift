@@ -391,6 +391,7 @@ final class HandsetQualificationTests: XCTestCase {
             speechProvenance: JSONObject? = baseProv,
             precomputeCheckpointsSaved: Int = 2,
             checkpointsAtPressureInjection: Int? = nil,
+            postStopResumedFromMs: Int64 = 0,
             postStopWindowsDecoded: Int = 1,
             postStopSegmentsDecoded: Int = 0
         ) -> PairedLaneResult {
@@ -407,6 +408,7 @@ final class HandsetQualificationTests: XCTestCase {
                 matchedVoicesBySpeaker: matchedVoicesBySpeaker,
                 precomputeCheckpointsSaved: precomputeCheckpointsSaved,
                 checkpointsAtPressureInjection: checkpointsAtPressureInjection,
+                postStopResumedFromMs: postStopResumedFromMs,
                 postStopWindowsDecoded: postStopWindowsDecoded,
                 postStopSegmentsDecoded: postStopSegmentsDecoded,
                 stopToPublishedSeconds: 1.0,
@@ -417,15 +419,15 @@ final class HandsetQualificationTests: XCTestCase {
 
         let baseline = makeLane(audioFilename: RecordingController.compressedFilename, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
         let control = makeLane(precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
-        let headStart = makeLane(precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
-        let pressure = makeLane(precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
+        let headStart = makeLane(precomputeCheckpointsSaved: 3, postStopResumedFromMs: 8_000, postStopWindowsDecoded: 1)
+        let pressure = makeLane(precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopResumedFromMs: 5_000, postStopWindowsDecoded: 2)
 
         let passing = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: pressure)
         XCTAssertTrue(passing.equivalencePassed)
         XCTAssertTrue(passing.pressureRecoveryPassed)
 
         // Swapping Alice and Carla across slots while keeping matchedVoiceNames == ["Alice", "Carla"] must fail equivalence.
-        let swappedHeadStart = makeLane(matchedVoicesBySpeaker: ["1": "Carla", "3": "Alice"], precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
+        let swappedHeadStart = makeLane(matchedVoicesBySpeaker: ["1": "Carla", "3": "Alice"], precomputeCheckpointsSaved: 3, postStopResumedFromMs: 8_000, postStopWindowsDecoded: 1)
         let swappedEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: swappedHeadStart, pressure: pressure)
         XCTAssertFalse(swappedEval.equivalencePassed, "Swapped speaker-to-voice assignment must set equivalencePassed = false")
         XCTAssertTrue(swappedEval.pressureRecoveryPassed)
@@ -436,16 +438,22 @@ final class HandsetQualificationTests: XCTestCase {
             ("backend", .string("other-backend")),
             ("language", .string("und"))
         ])
-        let badProvPressure = makeLane(speechProvenance: wrongProv, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
+        let badProvPressure = makeLane(speechProvenance: wrongProv, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopResumedFromMs: 5_000, postStopWindowsDecoded: 2)
         let badProvEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: badProvPressure)
         XCTAssertTrue(badProvEval.equivalencePassed)
         XCTAssertFalse(badProvEval.pressureRecoveryPassed, "Provenance mismatch must set pressureRecoveryPassed = false")
 
         // Parakeet: matching output with two extra checkpoints after pressure injection must fail pressureRecoveryPassed.
-        let parakeetIgnoredPressure = makeLane(precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 1)
+        let parakeetIgnoredPressure = makeLane(precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 2, postStopResumedFromMs: 5_000, postStopWindowsDecoded: 1)
         let parakeetIgnoredEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: parakeetIgnoredPressure)
         XCTAssertTrue(parakeetIgnoredEval.equivalencePassed)
         XCTAssertFalse(parakeetIgnoredEval.pressureRecoveryPassed, "Parakeet ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
+
+        // Parakeet: matching output with zero post-Stop resume progress (checkpoint discarded) must fail pressureRecoveryPassed.
+        let parakeetDiscardedPressure = makeLane(precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopResumedFromMs: 0, postStopWindowsDecoded: 4)
+        let parakeetDiscardedEval = Self.evaluateParakeetPaired(baseline: baseline, cafControl: control, headStart: headStart, pressure: parakeetDiscardedPressure)
+        XCTAssertTrue(parakeetDiscardedEval.equivalencePassed)
+        XCTAssertFalse(parakeetDiscardedEval.pressureRecoveryPassed, "Parakeet discarding checkpoint (resumedFromMs == 0) must set pressureRecoveryPassed = false")
 
         // Whistle: matching output with <=1 extra checkpoint passes; two extra checkpoints after pressure injection must fail pressureRecoveryPassed.
         let whistleProv = JSONObject([
@@ -455,16 +463,22 @@ final class HandsetQualificationTests: XCTestCase {
         ])
         let whistleBaseline = makeLane(audioFilename: RecordingController.compressedFilename, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
         let whistleControl = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
-        let whistleHeadStart = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
-        let whistlePressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
+        let whistleHeadStart = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopResumedFromMs: 8_000, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
+        let whistlePressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopResumedFromMs: 5_000, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
         let whistlePassing = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistlePressure)
         XCTAssertTrue(whistlePassing.equivalencePassed)
         XCTAssertTrue(whistlePassing.pressureRecoveryPassed)
 
-        let whistleIgnoredPressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 5, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 10)
+        let whistleIgnoredPressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 5, checkpointsAtPressureInjection: 3, postStopResumedFromMs: 5_000, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 10)
         let whistleIgnoredEval = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistleIgnoredPressure)
         XCTAssertTrue(whistleIgnoredEval.equivalencePassed)
         XCTAssertFalse(whistleIgnoredEval.pressureRecoveryPassed, "Whistle ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
+
+        // Whistle: matching output with zero post-Stop resume progress (checkpoint discarded) must fail pressureRecoveryPassed.
+        let whistleDiscardedPressure = makeLane(speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopResumedFromMs: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleDiscardedEval = Self.evaluateWhistlePaired(baseline: whistleBaseline, cafControl: whistleControl, headStart: whistleHeadStart, pressure: whistleDiscardedPressure)
+        XCTAssertTrue(whistleDiscardedEval.equivalencePassed)
+        XCTAssertFalse(whistleDiscardedEval.pressureRecoveryPassed, "Whistle discarding checkpoint (resumedFromMs == 0) must set pressureRecoveryPassed = false")
 
         // Whistle & Parakeet: segments with non-empty text but empty `seg.words` (missing word timings)
         // must extract to zero timed words and fail both equivalencePassed and pressureRecoveryPassed.
@@ -1452,6 +1466,7 @@ final class HandsetQualificationTests: XCTestCase {
         let matchedVoicesBySpeaker: [String: String]
         let precomputeCheckpointsSaved: Int
         let checkpointsAtPressureInjection: Int?
+        let postStopResumedFromMs: Int64
         let postStopWindowsDecoded: Int
         let postStopSegmentsDecoded: Int
         let stopToPublishedSeconds: Double
@@ -1594,6 +1609,8 @@ final class HandsetQualificationTests: XCTestCase {
                         return true
                     }
                     if firstTrigger {
+                        // Simulated PrecomputePressure injection while foregrounded (real OS screen-lock /
+                        // backgrounding capture continuity is tracked separately as a manual handset pass).
                         countAtInjection.withLock { $0 = n }
                         thermalInjected.withLock { $0 = .serious }
                         memInjected.withLock { $0 = 10 << 20 }
@@ -1646,10 +1663,12 @@ final class HandsetQualificationTests: XCTestCase {
         // Production Stop -> RecordingController.finishAudio -> TranscriptionJob (timed);
         // PortableExportService export is verified separately afterward.
         let postStopWindows = Mutex(0)
+        let capturedRequest = Mutex<TranscriptionRequest?>(nil)
         let host = MatchingJobHost(notes: notes, voices: enrolledVoices)
         let transcriber = ParakeetTranscriber(models: parakeetModels, runtime: SherpaRuntime.speech)
         let countingTranscriber = CountingTranscriber(
             inner: transcriber,
+            onRequest: { req in capturedRequest.withLock { $0 = req } },
             onWindow: { postStopWindows.withLock { $0 += 1 } }
         )
         let job = TranscriptionJob(notes: notes, transcriber: countingTranscriber, analyzer: analyzer,
@@ -1696,6 +1715,7 @@ final class HandsetQualificationTests: XCTestCase {
             matchedVoicesBySpeaker: Self.canonicalizeVoiceMap(host.matchedVoicesBySpeaker),
             precomputeCheckpointsSaved: precomputeSaved,
             checkpointsAtPressureInjection: countAtInjection.withLock { $0 },
+            postStopResumedFromMs: capturedRequest.withLock { $0?.resume?.recognition.doneMs ?? 0 },
             postStopWindowsDecoded: postStopWindows.withLock { $0 },
             postStopSegmentsDecoded: 0,
             stopToPublishedSeconds: elapsed,
@@ -1810,10 +1830,15 @@ final class HandsetQualificationTests: XCTestCase {
         try await fileCapture.appendRemainingAudio()
 
         let postStopSegs = Mutex(0)
+        let capturedRequest = Mutex<TranscriptionRequest?>(nil)
         let transcriber = WhistleTranscriber(acceptance: cap)
-        let countingTranscriber = CountingTranscriber(inner: transcriber, onSegment: { count in
-            postStopSegs.withLock { $0 += count }
-        })
+        let countingTranscriber = CountingTranscriber(
+            inner: transcriber,
+            onRequest: { req in capturedRequest.withLock { $0 = req } },
+            onSegment: { count in
+                postStopSegs.withLock { $0 += count }
+            }
+        )
         let job = TranscriptionJob(notes: notes, transcriber: countingTranscriber, analyzer: FakeAnalyzer(),
                                    checkpoints: checkpoints, provenance: provenance,
                                    host: StaticJobHost(identifySpeakers: false, voices: []),
@@ -1858,6 +1883,7 @@ final class HandsetQualificationTests: XCTestCase {
             matchedVoicesBySpeaker: [:],
             precomputeCheckpointsSaved: precomputeSaved,
             checkpointsAtPressureInjection: countAtInjection.withLock { $0 },
+            postStopResumedFromMs: Int64(capturedRequest.withLock { $0?.whistleResume?.processedSamples ?? 0 }) * 1000 / 16_000,
             postStopWindowsDecoded: 0,
             postStopSegmentsDecoded: postStopSegs.withLock { $0 },
             stopToPublishedSeconds: elapsed,
@@ -2356,6 +2382,7 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.matchedVoiceNames == cafControl.matchedVoiceNames &&
             headStart.matchedVoicesBySpeaker == cafControl.matchedVoicesBySpeaker &&
             headStart.precomputeCheckpointsSaved > 0 &&
+            headStart.postStopResumedFromMs > 0 &&
             headStart.postStopWindowsDecoded < baseline.postStopWindowsDecoded
         let pressureYieldedOK: Bool = {
             guard let injectedAt = pressure.checkpointsAtPressureInjection, injectedAt >= 1 else { return false }
@@ -2365,6 +2392,7 @@ final class HandsetQualificationTests: XCTestCase {
             controlAnchorOK &&
             controlProv != nil &&
             pressureYieldedOK &&
+            pressure.postStopResumedFromMs > 0 &&
             pressure.speechProvenance == controlProv &&
             pressure.words == cafControl.words &&
             pressure.speakerTurns == cafControl.speakerTurns &&
@@ -2400,6 +2428,7 @@ final class HandsetQualificationTests: XCTestCase {
             headStart.opusSha256 == cafControl.opusSha256 &&
             headStart.words == cafControl.words &&
             headStart.precomputeCheckpointsSaved > 0 &&
+            headStart.postStopResumedFromMs > 0 &&
             headStart.postStopSegmentsDecoded < baseline.postStopSegmentsDecoded
         let pressureYieldedOK: Bool = {
             guard let injectedAt = pressure.checkpointsAtPressureInjection, injectedAt >= 1 else { return false }
@@ -2410,6 +2439,7 @@ final class HandsetQualificationTests: XCTestCase {
             controlProv != nil &&
             controlProv?["engine"]?.string == "Whistle" &&
             pressureYieldedOK &&
+            pressure.postStopResumedFromMs > 0 &&
             pressure.speechProvenance == controlProv &&
             pressure.words == cafControl.words
         return PairedEvaluation(
