@@ -1,11 +1,11 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "160fb923944422c5c4ff01aa777bb572e2a6e96e",
+  "commit": "d9bf213a30179c395657e8d8ecd34fe2b987af1a",
   "sha256": {
     "contract/LIBRARY-RULES.md": "415d866eb4a098400c76a3975969d9764bb70eed905726fbdcf7e90e42f85ce8",
     "contract/STATUS-BADGES.md": "ea4ff3050d91db4dd1e3297c3f49ce2df7741e980e29be58e824ef113f04c405",
-    "strings/GLOSSARY.md": "00ca9c4e1bd529badf300fa0717afab085b503de7ea955aebc82afbd3b8fc87b",
-    "strings/strings.json": "01e70aee17a107b8f248293e8752dbd98d3457484bc8b6c14946e0b83ec669f9",
+    "strings/GLOSSARY.md": "45535ca123f63bbe607a27631f77fd1ccff38a533f450e16c946ff6530ec53b6",
+    "strings/strings.json": "fedf8cfa51992ded96fafb5d4f15af7e5d1700f877575b51caf0f5da6ad970fa",
     "vectors/format/README.md": "5553164d7879240803eb43aea7772ad45bb2698afdffc5d5ce929ea0ac2cc8bd",
     "vectors/format/format-vectors.json": "e418d48c7e551a90756699f42e939c7dd918f444deb302e4410af312afc32279",
     "vectors/library-vectors/README.md": "4ebeb57bd2b4df449f56a1fb4bf2c1679655fdf462566036c861f70fa359f1f4",
