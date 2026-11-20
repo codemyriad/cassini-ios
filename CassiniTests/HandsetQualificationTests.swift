@@ -455,19 +455,39 @@ final class HandsetQualificationTests: XCTestCase {
         XCTAssertTrue(whistleIgnoredEval.equivalencePassed)
         XCTAssertFalse(whistleIgnoredEval.pressureRecoveryPassed, "Whistle ignoring pressure (>1 extra checkpoint) must set pressureRecoveryPassed = false")
 
-        // Whistle: zero published words across all 4 lanes must fail both equivalencePassed and pressureRecoveryPassed.
-        let whistleEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
-        let whistleEmptyControl = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
-        let whistleEmptyHeadStart = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
-        let whistleEmptyPressure = makeLane(words: [], speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
+        // Whistle & Parakeet: segments with non-empty text but empty `seg.words` (missing word timings)
+        // must extract to zero timed words and fail both equivalencePassed and pressureRecoveryPassed.
+        let untimedSegment = TranscriptSegment(text: "hello world without word timings", start: 0, end: 2.0, speaker: "Alice", words: [])
+        let extractedWhistleUntimed = Self.extractComparableWords(from: [untimedSegment], includeSpeaker: false)
+        let extractedParakeetUntimed = Self.extractComparableWords(from: [untimedSegment], includeSpeaker: true)
+        XCTAssertTrue(extractedWhistleUntimed.isEmpty, "Missing seg.words must not fall back to draftWords")
+        XCTAssertTrue(extractedParakeetUntimed.isEmpty, "Missing seg.words must not fall back to draftWords")
+
+        let whistleEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleEmptyControl = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 20)
+        let whistleEmptyHeadStart = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 10, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 3)
+        let whistleEmptyPressure = makeLane(words: extractedWhistleUntimed, speechProvenance: whistleProv, precomputeCheckpointsSaved: 4, checkpointsAtPressureInjection: 3, postStopWindowsDecoded: 0, postStopSegmentsDecoded: 12)
         let whistleEmptyEval = Self.evaluateWhistlePaired(
             baseline: whistleEmptyBaseline,
             cafControl: whistleEmptyControl,
             headStart: whistleEmptyHeadStart,
             pressure: whistleEmptyPressure
         )
-        XCTAssertFalse(whistleEmptyEval.equivalencePassed, "Whistle empty transcripts must set equivalencePassed = false")
-        XCTAssertFalse(whistleEmptyEval.pressureRecoveryPassed, "Whistle empty transcripts must set pressureRecoveryPassed = false")
+        XCTAssertFalse(whistleEmptyEval.equivalencePassed, "Whistle untimed/empty transcripts must set equivalencePassed = false")
+        XCTAssertFalse(whistleEmptyEval.pressureRecoveryPassed, "Whistle untimed/empty transcripts must set pressureRecoveryPassed = false")
+
+        let parakeetEmptyBaseline = makeLane(audioFilename: RecordingController.compressedFilename, words: extractedParakeetUntimed, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
+        let parakeetEmptyControl = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 0, postStopWindowsDecoded: 4)
+        let parakeetEmptyHeadStart = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, postStopWindowsDecoded: 1)
+        let parakeetEmptyPressure = makeLane(words: extractedParakeetUntimed, precomputeCheckpointsSaved: 3, checkpointsAtPressureInjection: 2, postStopWindowsDecoded: 2)
+        let parakeetEmptyEval = Self.evaluateParakeetPaired(
+            baseline: parakeetEmptyBaseline,
+            cafControl: parakeetEmptyControl,
+            headStart: parakeetEmptyHeadStart,
+            pressure: parakeetEmptyPressure
+        )
+        XCTAssertFalse(parakeetEmptyEval.equivalencePassed, "Parakeet untimed/empty transcripts must set equivalencePassed = false")
+        XCTAssertFalse(parakeetEmptyEval.pressureRecoveryPassed, "Parakeet untimed/empty transcripts must set pressureRecoveryPassed = false")
     }
 
     @MainActor
@@ -1088,9 +1108,11 @@ final class HandsetQualificationTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: workDir) }
 
         let modelsRoot: URL? = engine == .parakeet ? try await Self.ensurePinnedModelsInstalled(in: workDir) : nil
-        // Keep only a single ~35 s multi-speaker cycle (~3.3 MiB) in memory and stream slices to disk
-        // so the 30-min harness does not retain ~165 MiB of synthetic PCM in RAM during RSS telemetry.
-        let cyclePCM = try Self.makeMultiSpeakerSpeechCycle48kPCM16LE()
+        // Keep only a single ~35 s multi-speaker cycle (~3.3 MiB) in memory (built off MainActor) and stream slices
+        // to disk so the 30-min harness does not retain ~165 MiB of synthetic PCM in RAM during RSS telemetry.
+        let cyclePCM = try await Task.detached(priority: .userInitiated) {
+            try Self.makeMultiSpeakerSpeechCycle48kPCM16LE()
+        }.value
         XCTAssertFalse(cyclePCM.isEmpty)
 
         let notesRoot = workDir.appendingPathComponent("notes", isDirectory: true)
@@ -1257,7 +1279,7 @@ final class HandsetQualificationTests: XCTestCase {
 
         let stored = await notes.note(note.id)
         let saved = try XCTUnwrap(stored)
-        let wordCount = saved.transcript.flatMap(\.draftWords).count
+        let wordCount = Self.extractComparableWords(from: saved.transcript, includeSpeaker: false).count
         XCTAssertGreaterThan(wordCount, 0)
 
         let report: [String: Any] = [
@@ -1544,9 +1566,7 @@ final class HandsetQualificationTests: XCTestCase {
             opusURL: opusURL,
             scratchCAFURL: decodedOpusCAF
         )
-        let words = saved.transcript.flatMap { seg in
-            seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: seg.speaker) }
-        }
+        let words = Self.extractComparableWords(from: saved.transcript, includeSpeaker: true)
         let turns = Self.canonicalizeSpeakerTurns(host.recordedTurns)
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
@@ -1711,9 +1731,7 @@ final class HandsetQualificationTests: XCTestCase {
             opusURL: opusURL,
             scratchCAFURL: decodedOpusCAF
         )
-        let words = saved.transcript.flatMap { seg in
-            seg.draftWords.map { ComparableWord(text: $0.text, startMs: $0.startMs, endMs: $0.endMs, speaker: nil) }
-        }
+        let words = Self.extractComparableWords(from: saved.transcript, includeSpeaker: false)
         return PairedLaneResult(
             audioFilename: saved.audioFilename,
             exportVerified: doc.state == DocumentState.ok,
@@ -2079,6 +2097,20 @@ final class HandsetQualificationTests: XCTestCase {
             )
         }
         return failures
+    }
+
+    /// Extracts timed words strictly from `seg.words` (never falling back to `seg.draftWords` when word timings are missing).
+    private static func extractComparableWords(from segments: [TranscriptSegment], includeSpeaker: Bool) -> [ComparableWord] {
+        segments.flatMap { seg in
+            seg.words.map { word in
+                ComparableWord(
+                    text: word.text,
+                    startMs: Int64((word.start * 1000).rounded()),
+                    endMs: Int64((word.end * 1000).rounded()),
+                    speaker: includeSpeaker ? seg.speaker : nil
+                )
+            }
+        }
     }
 
     private struct PairedEvaluation: Equatable {
