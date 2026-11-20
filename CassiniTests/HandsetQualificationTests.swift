@@ -728,6 +728,17 @@ final class HandsetQualificationTests: XCTestCase {
             XCTAssertLessThan(abs(parakeetHeadStart.exportedDurationSeconds - parakeetBaseline.exportedDurationSeconds), 0.15,
                               "Production afterStop (M4A->Opus) and transcribeWhileRecording (CAF->Opus) exported durations must match")
 
+            // Anchor speaker diarization & CAM++ saved-voice matching on the identical-CAF control so
+            // empty speaker turns or empty voice matches can never silently compare equal across lanes.
+            XCTAssertFalse(parakeetCafControl.speakerTurns.isEmpty,
+                           "Identical-CAF Parakeet control must produce non-empty Sortformer speaker turns")
+            XCTAssertEqual(parakeetCafControl.speakerCount, 3,
+                           "Identical-CAF Parakeet control must separate the 3 fixture speakers")
+            XCTAssertEqual(Set(parakeetCafControl.speakerTurns.map(\.speaker)).count, 3,
+                           "Identical-CAF Parakeet control speaker turns must cover all 3 distinct fixture speakers")
+            XCTAssertEqual(parakeetCafControl.matchedVoiceNames, ["Alice", "Carla"],
+                           "Identical-CAF Parakeet control must match the expected CAM++ saved voices (Alice, Carla)")
+
             // Production end-to-end equivalence (M4A afterStop vs CAF transcribeWhileRecording).
             let parakeetProductionWER = Self.wordErrorRate(reference: parakeetBaseline.words, hypothesis: parakeetHeadStart.words)
             XCTAssertLessThanOrEqual(parakeetProductionWER, 0.02,
@@ -1304,6 +1315,10 @@ final class HandsetQualificationTests: XCTestCase {
             }
         }
 
+        // Append any remaining tail audio before starting the Stop-to-published timer so `fileCapture.stop()`
+        // only finalizes the CAF header in place (matching real AVAudioRecorder.stop() without rewriting 29 MB).
+        try fileCapture.appendRemainingAudio()
+
         // Production Stop -> RecordingController.finishAudio -> TranscriptionJob (timed);
         // PortableExportService export is verified separately afterward.
         let postStopWindows = Mutex(0)
@@ -1467,6 +1482,10 @@ final class HandsetQualificationTests: XCTestCase {
                                          "Whistle precompute must pause within 1 segment after pressure injection (saved \(precomputeSaved), injected at \(injectedAt))")
             }
         }
+
+        // Append any remaining tail audio before starting the Stop-to-published timer so `fileCapture.stop()`
+        // only finalizes the CAF header in place (matching real AVAudioRecorder.stop() without rewriting 29 MB).
+        try fileCapture.appendRemainingAudio()
 
         let postStopSegs = Mutex(0)
         let transcriber = WhistleTranscriber(acceptance: cap)
@@ -1897,6 +1916,7 @@ final class HandsetQualificationTests: XCTestCase {
         var elapsed: TimeInterval = 0
         private(set) var recordedAt: Date?
         private var captureURL: URL?
+        private var bytesWritten: Int = 0
         private let prefixPCM: Data?
         private let fullPCM: Data
         private let fullDuration: TimeInterval
@@ -1918,16 +1938,30 @@ final class HandsetQualificationTests: XCTestCase {
             self.recordedAt = Date()
             let initial = prefixPCM ?? fullPCM
             try HandsetQualificationTests.writeCAF(to: url, sampleRate: 48_000, pcm: initial, finalized: false)
+            self.bytesWritten = initial.count
             self.elapsed = Double(initial.count / 2) / 48_000.0
             return .pcm48kMono
+        }
+
+        /// Appends any remaining fixture PCM beyond the precompute prefix before Stop is timed.
+        func appendRemainingAudio() throws {
+            guard let url = captureURL, bytesWritten < fullPCM.count else { return }
+            let handle = try FileHandle(forWritingTo: url)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: fullPCM[bytesWritten..<fullPCM.count])
+            try handle.synchronize()
+            bytesWritten = fullPCM.count
+            elapsed = fullDuration
         }
 
         func pause() {}
         func resume() throws {}
 
         func stop() async throws -> CaptureResult {
+            try appendRemainingAudio()
             if let url = captureURL {
-                try HandsetQualificationTests.writeCAF(to: url, sampleRate: 48_000, pcm: fullPCM, finalized: true)
+                try HandsetQualificationTests.finalizeCAFHeader(at: url, pcmBytes: UInt64(bytesWritten))
             }
             self.elapsed = fullDuration
             return CaptureResult(duration: fullDuration)
