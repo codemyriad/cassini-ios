@@ -272,11 +272,19 @@ final class SettingsFlowTests: XCTestCase {
         XCTAssertTrue(app.switches["recogniseSavedVoicesToggle"].waitForValue("0"))
         app.navigationBars.buttons.firstMatch.tap()
         openPage(app, "aboutRow", title: "About")
-        XCTAssertTrue(app.descendants(matching: .any)["aboutHelp"].exists)
+        let help = app.descendants(matching: .any)["aboutHelp"]
+        let reportProblem = app.descendants(matching: .any)["aboutReportProblem"]
+        let privacy = app.buttons["aboutPrivacy"]
+        XCTAssertTrue(help.exists)
+        XCTAssertTrue(reportProblem.exists)
+        XCTAssertTrue(reportProblem.label.contains("Report a problem"), reportProblem.label)
+        XCTAssertTrue(reportProblem.label.contains("Tell us what went wrong"), reportProblem.label)
+        XCTAssertLessThan(help.frame.minY, reportProblem.frame.minY, "Report a problem sits after Help")
+        XCTAssertLessThan(reportProblem.frame.minY, privacy.frame.minY, "Report a problem sits before Privacy")
         XCTAssertTrue(app.descendants(matching: .any)["aboutSourceCode"].exists)
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "{year}")).firstMatch.exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Codemyriad OÜ")).firstMatch.exists)
-        app.buttons["aboutPrivacy"].tap()
+        privacy.tap()
         XCTAssertTrue(app.navigationBars["Privacy"].waitForExistence(within: 15))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Cassini for iOS keeps"))
             .firstMatch.waitForExistence(within: 15))

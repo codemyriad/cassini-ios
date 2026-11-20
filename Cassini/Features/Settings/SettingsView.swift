@@ -292,9 +292,12 @@ private struct SettingsForm: View {
                 }.frame(maxWidth: .infinity).padding(.vertical, 20)
             }.listRowBackground(Color.canvasClear)
             Section {
-                Link(destination: URL(string: "https://cassini.talk/help")!) {
+                Link(destination: helpURL) {
                     SettingsRowLabel(title: SettingsPhase2Copy.help, subtitle: SettingsPhase2Copy.helpSubtitle)
                 }.accessibilityIdentifier("aboutHelp")
+                Link(destination: reportProblemURL) {
+                    SettingsRowLabel(title: SettingsPhase2Copy.reportProblem, subtitle: SettingsPhase2Copy.reportProblemSubtitle)
+                }.accessibilityIdentifier("aboutReportProblem")
                 Button { router.push(.licenseText(.privacy)) } label: {
                     SettingsRowLabel(title: SettingsPhase2Copy.privacy, subtitle: pad ? SettingsPhase2Copy.privacyIpad : SettingsPhase2Copy.privacyIphone)
                 }.accessibilityIdentifier("aboutPrivacy")

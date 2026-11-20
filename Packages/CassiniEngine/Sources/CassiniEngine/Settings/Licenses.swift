@@ -22,6 +22,10 @@ public struct LicenseText: Hashable, Sendable {
     }
 }
 
+/// The help page the About › Help row opens.
+public let helpURL = URL(string: "https://cassini.talk/help")!
+/// The page the About › "Report a problem" row opens (D110).
+public let reportProblemURL = URL(string: "https://cassini.talk/report")!
 /// The repository the "Source code on GitHub" row opens.
 public let sourceCodeURL = URL(string: "https://github.com/codemyriad/cassini-ios")!
 

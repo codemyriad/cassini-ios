@@ -1,4 +1,4 @@
-// Generated from cassini-ux 160fb923944422c5c4ff01aa777bb572e2a6e96e; do not edit.
+// Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a; do not edit.
 import Foundation
 import CassiniNotebook
 
@@ -30,6 +30,12 @@ enum SettingsPhase2Copy {
     }
     static var privacyIphone: String {
         String(localized: "about.privacy.subtitle.iphone", table: "SettingsPhase2")
+    }
+    static var reportProblem: String {
+        String(localized: "about.reportProblem", table: "SettingsPhase2")
+    }
+    static var reportProblemSubtitle: String {
+        String(localized: "about.reportProblem.subtitle", table: "SettingsPhase2")
     }
     static var sourceCode: String {
         String(localized: "about.sourceCode", table: "SettingsPhase2")

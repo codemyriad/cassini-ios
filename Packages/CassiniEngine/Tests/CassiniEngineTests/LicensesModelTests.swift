@@ -46,6 +46,8 @@ import CassiniEngine
         #expect(reads.list.isEmpty)
         #expect(effects.list == [.openURL(sourceCodeURL)])
         #expect(sourceCodeURL.absoluteString == "https://github.com/codemyriad/cassini-ios")
+        #expect(helpURL.absoluteString == "https://cassini.talk/help")
+        #expect(reportProblemURL.absoluteString == "https://cassini.talk/report")
     }
 
     // ports: LicensesViewModelTest#theOpenPaneComesBackAfterProcessDeath
