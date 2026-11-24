@@ -237,10 +237,13 @@ import Testing
             )
             await pre.runOnce(noteID: note.id, captureURL: cafURL)
 
-            #expect(savedFrames.withLock { $0 } == [10 * 48_000, 20 * 48_000, 24 * 48_000],
+            let actualFrames: [Int64] = savedFrames.withLock { $0 }
+            let expectedFrames: [Int64] = [480_000, 960_000, 1_152_000]
+            #expect(actualFrames == expectedFrames,
                     "Whistle precompute must persist at 10 s intervals and flush settled tail on exit")
             let loaded = try #require(try checkpoints.load(note.id))
-            #expect(loaded.whistle?.sourceFrame == 24 * 48_000)
+            let expectedFinalFrame: Int64 = 1_152_000
+            #expect(loaded.whistle?.sourceFrame == expectedFinalFrame)
         }
 
         // Case B: 21 s growing CAF (20 full 1 s blocks, exact multiple of 10 s) ->
@@ -267,7 +270,9 @@ import Testing
             )
             await pre.runOnce(noteID: note.id, captureURL: cafURL)
 
-            #expect(savedFrames.withLock { $0 } == [10 * 48_000, 20 * 48_000],
+            let actualFrames: [Int64] = savedFrames.withLock { $0 }
+            let expectedFrames: [Int64] = [480_000, 960_000]
+            #expect(actualFrames == expectedFrames,
                     "Exact 10 s multiple must not double-write on exit")
         }
     }
@@ -354,12 +359,16 @@ import Testing
             )
             await pre.runOnce(noteID: note.id, captureURL: cafURL)
 
-            let frames = savedFrames.withLock { $0 }
+            let frames: [Int64] = savedFrames.withLock { $0 }
+            let tenSecondsFrames: Int64 = 480_000
+            let twentySecondsFrames: Int64 = 960_000
             #expect(frames.count == 2, "Expected 10 s periodic checkpoint plus immediate flush on thermal yield")
-            #expect(frames.first == 10 * 48_000)
-            let flushedFrame = try #require(frames.last)
-            #expect(flushedFrame > 10 * 48_000 && flushedFrame < 20 * 48_000)
-            #expect(try checkpoints.load(note.id)?.whistle?.sourceFrame == flushedFrame)
+            #expect(frames.first == tenSecondsFrames)
+            let flushedFrame: Int64 = try #require(frames.last)
+            #expect(flushedFrame > tenSecondsFrames)
+            #expect(flushedFrame < twentySecondsFrames)
+            let persistedFrame: Int64? = try checkpoints.load(note.id)?.whistle?.sourceFrame
+            #expect(persistedFrame == flushedFrame)
         }
 
         // Part B: Stop (`precomputer.stop(noteID:)`) in continuous mode after 10 s periodic checkpoint ->
@@ -414,12 +423,16 @@ import Testing
             for await _ in enteredPostTen { break }
             await pre.stop(noteID: note.id)
 
-            let frames = savedFrames.withLock { $0 }
+            let frames: [Int64] = savedFrames.withLock { $0 }
+            let tenSecondsFrames: Int64 = 480_000
+            let twentySecondsFrames: Int64 = 960_000
             #expect(frames.count == 2, "Expected 10 s periodic checkpoint plus immediate flush on Stop")
-            #expect(frames.first == 10 * 48_000)
-            let flushedFrame = try #require(frames.last)
-            #expect(flushedFrame > 10 * 48_000 && flushedFrame < 20 * 48_000)
-            #expect(try checkpoints.load(note.id)?.whistle?.sourceFrame == flushedFrame)
+            #expect(frames.first == tenSecondsFrames)
+            let flushedFrame: Int64 = try #require(frames.last)
+            #expect(flushedFrame > tenSecondsFrames)
+            #expect(flushedFrame < twentySecondsFrames)
+            let persistedFrame: Int64? = try checkpoints.load(note.id)?.whistle?.sourceFrame
+            #expect(persistedFrame == flushedFrame)
         }
     }
 
