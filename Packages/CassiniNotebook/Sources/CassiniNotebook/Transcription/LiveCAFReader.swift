@@ -120,6 +120,7 @@ public final class LiveCAFReader: @unchecked Sendable {
         public mutating func advance(
             to committedFrames: UInt64,
             using reader: LiveCAFReader,
+            checkTaskCancellation: Bool = true,
             isCancelled: () -> Bool = { false }
         ) throws -> String {
             guard committedFrames > 0, committedFrames >= hashedFrames else { throw LiveCAFReader.Error.outOfRange }
@@ -131,7 +132,7 @@ public final class LiveCAFReader: @unchecked Sendable {
                 var remainingFrames = committedFrames - hashedFrames
                 try reader.handle.seek(toOffset: reader.layout.dataStartOffset + hashedFrames * bytesPerFrame)
                 while remainingFrames > 0 {
-                    if isCancelled() || Task.isCancelled { throw CancellationError() }
+                    if isCancelled() || (checkTaskCancellation && Task.isCancelled) { throw CancellationError() }
                     let toReadBytes = Int(min(remainingFrames * bytesPerFrame, UInt64(chunkBytes)))
                     guard let chunk = try reader.handle.read(upToCount: toReadBytes), chunk.count == toReadBytes else {
                         throw LiveCAFReader.Error.shortRead
@@ -143,7 +144,7 @@ public final class LiveCAFReader: @unchecked Sendable {
                     remainingFrames -= framesReadNow
                 }
             }
-            if isCancelled() || Task.isCancelled { throw CancellationError() }
+            if isCancelled() || (checkTaskCancellation && Task.isCancelled) { throw CancellationError() }
             let snapshot = hasher
             return snapshot.finalize().map { String(format: "%02x", $0) }.joined()
         }

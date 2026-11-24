@@ -1,19 +1,20 @@
 import Foundation
 
-/// Recording-time and post-Stop transcription policy (`D-1117`, `D109`).
+/// Recording-time and post-Stop transcription policy (`D-1117`, `D109`, `D111`).
 ///
-/// The shipped default is `.afterStop`. Persisted values accept the canonical Swift names as well as the
-/// Python/GNOME (`snake_case`) and Kotlin/Android (`SCREAMING_SNAKE_CASE`) tokens from the shared contract;
-/// any unknown, empty, null, wrong-case, or non-string value resolves deterministically to `.afterStop`.
+/// The shipped default is `.transcribeWhileRecording` (`D111`). Persisted values accept the canonical Swift names as
+/// well as the Python/GNOME (`snake_case`) and Kotlin/Android (`SCREAMING_SNAKE_CASE`) tokens from the shared contract;
+/// any unknown, empty, null, wrong-case, or non-string value resolves deterministically to `.transcribeWhileRecording`.
 public enum TranscriptionMode: String, Codable, CaseIterable, Hashable, Sendable {
     /// Run zero native models during recording and do not auto-enqueue transcription on Stop.
     case recordOnly
-    /// Default shipped behaviour: zero models during recording, auto-enqueue batch transcription on Stop.
+    /// Zero models during recording; auto-enqueue batch transcription on Stop.
     case afterStop
-    /// Follow committed `.caf` frames read-only during recording to populate resumable checkpoints.
+    /// Default shipped behaviour (`D111`): follow committed `.caf` frames read-only during recording to populate
+    /// resumable checkpoints, then finalize on Stop.
     case transcribeWhileRecording
 
-    public static let defaultMode: TranscriptionMode = .afterStop
+    public static let defaultMode: TranscriptionMode = .transcribeWhileRecording
 
     /// Whether a completed recording should auto-enqueue transcription on Stop.
     public var autoEnqueueOnStop: Bool {

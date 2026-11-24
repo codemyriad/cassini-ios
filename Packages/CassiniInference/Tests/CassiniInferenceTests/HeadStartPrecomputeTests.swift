@@ -203,6 +203,239 @@ import Testing
         #expect(headProv.resumedFromMs == baseProv.resumedFromMs)
     }
 
+    @Test func whistlePrecomputeThrottlesPeriodicDiskWritesToTenSecondsAndFlushesOnExit() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let store = try NoteStore(root: dir.appendingPathComponent("notes", isDirectory: true))
+        let checkpoints = CheckpointFiles(notes: store)
+        let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, cpuSupported: true,
+                                           bundleVerified: true, pipelineAccepted: true, deviceAccepted: true)
+
+        // Case A: 25 s growing CAF (24 full 1 s blocks behind 0.1 s safety margin) ->
+        // periodic saves at 10 s and 20 s plus final flush at 24 s (3 writes instead of 24).
+        do {
+            let note = Note(title: "WhistleThrottle25s", audioFilename: "capture.caf")
+            try await store.save(note)
+            let cafURL = store.audioURL(for: note)
+            try Self.writeCAF(to: cafURL, pcm: Self.make48kPCM16LE(seconds: 25), finalized: false)
+
+            let savedFrames = Mutex<[Int64]>([])
+            let pre = CAFPrefixPrecomputer(
+                checkpoints: checkpoints,
+                budget: NativeBudget(),
+                mode: { .transcribeWhileRecording },
+                engine: { .whistle(.init(acceptance: { capability }, backend: Self.deterministicWhistleBackend(), skipBundleVerification: true)) },
+                pressure: PrecomputePressure(isAppActive: { true }, thermalState: { .nominal }, availableMemory: { 2 << 30 }),
+                safetyMarginFrames: 4_800,
+                onCheckpointSaved: { _, cp in
+                    if let frame = cp.whistle?.sourceFrame {
+                        savedFrames.withLock { $0.append(frame) }
+                    }
+                }
+            )
+            await pre.runOnce(noteID: note.id, captureURL: cafURL)
+
+            let actualFrames: [Int64] = savedFrames.withLock { $0 }
+            let expectedFrames: [Int64] = [480_000, 960_000, 1_152_000]
+            #expect(actualFrames == expectedFrames,
+                    "Whistle precompute must persist at 10 s intervals and flush settled tail on exit")
+            let loaded = try #require(try checkpoints.load(note.id))
+            let expectedFinalFrame: Int64 = 1_152_000
+            #expect(loaded.whistle?.sourceFrame == expectedFinalFrame)
+        }
+
+        // Case B: 21 s growing CAF (20 full 1 s blocks, exact multiple of 10 s) ->
+        // periodic saves at 10 s and 20 s only, no duplicate flush at exit.
+        do {
+            let note = Note(title: "WhistleThrottle21s", audioFilename: "capture.caf")
+            try await store.save(note)
+            let cafURL = store.audioURL(for: note)
+            try Self.writeCAF(to: cafURL, pcm: Self.make48kPCM16LE(seconds: 21), finalized: false)
+
+            let savedFrames = Mutex<[Int64]>([])
+            let pre = CAFPrefixPrecomputer(
+                checkpoints: checkpoints,
+                budget: NativeBudget(),
+                mode: { .transcribeWhileRecording },
+                engine: { .whistle(.init(acceptance: { capability }, backend: Self.deterministicWhistleBackend(), skipBundleVerification: true)) },
+                pressure: PrecomputePressure(isAppActive: { true }, thermalState: { .nominal }, availableMemory: { 2 << 30 }),
+                safetyMarginFrames: 4_800,
+                onCheckpointSaved: { _, cp in
+                    if let frame = cp.whistle?.sourceFrame {
+                        savedFrames.withLock { $0.append(frame) }
+                    }
+                }
+            )
+            await pre.runOnce(noteID: note.id, captureURL: cafURL)
+
+            let actualFrames: [Int64] = savedFrames.withLock { $0 }
+            let expectedFrames: [Int64] = [480_000, 960_000]
+            #expect(actualFrames == expectedFrames,
+                    "Exact 10 s multiple must not double-write on exit")
+        }
+    }
+
+    @Test func whistlePrecomputeFlushesUncommittedWorkImmediatelyOnYieldAndStop() async throws {
+        final class CancellationGate: @unchecked Sendable {
+            private let lock = Mutex<(continuation: CheckedContinuation<Void, Never>?, resumed: Bool)>((nil, false))
+
+            func waitUntilCancelled() async {
+                await withTaskCancellationHandler {
+                    await withCheckedContinuation { cont in
+                        let shouldResumeNow = lock.withLock { state -> Bool in
+                            if state.resumed { return true }
+                            state.continuation = cont
+                            return false
+                        }
+                        if shouldResumeNow { cont.resume() }
+                    }
+                } onCancel: {
+                    let cont = lock.withLock { state -> CheckedContinuation<Void, Never>? in
+                        state.resumed = true
+                        let pending = state.continuation
+                        state.continuation = nil
+                        return pending
+                    }
+                    cont?.resume()
+                }
+            }
+        }
+
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let store = try NoteStore(root: dir.appendingPathComponent("notes", isDirectory: true))
+        let checkpoints = CheckpointFiles(notes: store)
+        let capability = WhistleCapability(arm64: true, operatingSystemSupported: true, cpuSupported: true,
+                                           bundleVerified: true, pipelineAccepted: true, deviceAccepted: true)
+
+        // Part A: Thermal yield (.serious) after 10 s periodic checkpoint + 2 more settled segments ->
+        // flushes the intermediate settled state immediately before exiting.
+        do {
+            let note = Note(title: "WhistleYieldFlush", audioFilename: "capture.caf")
+            try await store.save(note)
+            let cafURL = store.audioURL(for: note)
+            try Self.writeCAF(to: cafURL, pcm: Self.make48kPCM16LE(seconds: 25), finalized: false)
+
+            let savedFrames = Mutex<[Int64]>([])
+            let thermal = Mutex(ProcessInfo.ThermalState.nominal)
+            let postTenSegments = Mutex(0)
+            let baseBackend = Self.deterministicWhistleBackend()
+            let backend = WhistleSessionBackend(
+                makeVAD: baseBackend.makeVAD,
+                prepare: baseBackend.prepare,
+                transcribe: { samples, cap, bundle, submitted, resultReady in
+                    let res = try await baseBackend.transcribe(samples, cap, bundle, submitted, resultReady)
+                    if !savedFrames.withLock({ $0.isEmpty }) {
+                        let count = postTenSegments.withLock { $0 += 1; return $0 }
+                        if count == 2 {
+                            thermal.withLock { $0 = .serious }
+                        }
+                    }
+                    return res
+                },
+                close: baseBackend.close
+            )
+
+            let pre = CAFPrefixPrecomputer(
+                checkpoints: checkpoints,
+                budget: NativeBudget(),
+                mode: { .transcribeWhileRecording },
+                engine: { .whistle(.init(acceptance: { capability }, backend: backend, skipBundleVerification: true)) },
+                pressure: PrecomputePressure(
+                    isAppActive: { true },
+                    thermalState: { thermal.withLock { $0 } },
+                    availableMemory: { 2 << 30 }
+                ),
+                safetyMarginFrames: 4_800,
+                onCheckpointSaved: { _, cp in
+                    if let frame = cp.whistle?.sourceFrame {
+                        savedFrames.withLock { $0.append(frame) }
+                    }
+                }
+            )
+            await pre.runOnce(noteID: note.id, captureURL: cafURL)
+
+            let frames: [Int64] = savedFrames.withLock { $0 }
+            let tenSecondsFrames: Int64 = 480_000
+            let twentySecondsFrames: Int64 = 960_000
+            #expect(frames.count == 2, "Expected 10 s periodic checkpoint plus immediate flush on thermal yield")
+            #expect(frames.first == tenSecondsFrames)
+            let flushedFrame: Int64 = try #require(frames.last)
+            #expect(flushedFrame > tenSecondsFrames)
+            #expect(flushedFrame < twentySecondsFrames)
+            let persistedFrame: Int64? = try checkpoints.load(note.id)?.whistle?.sourceFrame
+            #expect(persistedFrame == flushedFrame)
+        }
+
+        // Part B: Stop (`precomputer.stop(noteID:)`) in continuous mode after 10 s periodic checkpoint ->
+        // flushes settled work even though the follower task is cancelled.
+        do {
+            let note = Note(title: "WhistleStopFlush", audioFilename: "capture.caf")
+            try await store.save(note)
+            let cafURL = store.audioURL(for: note)
+            try Self.writeCAF(to: cafURL, pcm: Self.make48kPCM16LE(seconds: 25), finalized: false)
+
+            let savedFrames = Mutex<[Int64]>([])
+            let (enteredPostTen, enteredPostTenCont) = AsyncStream.makeStream(of: Void.self)
+            let pausedOnce = Mutex(false)
+            let gate = CancellationGate()
+            let baseBackend = Self.deterministicWhistleBackend()
+            let backend = WhistleSessionBackend(
+                makeVAD: baseBackend.makeVAD,
+                prepare: baseBackend.prepare,
+                transcribe: { samples, cap, bundle, submitted, resultReady in
+                    let res = try await baseBackend.transcribe(samples, cap, bundle, submitted, resultReady)
+                    if !savedFrames.withLock({ $0.isEmpty }) {
+                        let shouldPause = pausedOnce.withLock { already -> Bool in
+                            if already { return false }
+                            already = true
+                            return true
+                        }
+                        if shouldPause {
+                            enteredPostTenCont.yield()
+                            enteredPostTenCont.finish()
+                            await gate.waitUntilCancelled()
+                        }
+                    }
+                    return res
+                },
+                close: baseBackend.close
+            )
+
+            let pre = CAFPrefixPrecomputer(
+                checkpoints: checkpoints,
+                budget: NativeBudget(),
+                mode: { .transcribeWhileRecording },
+                engine: { .whistle(.init(acceptance: { capability }, backend: backend, skipBundleVerification: true)) },
+                pressure: PrecomputePressure(isAppActive: { true }, thermalState: { .nominal }, availableMemory: { 2 << 30 }),
+                safetyMarginFrames: 4_800,
+                onCheckpointSaved: { _, cp in
+                    if let frame = cp.whistle?.sourceFrame {
+                        savedFrames.withLock { $0.append(frame) }
+                    }
+                }
+            )
+            pre.start(noteID: note.id, captureURL: cafURL)
+            for await _ in enteredPostTen { break }
+            await pre.stop(noteID: note.id)
+
+            let frames: [Int64] = savedFrames.withLock { $0 }
+            let tenSecondsFrames: Int64 = 480_000
+            let twentySecondsFrames: Int64 = 960_000
+            #expect(frames.count == 2, "Expected 10 s periodic checkpoint plus immediate flush on Stop")
+            #expect(frames.first == tenSecondsFrames)
+            let flushedFrame: Int64 = try #require(frames.last)
+            #expect(flushedFrame > tenSecondsFrames)
+            #expect(flushedFrame < twentySecondsFrames)
+            let persistedFrame: Int64? = try checkpoints.load(note.id)?.whistle?.sourceFrame
+            #expect(persistedFrame == flushedFrame)
+        }
+    }
+
     // MARK: - 4. Negative controls
 
     @Test func cafRepairTruncationOrAlterationInsidePrefixFallsBackToCleanFullDecode() async throws {

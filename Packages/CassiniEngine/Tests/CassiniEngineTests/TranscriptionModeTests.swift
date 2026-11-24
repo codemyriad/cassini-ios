@@ -28,34 +28,34 @@ import CassiniNotebook
         }
     }
 
-    @Test func settingsStoreDefaultsToAfterStopAndNormalizesPersistedModes() {
+    @Test func settingsStoreDefaultsToTranscribeWhileRecordingAndNormalizesPersistedModes() {
         let suite = "cassini.mode-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
 
         let clock = RecordingTestClock(now: Date(timeIntervalSince1970: 1_700_000_000))
         let fresh = SettingsStore(defaults: defaults, clock: clock)
-        #expect(fresh.transcriptionMode == .afterStop)
-        #expect(fresh.currentTranscriptionMode == .afterStop)
+        #expect(fresh.transcriptionMode == .transcribeWhileRecording)
+        #expect(fresh.currentTranscriptionMode == .transcribeWhileRecording)
 
         fresh.transcriptionMode = .recordOnly
         #expect(defaults.string(forKey: SettingsKeys.transcriptionMode) == "recordOnly")
         #expect(fresh.currentTranscriptionMode == .recordOnly)
 
         // Python & Kotlin aliases resolve cleanly.
-        defaults.set("transcribe_while_recording", forKey: SettingsKeys.transcriptionMode)
+        defaults.set("after_stop", forKey: SettingsKeys.transcriptionMode)
         let fromSnake = SettingsStore(defaults: defaults, clock: clock)
-        #expect(fromSnake.transcriptionMode == .transcribeWhileRecording)
+        #expect(fromSnake.transcriptionMode == .afterStop)
 
         defaults.set("RECORD_ONLY", forKey: SettingsKeys.transcriptionMode)
         let fromScreaming = SettingsStore(defaults: defaults, clock: clock)
         #expect(fromScreaming.transcriptionMode == .recordOnly)
 
-        // Unknown, empty, wrong-case, and non-string values fall back deterministically to `.afterStop`.
+        // Unknown, empty, wrong-case, and non-string values fall back deterministically to `.transcribeWhileRecording` (`D111`).
         for invalid: Any in ["livePreview", "", "recordonly", 42] {
             defaults.set(invalid, forKey: SettingsKeys.transcriptionMode)
             let loaded = SettingsStore(defaults: defaults, clock: clock)
-            #expect(loaded.transcriptionMode == .afterStop)
+            #expect(loaded.transcriptionMode == .transcribeWhileRecording)
         }
     }
 
