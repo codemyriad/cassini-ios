@@ -1,11 +1,11 @@
 # Shared string source
 
-D-1034 (L-10) pins the full shared catalog to `codemyriad/cassini-ux`
-`b26190b57d8e35391ba9b4bafd177d66b10f0ec3`, `strings/strings.json`, SHA-256
-`10d65abc7b10f81422377632aa899506b33e02cc9269afc96e11ec89cee69367`.
+The current global shared catalog pin (updated in D-1131 / L-65) is `codemyriad/cassini-ux`
+`d9bf213a30179c395657e8d8ecd34fe2b987af1a`, `strings/strings.json`, SHA-256
+`fedf8cfa51992ded96fafb5d4f15af7e5d1700f877575b51caf0f5da6ad970fa`.
 `contracts/shared-strings/UPSTREAM.json` is the global source pin and points to the complete, byte-identical catalog in
-`Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; the resource
-bundle pin uses the same commit and hash. The generator rejects disagreement between them.
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; `contracts/wave5-strings/UPSTREAM.json`
+and the resource bundle pin use the same commit and hash. The generators reject disagreement between them.
 
 `scripts/generate-status-badge-strings.py` emits the implemented badge and provenance selection: the ten existing shared badge /
 interrupted-position keys and the seven `states.phone.*` labels (`audioOnly`, `cantPlay`, `cantReadTranscript`,
@@ -118,3 +118,10 @@ with “Transcribed” replacing “Written down”. The native string audit fin
 Only implemented IDs are compiled: pending `permissionPrompt.*` / L-68 on D-1095 stays out of the app,
 and Info.plist and InfoPlist.xcstrings are unchanged. The status/format/library bundle is re-vendored as a whole;
 the coordinated import policy is verified byte-identical and the Markdown selection keeps its source receipt.
+
+D-1131 (D110, L-65) advances the complete shared catalogs (`contracts/shared-strings/UPSTREAM.json`,
+`contracts/wave5-strings/UPSTREAM.json`, `contracts/import-types/UPSTREAM.json`,
+`Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/UPSTREAM.json`, and the Markdown selection's
+`source_commit`) to `codemyriad/cassini-ux` `d9bf213a30179c395657e8d8ecd34fe2b987af1a` (SHA-256
+`fedf8cfa51992ded96fafb5d4f15af7e5d1700f877575b51caf0f5da6ad970fa`), adding the "Report a problem" copy in Settings › About
+and regenerating all compiled subsets across all six languages.

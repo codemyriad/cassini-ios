@@ -1,6 +1,6 @@
 # Architecture
 
-Cassini for iOS is a SwiftUI app over five modules, the library targets of the one root Swift package
+Cassini for iOS is a SwiftUI app over seven modules, the library targets of the one root Swift package
 (`Package.swift`; the folders under `Packages/` have no manifest of their own), plus a Debug-only module of fakes. The
 modules hold every rule that Android unit-tests, so `swift test`, run from the repository root, covers them on the
 Mac. The app target only composes the packages,
@@ -15,19 +15,22 @@ Cassini (app: composition, adapters, views) ────────────
   │            │              │                            │           intents, compiled into both targets)
   ▼            ▼              ▼                            ▼
 CassiniInference   CassiniAudio    CassiniEngineTesting (fakes of the ports; empty in Release)
-  │ Parakeet, Apple  │ CAF repair,    │
-  │ Speech, speakers │ libopus        │
-  ▼                  │                ▼
-CassiniEngine ◀──────┼──────── stores, coordinators, screen models, ports
-  │                  │
-  ▼                  │
-CassiniNotebook      │         model, pure rules, file formats
-  │                  │
-  ▼                  ▼
-CassiniCore ───────────────── the portable Ogg Opus document (read, verify, seal), over CZlib
+  │ Parakeet, Whistle, │ CAF repair,    │
+  │ Apple Speech, spk  │ libopus        │
+  ├──▶ CassiniWhistle  │                │
+  │      (CWhistleDSP) │                │
+  ├──▶ CassiniSherpa   │                │
+  ▼                    │                ▼
+CassiniEngine ◀────────┼──────── stores, coordinators, screen models, ports
+  │                    │
+  ▼                    │
+CassiniNotebook        │         model, pure rules, file formats
+  │                    │
+  ▼                    ▼
+CassiniCore ─────────────────── the portable Ogg Opus document (read, verify, seal), over CZlib
 ```
 
-Every arrow points at a dependency. The app imports all five modules. `CassiniEngineTesting` is linked in every
+Every arrow points at a dependency. The app imports the library modules it composes. `CassiniEngineTesting` is linked in every
 build for the UI-test launches, and is empty in Release, where every source is compiled out.
 
 | Module | What it holds |
@@ -39,6 +42,7 @@ build for the UI-test launches, and is empty in Release, where every source is c
 | `CassiniEngineTesting` | Fakes of every port (`FakeTranscriber`, `FakeAnalyzer`, `FakeCapture`, `FakeClock`, …). Each source is under `#if DEBUG`, so a Release build links an empty module. |
 | `CassiniInference` | The adapters to the recognition engines: `ParakeetTranscriber` (Parakeet Ultra over the `SpeechDecoding`/`SpeechDetecting` ports, on its own inference thread), `AppleSpeechTranscriber` (`SpeechAnalyzer`, iOS 26 and later only: the fallback where neither Whistle nor a verified Ultra can run), `UnavailableSpeechTranscriber` (its stand-in below iOS 26, which refuses every job) and `SpeakerAnalyzer` (Android's streaming Sortformer and CAM++ over the native runtime, from the pinned catalog through `PinnedModelInstaller`), with `ZstdDecompressor` for the diarizer's seekable Zstandard download. |
 | `CassiniSherpa` | The only importer of the sherpa-onnx C API (`SherpaOnnxC`, iOS only: the release `v1.13.7-cassini-mobile.1`, or the local build with `CASSINI_SHERPA_LOCAL=1`): `ParakeetDecoder` and `SileroDetector`, which conform to CassiniEngine's ports, and `SherpaRuntime.speech`, the factory the app passes to `ParakeetTranscriber`. Without the runtime its objects throw `notLinked`. |
+| `CassiniWhistle` | The lazy, private bundled Whistle/Needle C API wrapper over `CWhistleDSP` (linked lazily without loading a native framework at app launch) and its bundled resources. |
 | `CassiniAudio` | Audio work that needs AVFoundation or libopus: inspection, CAF repair and Opus encode and decode (through `COpusBridge`). |
 | `Cassini` (app) | `AppEnvironment`, `AppGraph` (which binds each screen model's `Ports` to the stores, e.g. `NoteScreens`), the `Router`, the adapters (`AVCaptureAdapter`, `AVPlaybackAdapter`, `ActivityKitAdapter`, `UNNotifier`, `UIKitBackgroundRunner`, …), the thin app stores (`ProcessingStore`, `RecordingStore`, `PlaybackStore`, `ImportStore`, `ExportStore`, `NoticesStore`), the views and the string catalogs. |
 
