@@ -163,7 +163,8 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test32LibraryLargestText() throws {
         let app = try launchPhone(["--seed", "search"] + Self.largestText)
-        XCTAssertTrue(row(app, "Notes from the design review").waitForExistence(within: 15))
+        // The top row: at this size the older ones are below the fold.
+        XCTAssertTrue(row(app, "A quieter kind of productivity").waitForExistence(within: 15))
         capture("32-library-largest-text")
     }
 
