@@ -88,12 +88,13 @@ records their exact revisions.
   with it. Imports show an `Importing…` card; failures keep a `Needs attention` card with retry/dismiss controls.
 - **Transcribe on the device** with the bundled Whistle model at once, or with Parakeet Ultra after a one-time download
   of about 531 MB (Ultra, its speech detector and the speaker models, from Cassini's model host) on devices with
-  4 GB of memory or more (those that report at least 3.25 GiB). A Parakeet run that cannot get the memory it needs or
+  4 GB of memory or more (those that report at least 3.25 GiB). By default, Cassini precomputes transcription while
+  recording (D111) so the transcript finishes shortly after Stop; you can also transcribe after Stop or on demand. A Parakeet run that cannot get the memory it needs or
   cannot load its model before it has saved any progress is run again with Whistle, for that note only; one that
   has saved progress or speaker names fails and keeps them. On iOS 26 or later, where neither Whistle nor a verified Parakeet can run, Cassini uses Apple's
   `SpeechAnalyzer` after a model download for the speech language you choose; iOS 18 has no Apple speech, so a device
   that can run neither engine cannot transcribe there ([iOS 18](docs/ios18.md)). The queue is durable: jobs run one at a
-  time and survive a relaunch. Progress is saved every 30 seconds of audio, so "Stop and keep progress", iOS taking the
+  time and survive a relaunch. Progress is saved every 30 seconds of audio (and Whistle precompute checkpoints every 10 seconds), so "Stop and keep progress", iOS taking the
   background time back, or a crash all resume from the last checkpoint. The progress card shows the stages, the percent,
   the time left, a battery projection and the draft so far. On iOS 26 or later transcription continues in the background
   with a system progress indicator; on iOS 18 it pauses when iOS ends the short background time (seen once on the iOS 18.2
@@ -104,8 +105,9 @@ records their exact revisions.
   can name a speaker across all their passages, play a sample of their voice, merge two speakers, or reassign a
   passage.
 - **Saved voices.** Cassini can remember a named voice, suggest it in later notes ("Is this Sam Rivera?"), and keep
-  names over a Transcribe again. Automatic naming is optional and off by default. You can rename or forget a saved
-  voice, forget everyone, or erase all voice data.
+  names over a Transcribe again. A one-time prompt over a multi-speaker meeting lets you choose whether to remember
+  people you name (default on); automatic naming is optional and off by default. You can add a voice with guided
+  four-second enrollment, rename or forget a saved voice, forget everyone, or erase all voice data.
 - **Read and listen.** The playing word is highlighted, and tapping a word plays from there. You can skip 10 seconds
   back or forward, change the speed, and use the lock-screen and headphone controls. The playback position is kept
   across launches.
@@ -115,16 +117,20 @@ records their exact revisions.
 - **Edit and versions.** You can edit a passage's text; its word timing is dropped, but its place in the audio is
   kept. Every transcription, merge and run of edits keeps the transcript from before it as a version you can go back
   to.
-- **Export** plain text, localized Markdown, SRT or WebVTT subtitles, structured JSON, a copy of the original audio, or a portable Cassini
-  `.opus` document. The document keeps the source's verified transcripts, its private `x` data and its audio packets,
-  adds the note's versions and speaker names, and records how each transcript was made. A stale or unverified source
-  with nothing new on the device is shared as it is, without a renamed title; one transcribed again keeps only the new
-  versions, beside the source's private data and meeting details.
+- **Export** a portable Cassini `.opus` document or localized Markdown as primary choices, or Plain text, SRT or WebVTT
+  subtitles under More formats (or a copy of the original audio when a meeting has no finished transcript). The Library
+  also supports exporting selected meetings or the whole live Library as a ZIP archive, and importing ZIP archives
+  alongside audio/Cassini files ([bulk transfer](docs/bulk-transfer.md)). The portable `.opus` document keeps the
+  source's verified transcripts, its private `x` data and its audio packets, adds the note's versions and speaker
+  names, and records how each transcript was made. A stale or unverified source with nothing new on the device is shared
+  as it is, without a renamed title; one transcribed again keeps only the new versions, beside the source's private data
+  and meeting details.
 - **Recently Deleted.** Deleted notes stay for 30 days, with Undo right after the delete, and can be restored,
   deleted now, or emptied all at once. A permanent delete also removes that note's voice samples.
-- **Settings** for the app language (in the Settings app), the speech language (Apple Speech devices on iOS 26 or later only),
-  automatic transcription, speaker identification and automatic naming. The on-device model rows show their status,
-  with Download and Cancel. Your library's totals and the licences are there too.
+- **Settings** follows the shared topic map (D103): app language (in the Settings app), speech language (Apple Speech
+  devices on iOS 26 or later only), transcription, speakers and saved voices, Moving and backup (with independent
+  meeting and saved-voice backup switches and ZIP export), on-device model status with Download and Cancel, library
+  totals, licences, and About › Report a problem (D110).
 - **Six languages:** English, Italian, French, Spanish, and Brazilian and European Portuguese (D50).
   - Cassini follows the system's language. A regional variant reads as its language (fr-CA as French), and a bare
     `pt` as Brazilian Portuguese. pt-PT and the other Portuguese regions read as European Portuguese, and any other
@@ -199,11 +205,42 @@ TestFlight still need.
   languages, including for VoiceOver. iOS omits the repeated unknown-date label from individual row metadata,
   the Note subtitle and the Document info Recorded row; the Note subtitle keeps the duration. Android repeats
   “Date unknown” on those surfaces. Neither app displays a document's sealing or import time as its recording date.
-- **First-run hero and backup copy (D98).** An empty Library shows the Wave 5 hero with its backup qualifier and
-  `privacy.onDevice.{iphone,ipad}.withBackup` while backups are enabled (the default), or
-  `privacy.onDevice.{iphone,ipad}.backupExcluded` when the library root is marked `isExcludedFromBackup = true`.
-  Unlike Android's phone-only state, iOS never claims “The audio never leaves it.”, because
-  `NSURLIsExcludedFromBackupKey` is backup guidance and Quick Start device migration may still copy local app storage.
+- **First-run hero and backup copy (D98, D103, D105).** An empty Library places its grey conversation wave and hero
+  (“Every word written down.”) above Import audio and Record on the search bar's 16-point edge, wrapping and scrolling
+  at larger text sizes. Like Android, first run uses the same copy whether backups are on or off: iOS names this iPhone
+  or iPad and notes that backups follow your iCloud settings. Settings › Backup retains the full D98/D103 answer-first
+  page with independent meeting and saved-voice switches (both default on), separate explanations of iCloud, computer
+  backups and ZIP copies, and Backup's ZIP export (excluding live and interrupted captures). Unlike Android's phone-only
+  state, iOS never claims “The audio never leaves it.”, because `NSURLIsExcludedFromBackupKey` is backup guidance and
+  Quick Start device migration may still copy local app storage; Cassini also cannot inspect whether iCloud Backup has
+  run. The once-only backup notice floats above Record only after a saved recording or import (yielding to Undo).
+  Downloaded models are always excluded from backups; directory exclusion covers all descendants and is reapplied at
+  startup.
+- **ZIP transfers (D96) and single-meeting export (D99 / PARITY §2).** The Library import picker accepts multiple
+  audio/Cassini files and ZIP archives, and Edit exports selected notes or the whole live Library as ZIP (excluding
+  private voiceprints and guided samples; see [bulk transfer](docs/bulk-transfer.md)). Single-meeting export offers
+  Cassini file and Markdown as primary choices, with Plain text, SRT and WebVTT under More formats (meetings without a
+  finished transcript hide text choices and share original audio; JSON is retained only as an internal writer, absent
+  from the sheet). Phase 2 TXT/SRT/VTT derivatives use speaker-turn blocks, seven-second subtitle segments and monotonic
+  non-overlapping cues (local regression coverage pending shared goldens; the shared Markdown golden matches byte for
+  byte).
+- **Shared status badges, imported provenance (L-10), and Phase 1 QA (D-989).** The pinned badge contract, full catalog
+  and vectors drive the pure selector and compiled six-language lookup without runtime JSON parsing; `RowBadge` adapts
+  iOS lifecycle states while preserving phone-only statuses and actions. Library and Search show the shared outline
+  Imported badge before speaker counts on finished imported meetings (headers also identify imported meetings and
+  transcripts made on another device; recovered local captures remain own recordings). The
+  [D-989 QA report](docs/qa-phase1-d989.md) records the Phase 1 phone surface audit: meeting header names use assigned
+  speaker colours (unnamed stone), and Library Search and Find match spoken words rather than synthetic viewer labels.
+- **Phase 2 Settings, voices, and onboarding (D103, D106).** Settings uses the shared topic map while keeping the
+  Apple Speech language picker, “Transcribe right away” and “Name strong matches automatically” switches, and opening
+  app language in iOS Settings. Turning off “Recognise saved voices” clears unconfirmed matches from active and paused
+  drafts while keeping confirmed names. A one-time voices question opens over a visible multi-speaker meeting (including
+  chip-only speakers and live drafts) to set the independent **Remember people I name** default (default on). The Saved
+  voices page keeps guided **Add voice** enrollment (`PrivateVoices/Enrollment`, excluded from Library and ZIP exports)
+  as an iOS extra; row playback, sample counts and Ready labels are removed. Download consent is a full-screen modal
+  with a source-only detail page; standalone downloads retain **Download** and speakers-only jobs retain **Download and
+  identify speakers**. Shared strings are pinned to `cassini-ux` `d9bf213a30179c395657e8d8ecd34fe2b987af1a` across all
+  six languages ([shared-strings-pin.md](docs/shared-strings-pin.md)). Pending L-68 permission prompts are not adopted.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
   are verified. Parakeet needs a device that reports at least 3.25 GiB of physical RAM (every 4 GB device and no 3 GB
   one; Android asks for 4,000,000,000 bytes, which the 4 GB iPhone 12 and 13 do not report) and the normal runtime
@@ -278,9 +315,9 @@ TestFlight still need.
   [Whistle/README.md](Whistle/README.md) and two AWS Device Farm runs on 2026-11-10 (iPhone 11 on iOS 18.6.2, iPhone
   15 on iOS 18.0); no A12 or A10 device on iOS 18 has run it. The transcription's background pause was checked by
   hand on the iOS 18.2 simulator (see [iOS 18](docs/ios18.md)); the download's stop was not.
-- **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, JSON export, the Speakers
-  list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription, speakers and
-  your library.
+- **iOS extras.** Stars, bookmarks, playback speed, lock-screen controls, passage editing, guided Add voice enrollment,
+  the Speakers list, the "Recently Deleted" name, "Forget all voice data", and Settings sections for transcription,
+  speakers and your library.
 - **Platform.** The app language is set in the Settings app. iOS has no system Back, so the back button carries the
   title of the screen below. The iPad has a split view. Rename is a sheet. Notifications are silent results with
   hidden-preview text. The W1 preview reads the pinned Cassini palette (cool neutral grounds, navy light accent, and a blue/magenta/cyan/orange/violet/slate speaker cycle) with system
@@ -357,8 +394,7 @@ regex rejoin, was fixed on main by #81, which measures the keystroke in main-thr
 16 ms), a crash of every pinned-model download (on iOS 18 `Task(executorPreference: nil)` crashes; `PinnedModelInstaller`
 now starts a plain `Task` when it has no executor), and seven UI failures, fixed on this branch: Name a speaker could
 save a name one keystroke old (on every OS), the iPadOS 18 split view started without its sidebar, the running draft
-did not follow its end, and the audit reported clipped text with no element on Settings and Saved voices. The leg
-stays off by default for now.
+did not follow its end, and the audit reported clipped text with no element on Settings and Saved voices.
 `ScreenshotTests` skip unless `scripts/screenshots.sh` runs them.
 
 To install the runtime, download the iOS 18.2 simulator runtime DMG (22C150) with the owner's Apple ID and keep it on
@@ -410,7 +446,7 @@ PATH="/path/to/pr-shots-venv/bin:$PATH" scripts/pr-shots.sh --base origin/main -
 ```
 
 The base is the merge base of that ref and the head worktree (`--head PATH` defaults to this checkout).
-Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 26 images, including Note and Library export menus) in light and dark,
+Use a new output folder outside the worktree; commit changes and remove untracked files first. It renders each source's English screenshot set (currently 31 iPhone and 5 iPad screens in light and dark, 72 images total) in light and dark,
 using each source's capture tests, renderer and one private simulator pair. Legacy bases without manifest tooling
 receive only the head renderer/helper, preserving their capture tests. New reading shots start paused,
 so no pressed skip-button tint leaks into a capture. Each render takes `~/.cassini-heavy.lock` itself
@@ -551,91 +587,3 @@ the licences of the dependencies and the models, including every library of the 
 ONNX Runtime 1.27.1's own notices for the libraries inside it. Both show under Settings → Source code and notices. The
 portable format is specified in
 [cassini-format](https://github.com/codemyriad/cassini-format).
-
-### ZIP transfers (D96)
-
-The Library import picker accepts multiple audio/Cassini files and ZIP archives. Edit selects notes for Export
-Selected as ZIP; Export All as ZIP includes the whole live Library. Transfers show progress, support cancellation
-and retain already imported notes. The [archive rules and iOS differences](docs/bulk-transfer.md) cover limits,
-original-audio fallback, safe paths and cleanup. iOS uses its native picker/share sheet and AVFoundation audio
-support; Android-only container support is not added.
-
-### Shared status badges
-
-The pinned badge contract, full catalog and vectors drive the pure selector and compiled six-language lookup.
-`RowBadge` adapts iOS lifecycle states while preserving phone-only statuses and actions. Rendered pills retain
-Dynamic Type and translated text. State, catalog, generation and corruption tests verify the full outputs;
-UI geometry tests cover accessibility text. Runtime rendering never parses JSON.
-
-### Phase 1 alignment QA
-
-The [D-989 QA report](docs/qa-phase1-d989.md) records the six audited phone surfaces,
-existing implementation PRs and iOS platform differences. Meeting header names use the same
-assigned speaker colours as transcript labels; unnamed speakers remain stone in both appearances.
-Library Search and Find match spoken words rather than labels inserted by the viewer. Search previews
-join paragraphs with spaces so blank lines cannot hide the matching word. Both search surfaces preserve
-the viewer’s spacing around standalone punctuation, including punctuation inside inline replies.
-
-Wave 6 voices and phone backups (`D-979`, `D98`): iOS includes meetings and saved voices in OS backups by default.
-Settings → Backup controls Library directory exclusion and the independent PrivateVoices exclusion;
-Saved voices includes a one-question opt-in for automatic naming, transcript enrollment (unchanged), guided
-four-second test-phrase enrollment, sample playback, rename and forget. Guided audio stays under
-`PrivateVoices/Enrollment`, never in the Library or ZIP export, and is removed when its voice is forgotten.
-Unlike Android's “phone only” mode, iOS only marks directories to be left out of iCloud Backup: Quick Start may still
-copy them. The floating Library notice appears only after a saved meeting exists; the Backup page explains this guidance. Turning exclusion on does not delete existing
-cloud backups. Directory resource flags cover all descendants, including new directories, atomic replacements,
-recordings and imports; startup reapplies both committed preferences, including the old always-excluded voice store.
-Manual ZIP export contains portable meetings (or their original audio) and never private voiceprints or guided samples,
-regardless of the saved-voice backup switch. Speech model folders retain their separate backup exclusions.
-
-Single-meeting export follows D99 / PARITY §2: Cassini file and Markdown are primary choices, with Plain text,
-SRT and WebVTT under More formats. Meetings without a finished transcript hide text choices; raw imports then
-share the original audio. Finished transcripts, edits and saved versions remain exportable during a queued,
-running or failed re-transcription. A completed no-speech result also offers text formats. Job checkpoints never
-enter the stored transcript or its exports.
-Confirming opens the iOS share sheet. Multi-meeting export remains ZIP. JSON is retained as an internal writer,
-but is absent from the sheet. The Phase 2 TXT/SRT/VTT derivatives use speaker-turn blocks, seven-second subtitle
-segments and monotonic non-overlapping cues; the older Android writer fixtures remain as historical coverage.
-The shared Markdown golden matches byte for byte. At cassini-ux `b26190b`, `vectors/export/` has no TXT/SRT/VTT
-vectors, so those formats have local regression coverage pending shared goldens. This is the current difference
-from Android's older subtitle rules (six-second cues and cross-speaker overlap).
-
-Imported provenance (L-10): Library and Search show the shared outline Imported badge before speaker counts on finished imported meetings; progress and problem states take its place. Headers identify imported meetings and files that arrived with a transcript from another device. This matches the Phase 2 phone contract; recovered local captures remain own recordings. Existing stored import records are read without migration, and import-flow copy is unchanged.
-
-D103 phone Settings uses the shared topic map. iOS keeps its speech-language picker on Apple Speech devices, its “Transcribe right away” and “Name strong matches automatically” switches, and opens app language in iOS Settings. The Backup page retains iOS backup guidance; it cannot report whether iCloud Backup has run. Turning off “Recognise saved voices” clears unconfirmed matches from active and paused drafts, while keeping confirmed names and Remember choices. Re-analysis still carries over names given within the same meeting.
-
-D103 Backup uses the answer-first phone page, independent meeting and saved-voice switches, inclusion rows and
-separate explanations of iCloud, computer backups and ZIP copies. Both switches still default on. Settings remain
-eligible independently of the Library directory, saved voices follow both switches, and downloaded models are always
-excluded. “Included” is conditional on iCloud Backup being enabled; Cassini cannot inspect its state or completion.
-The once-only notice floats above Record after a saved recording or import, never over an empty first launch or a
-first live/interrupted recording. The notice temporarily yields to the Undo snackbar. Close and Keep backup on preserve choices; exclusion dismisses only after its
-storage transaction succeeds. Backup’s ZIP action uses the Library exporter and excludes live and interrupted captures.
-
-### Phase 2 onboarding and voices (D103)
-
-The one-time voices question opens over a visible meeting with more than one actual speaker, including
-speakers shown only in reply chips and live drafts. It waits while saved voices are read-only and for restored sheets
-and other overlays. Yes and Not now set the
-independent **Remember people I name** default; dismissal preserves it. A Settings change also answers the question.
-The default starts on and does not change automatic naming or recognition. Existing voice links and explicit draft
-Remember choices take precedence. Legacy answered flags remain answered; legacy auto-name values do not infer a
-Remember preference. The answer/default share one UserDefaults record, written through its asynchronous persistence
-mechanism without a main-actor disk flush.
-
-The shared copy is pinned to `cassini-ux` `dd06a62dc881034fed417b000f47004e577a3fb0` (all six languages).
-The iOS Saved voices page keeps guided **Add voice** enrollment as an existing platform extra; row playback,
-sample counts and Ready labels are removed. Download consent is a full-screen modal with a source-only detail page.
-Its displayed speaker models are separate rows while installation and consent retain their existing bundle grouping.
-Apple does not publish speech-asset download sizes, so that path retains the approved size-free body and estimated
-installation space. Standalone downloads retain **Download**, and speakers-only jobs retain **Download and identify
-speakers**: neither starts a transcription. These are platform constraints/existing iOS extras to the phone board.
-
-### Phase 2 first run (D105)
-
-The empty Library places its grey conversation wave and hero above Import audio and Record, on the search bar’s
-16-point edge. The 28-point hero and the two privacy lines wrap and scroll at larger text sizes. Like Android,
-first run has the same copy with backups on or off. iOS names this iPhone or iPad and says backups follow your
-iCloud settings; Settings still uses the full D98 backup or exclusion wording. The process is called “transcribe”,
-while “Every word written down.” remains the hero. Shared strings are pinned to cassini-ux #55,
-`277c65423909ec6f696836eeefede6d4ac5e4c84`. Pending L-68 permission prompts are not adopted.
