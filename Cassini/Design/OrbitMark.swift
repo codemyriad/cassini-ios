@@ -1,10 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// The app/store name remains distinct from the approved in-app wordmark (L-15).
+/// The product name shown in About, Now Playing, and accessibility surfaces.
 enum ProductName {
     static let full = "Cassini talk"
-    static let wordmark = "cassini.talk"
 }
 
 struct OrbitMark: View {

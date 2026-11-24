@@ -2,7 +2,6 @@ import SwiftUI
 import CassiniEngine
 import CassiniInference
 import CassiniWhistle
-import os
 import CassiniSherpa
 import CassiniNotebook
 #if DEBUG

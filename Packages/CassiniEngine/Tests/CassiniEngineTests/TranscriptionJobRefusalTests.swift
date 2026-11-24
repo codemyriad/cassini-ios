@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import Testing
 import CassiniEngine
 import CassiniEngineTesting

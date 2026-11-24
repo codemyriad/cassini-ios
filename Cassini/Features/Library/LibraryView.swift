@@ -140,6 +140,8 @@ struct LibraryView: View {
         } message: { _ in Text(LibraryCopy.freshBody) }
     }
 
+    // MARK: - Layout
+
     @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>, showsHero: Bool,
                                            minimumHeight: CGFloat) -> some View {
         if showsHero {
@@ -192,6 +194,8 @@ struct LibraryView: View {
             }
         }
     }
+
+    // MARK: - Search & filters
 
     @ViewBuilder private var searchHeader: some View {
         Group {
@@ -332,6 +336,8 @@ struct LibraryView: View {
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    // MARK: - Rows & actions
+
     private func row(_ row: LibraryRow, day: DayKey, exportable: Bool) -> some View {
         HStack {
             if editMode.isEditing && exportable {
@@ -363,6 +369,8 @@ struct LibraryView: View {
         }
     }
 
+
+    // MARK: - Scene state & bindings
 
     /// The presented confirmation's action; the model clears the dialog.
     private func confirm(_ dialog: LibraryDialog) { Task { await model.confirm(dialog) } }

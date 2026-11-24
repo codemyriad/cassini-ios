@@ -1312,48 +1312,6 @@
         }
       }
     },
-    "Keep your favorites close.": {
-      "comment": "Starred filter with nothing (iOS extra)",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep your favorites close."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ten tus favoritas a mano."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gardez vos notes favorites à portée de main."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tieni vicine le tue preferite."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mantenha suas favoritas por perto."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tenha as favoritas por perto."
-          }
-        }
-      }
-    },
     "Newer format": {
       "comment": "Row status",
       "extractionState": "manual",
@@ -1392,48 +1350,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Formato mais recente"
-          }
-        }
-      }
-    },
-    "Notes": {
-      "comment": "Library headline at accessibility text sizes",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notes"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notas"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notes"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Note"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notas"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notas"
           }
         }
       }
@@ -2227,78 +2143,6 @@
         }
       }
     },
-    "Search": {
-      "comment": "Library search field placeholder where no longer one fits on one line",
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rechercher"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pesquisar"
-          }
-        }
-      }
-    },
-    "Search titles and transcripts": {
-      "comment": "Library search field placeholder where the long one does not fit on one line (the iPad sidebar)",
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar en títulos y transcripciones"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Titres et transcriptions"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca titoli e trascrizioni"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Buscar em títulos e transcrições"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pesquisar títulos e transcrições"
-          }
-        }
-      }
-    },
     "Search titles and what was said": {
       "comment": "Library search field placeholder",
       "extractionState": "manual",
@@ -2463,48 +2307,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adicionar estrela"
-          }
-        }
-      }
-    },
-    "Star a note to find it here.": {
-      "comment": "Starred filter with nothing (iOS extra)",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Star a note to find it here."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Destaca una nota para encontrarla aquí."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajoutez une étoile à une note pour la retrouver ici."
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi una stella a una nota per trovarla qui."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Marque uma nota com estrela para encontrá-la aqui."
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Adicione uma estrela a uma nota para a encontrar aqui."
           }
         }
       }

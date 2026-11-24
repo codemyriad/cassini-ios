@@ -53,22 +53,3 @@ struct ParakeetSuggestionView: View {
         }
     }
 }
-
-struct SpeechModelChoiceRow: View {
-    let store: SpeechModelsStore
-
-    var body: some View {
-        if store.policy.whistleAvailable {
-            Picker(selection: Binding(get: store.selectedRecognizer, set: store.choose)) {
-                Text(verbatim: "Whistle").tag(SpeechRecognizer.whistle)
-                if store.policy.parakeetInstallation == .verified && store.parakeetCapable {
-                    Text(verbatim: "Parakeet Ultra").tag(SpeechRecognizer.parakeet)
-                        .disabled(!store.policy.parakeetRunnable)
-                }
-            } label: {
-                Text("Speech recognition", tableName: "Settings")
-            }
-            .accessibilityIdentifier("speechModelChoice")
-        }
-    }
-}
