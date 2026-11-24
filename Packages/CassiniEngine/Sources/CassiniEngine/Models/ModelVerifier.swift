@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Synchronization
 import CassiniNotebook
 
@@ -108,9 +109,9 @@ public final class ModelVerifier: Sendable {
         }
     }
 
+    private static let logger = Logger(subsystem: "io.codemyriad.cassini", category: "ModelInstall")
+
     private static func log(_ message: String) {
-        #if DEBUG
-        print("ModelVerifier: \(message)")
-        #endif
+        logger.debug("ModelVerifier: \(message, privacy: .private)")
     }
 }

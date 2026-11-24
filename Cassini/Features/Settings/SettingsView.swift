@@ -332,7 +332,9 @@ private struct SettingsForm: View {
     }
 }
 
-struct SettingsAnswerRow: View {
+// MARK: - Subviews
+
+private struct SettingsAnswerRow: View {
     let title: String
     let answer: String
     var icon: String? = nil

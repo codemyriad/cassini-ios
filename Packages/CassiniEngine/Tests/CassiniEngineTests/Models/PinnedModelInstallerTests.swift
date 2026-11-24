@@ -10,8 +10,6 @@ import CassiniNotebook
 /// parts waits for it, and every artifact is fetched once. The fetcher is a fake that writes sparse files of the pinned
 /// sizes, so nothing is downloaded and almost no disk is used.
 @MainActor @Suite final class PinnedModelInstallerTests {
-    private static let partBytes = 1024
-
     private let folder = TemporaryFolder()
     private let suite = "cassini.tests.\(UUID().uuidString)"
     private let release = Gate()

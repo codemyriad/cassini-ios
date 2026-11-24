@@ -4,7 +4,6 @@ import CassiniNotebook
 import CryptoKit
 import Foundation
 import Synchronization
-import UniformTypeIdentifiers
 
 /// Copies a file another app offered (the picker, Files, a share) into the library, as Android's `ImportRepository.copy`.
 ///

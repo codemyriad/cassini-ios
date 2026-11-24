@@ -4,16 +4,11 @@ import CassiniNotebook
 /// The words of the Library, from the Library string table: Android's copy, with "Recently Deleted" for its Trash.
 enum LibraryCopy {
     static let headline = String(localized: "A little more present.", table: "Library", comment: "Library headline")
-    static let headlineLarge = String(localized: "Notes", table: "Library", comment: "Library headline at accessibility text sizes")
     static let subheadline = String(localized: "Keep the conversation. Find the important parts.", table: "Library",
                                     comment: "Library line under the headline")
     static let settings = String(localized: "Settings", table: "Library", comment: "Library toolbar button")
     static let searchPlaceholder = String(localized: "Search titles and what was said", table: "Library",
                                           comment: "Library search field placeholder")
-    static let searchPlaceholderMedium = String(localized: "Search titles and transcripts", table: "Library",
-                                                comment: "Library search field placeholder where the long one does not fit on one line (the iPad sidebar)")
-    static let searchPlaceholderShort = String(localized: "Search", table: "Library",
-                                               comment: "Library search field placeholder where no longer one fits on one line")
     static let clearSearch = String(localized: "Clear search", table: "Library", comment: "Library search field clear button")
     static let anyDate = String(localized: "Any date", table: "Library", comment: "D14 search date filter: no date constraint")
     static let pastWeek = String(localized: "Past 7 days", table: "Library", comment: "D14: today and six preceding local calendar days")
@@ -168,6 +163,4 @@ enum LibraryCopy {
     // MARK: Empty states
 
     static let unavailableTitle = String(localized: "Your notes can’t be opened", table: "Library", comment: "The library could not be read")
-    static let noStarredTitle = String(localized: "Keep your favorites close.", table: "Library", comment: "Starred filter with nothing (iOS extra)")
-    static let noStarredBody = String(localized: "Star a note to find it here.", table: "Library", comment: "Starred filter with nothing (iOS extra)")
 }

@@ -164,14 +164,11 @@ enum SpeakersCopy {
         return SavedVoicesPhase2Copy.meta(meetings: notes, confirmedSpeech: speech)
     }
     static func options(_ name: String) -> String { String(localized: "Options for \(name)", table: "Speakers") }
-    static let renameMore = String(localized: "Rename…", table: "Speakers")
-    static let forgetMore = String(localized: "Forget…", table: "Speakers")
     static func forgetTitle(_ name: String) -> String { SavedVoicesPhase2Copy.forgetTitle(name) }
     static func forgetBody(_ name: String) -> String { SavedVoicesPhase2Copy.forgetBody(name) }
     static var forget: String { SavedVoicesPhase2Copy.forgetPrimary }
     static var stale: String { SavedVoicesPhase2Copy.stale }
     static var footnote: String { SavedVoicesPhase2Copy.howToAdd }
-    static let forgetEveryoneMore = String(localized: "Forget everyone…", table: "Speakers")
     static let forgetEveryoneTitle = String(localized: "Forget everyone?", table: "Speakers")
     static func forgetEveryoneBody(_ count: Int) -> String {
         String(localized: "Cassini stops recognising all \(count) saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.", table: "Speakers")

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The card surface: fill, corner radius and a hairline edge.
-struct CardBackground: ViewModifier {
+private struct CardBackground: ViewModifier {
     var radius = Radius.card
     var outlined = true
     func body(content: Content) -> some View {

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Synchronization
 import CassiniNotebook
 
@@ -29,6 +30,8 @@ public struct InstallResult: Hashable, Sendable {
     public var skipped: [ModelDescriptor]
     public init(part: ModelPart, skipped: [ModelDescriptor]) { self.part = part; self.skipped = skipped }
 }
+
+// MARK: - Fetching
 
 /// Fetches the files of one model into a directory (Android's `ModelFetcher`). Tests pass a fake; the app uses
 /// `NetworkModelFetcher`.
@@ -230,6 +233,8 @@ public final class ModelRepository: Sendable {
     public func clearProgress(_ part: ModelPart) {
         update { $0.inFlight[part] = nil }
     }
+
+    // MARK: - Installation & pruning
 
     /// Installs the models of `part` that are not ready, through the fetcher, and pushes the progress into `status`
     /// and to `progress`. Each model's revision appears only once all of its files verified. The primary model is required: its failure ends the install with its `ModelError` (CANCELLED when the task was
@@ -463,12 +468,14 @@ public final class ModelRepository: Sendable {
         return verifying ? .verifying(percent: percent) : .downloading(percent: percent, bytes: done, total: total)
     }
 
+    private static let logger = Logger(subsystem: "io.codemyriad.cassini", category: "ModelInstall")
+
     private static func log(_ message: String) {
-        #if DEBUG
-        print("ModelRepository: \(message)")
-        #endif
+        logger.debug("ModelRepository: \(message, privacy: .private)")
     }
 }
+
+// MARK: - ModelStore adapter
 
 /// `ModelStore` over a `ModelRepository` (Android's `RepositoryModelStore`): consent read once when the install
 /// starts, the network from `online`, the free space from `storage`.

@@ -1,6 +1,5 @@
 import XCTest
 import Foundation
-import UniformTypeIdentifiers
 import CassiniCore
 import CassiniEngine
 import CassiniEngineTesting

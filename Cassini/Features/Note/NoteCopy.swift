@@ -16,7 +16,6 @@ enum NoteCopy {
     static let documentInfo = String(localized: "Document info", table: "Note")
     static let exportTranscript = String(localized: "Export transcript", table: "Note")
     static let exportDocument = String(localized: "Export Cassini document", table: "Note")
-    static let preparingDocument = String(localized: "Preparing Cassini document…", table: "Note")
     static let shareAudio = String(localized: "Share original audio", table: "Note")
     static let speechUnavailable = String(localized: "No on-device speech model is available for this device and language.", table: "Note")
     static let transcribe = String(localized: "Transcribe", table: "Note")
@@ -170,7 +169,6 @@ enum NoteCopy {
 
     static let unavailableTitle = String(localized: "Recording unavailable", table: "Note")
     static let unavailableBody = String(localized: "Return to your library to choose a recording.", table: "Note")
-    static let backToLibrary = String(localized: "Back to library", table: "Note")
     static let passageChanged = String(localized: "This passage changed while you were editing.", table: "Note")
     static let passageLocked = String(localized: "Wait until transcription finishes", table: "Note")
 }

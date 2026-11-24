@@ -51,6 +51,8 @@ public struct ArtifactFetcher: Sendable {
         self.storage = storage
     }
 
+    // MARK: - Verification & sizing
+
     /// Hex SHA-256 of `file`, checking `cancelled` between blocks (the task's cancellation by default; the inference
     /// thread passes its cancel flag). `onBytes` receives the bytes hashed so far: after the first block, then at most
     /// every half second, and always once at the end with the file's length (a block that reaches the end is reported
@@ -115,6 +117,8 @@ public struct ArtifactFetcher: Sendable {
     /// tag or a `416` fails with `DOWNLOAD` and deletes the `.part`. A `206` that ends before the artifact's last byte
     /// (some servers cap open-ended ranges) keeps what it brought and fails with `DOWNLOAD`, so the next attempt resumes
     /// further on. On a size or SHA-256 mismatch the `.part` is deleted.
+    // MARK: - Downloading
+
     public func fetch(_ url: String, _ artifact: Artifact, into directory: URL,
                       redirects: RedirectPolicy = .downloads, progress: (Int64, Bool) -> Void) async throws {
         var stage = "download.directory"
@@ -385,6 +389,8 @@ public struct ArtifactFetcher: Sendable {
     /// `progress` counts in bytes of `download`, as for `fetch`. While verifying, the count covers the whole check:
     /// hashing the compressed file, decompressing it and hashing the result, each share in proportion to the bytes it
     /// reads or writes, so "Checking files" rises once from 0 to the download's size.
+    // MARK: - Compressed artifacts
+
     public func fetchCompressed(_ url: String, download: Artifact, artifact: Artifact, into directory: URL,
                                 decoder: any Decompressing, redirects: RedirectPolicy = .downloads,
                                 progress: (Int64, Bool) -> Void) async throws {
@@ -499,6 +505,8 @@ public struct ArtifactFetcher: Sendable {
             throw ModelError(.modelVerify, "Decompression: \(error)")
         }
     }
+
+    // MARK: - File helpers
 
     /// Local filesystem failures cannot be repaired by a network retry. Public `digest` retains its raw I/O
     /// errors for installed-model validation; installation call sites classify them here.

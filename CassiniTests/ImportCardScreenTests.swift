@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import XCTest
 import CassiniEngine
 import CassiniEngineTesting
