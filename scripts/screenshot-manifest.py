@@ -44,6 +44,10 @@ SHOTS = {
     "29-voices-question": ("Voices question", "P2Voices-Phones", "test29VoicesQuestion", "speakers"),
     "31-first-run-largest-text": ("First run, largest text", "P2FirstRun-Phones", "test31FirstRunLargestText", "empty"),
     "30-model-download": ("Model download", "P2Download-Phones", "test30ModelDownload", "library"),
+    "32-library-largest-text": ("Library, largest text", "Main", "test32LibraryLargestText", "search"),
+    "33-read-and-listen-largest-text": ("Read and listen, largest text", "Meeting", "test33ReadAndListenLargestText", "brandSpeakers"),
+    "34-meeting-long-press-menu": ("Meeting long-press menu", "LibraryMenu", "test34MeetingLongPressMenu", "brandSpeakers"),
+    "35-meeting-more-menu": ("Meeting more menu", "NoteMenu", "test35MeetingMoreMenu", "brandSpeakers"),
 
     "01-split-landscape": ("Split view landscape", "Meeting", "testSplitViewLandscape", "reading"),
     "02-split-portrait": ("Split view portrait", "Meeting", "testSplitViewPortrait", "reading"),

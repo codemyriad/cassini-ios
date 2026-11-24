@@ -1,0 +1,76 @@
+# Takes the README's screenshots (scripts/screenshots.sh) on the rented Mac pool and uploads them as an artifact,
+# for QA cards that need current screenshots from a machine without a simulator. Never commits anything.
+# Runs on demand on main (`gh workflow run screenshots.yml -f device=iphone`) or on a same-repo PR labelled `screenshots`.
+name: Screenshots
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      device:
+        description: 'iphone, ipad, or both'
+        default: iphone
+        type: choice
+        options: [iphone, ipad, both]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  screenshots:
+    name: Screenshots (artifact only)
+    if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.name == 'screenshots' && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: [self-hosted, macOS, ARM64, cm-mac-m4]
+    timeout-minutes: 150
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      CASSINI_LOCK_MINUTES: '90'
+      CASSINI_KEEP_SIMS: '0'
+      DEVICE: ${{ github.event_name == 'workflow_dispatch' && inputs.device || 'iphone' }}
+    steps:
+      - name: Name this run's simulator clones
+        run: printf 'CASSINI_SIM_PREFIX=ts-ci-shots-%s\n' "$(printf '%s' "$RUNNER_NAME" | tr -cs 'A-Za-z0-9._-' '-')" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          path: cassini-ios
+      - uses: actions/checkout@v5
+        with:
+          repository: codemyriad/cassini-format
+          ref: 32f37a6200c88bdd4d23c1f44497f1761f3401da
+          persist-credentials: false
+          path: cassini-format
+      - name: Toolchain and simulators
+        working-directory: cassini-ios
+        run: |
+          test -d "$DEVELOPER_DIR"
+          command -v xcodegen
+          xcodebuild -version
+          xcrun simctl list runtimes
+          # Lists every phone the simulator offers (a foldable iPhone would show here).
+          xcrun simctl list devicetypes | grep -i iphone
+      - name: Take the screenshots
+        working-directory: cassini-ios
+        run: |
+          set -- --output "$RUNNER_TEMP/shots"
+          [ "$DEVICE" = both ] || set -- "$@" --device "$DEVICE"
+          CASSINI_SHOTS_RUN_ID="$GITHUB_RUN_ID" scripts/screenshots.sh "$@"
+      - name: Remove only this run's simulator clones
+        if: always()
+        working-directory: cassini-ios
+        run: scripts/test.sh clean
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/shots
+            cassini-ios/DerivedData.noindex/screenshots/*.log
+          retention-days: 14
+          if-no-files-found: warn

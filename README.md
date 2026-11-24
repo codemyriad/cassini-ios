@@ -437,6 +437,8 @@ subset. For a headless English gallery run, use
 The folder receives stable `light/01-library.png` through `light/09-saved-voices.png` names and
 `ipad/light/01-split-landscape.png`, `ipad/light/02-split-portrait.png`. Custom output runs retain other files in the
 chosen folder. Capture runs through `simctl` and XCTest; no Simulator window is needed.
+Without a Mac, run it on the rented Mac pool: `gh workflow run screenshots.yml -f device=iphone` (or label a
+same-repo PR `screenshots`) uploads the PNGs and `shots.json` as the run's `screenshots-*` artifact; nothing is committed.
 For local before/after PR renders, fetch main and run (outside any enclosing heavy lock):
 
 ```sh

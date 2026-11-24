@@ -161,6 +161,53 @@ final class ScreenshotTests: XCTestCase {
         capture("30-model-download")
     }
 
+    @MainActor func test32LibraryLargestText() throws {
+        let app = try launchPhone(["--seed", "search"] + Self.largestText)
+        // The top row: at this size the older ones are below the fold.
+        XCTAssertTrue(row(app, "A quieter kind of productivity").waitForExistence(within: 15))
+        capture("32-library-largest-text")
+    }
+
+    @MainActor func test33ReadAndListenLargestText() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture] + Self.largestText)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        waitForInitialPosition(app)
+        capture("33-read-and-listen-largest-text")
+    }
+
+    /// The long-press menu of a meeting in the Library.
+    @MainActor func test34MeetingLongPressMenu() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers"])
+        let note = row(app, "Community garden planning")
+        XCTAssertTrue(note.waitForExistence(within: 15))
+        note.press(forDuration: 1)
+        captureSettledMenu("34-meeting-long-press-menu", app)
+    }
+
+    /// The "…" menu (Share and more) of an open meeting with named speakers.
+    @MainActor func test35MeetingMoreMenu() throws {
+        let app = try launchPhone(["--seed", "brandSpeakers", "--open-fixture", Self.fixture])
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
+        waitForInitialPosition(app)
+        app.buttons["noteActions"].tap()
+        captureSettledMenu("35-meeting-more-menu", app)
+    }
+
+    private static let largestText = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+
+    /// Waits for an open menu (its Export item) to stop moving, then captures it.
+    @MainActor private func captureSettledMenu(_ name: String, _ app: XCUIApplication) {
+        let item = app.buttons["exportOpen"]
+        var last: CGRect?
+        XCTAssertTrue(poll(within: 15) {
+            guard item.exists && item.isHittable else { return false }
+            let frame = item.frame
+            defer { last = frame }
+            return frame == last
+        }, "the menu has settled")
+        capture(name)
+    }
+
     @MainActor private func captureSettingsPage(_ id: String, name: String, arguments: [String] = []) throws {
         let app = try launchPhone(["--seed", "voices"] + arguments)
         app.buttons["settingsButton"].tap()
