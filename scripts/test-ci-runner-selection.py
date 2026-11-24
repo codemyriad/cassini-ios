@@ -144,6 +144,7 @@ class CiRunnerSelectionTests(unittest.TestCase):
                 ("ci.yml", "harness"),
                 ("ci.yml", "fast-and-build"),
                 ("daily-testflight.yml", "testflight"),
+                ("screenshots.yml", "screenshots"),
                 ("simulator-gate.yml", "simulator-gate"),
             ],
         )
@@ -151,11 +152,30 @@ class CiRunnerSelectionTests(unittest.TestCase):
             with self.subTest(workflow=wf, job=job):
                 if (wf, job) == ("daily-testflight.yml", "testflight"):
                     self.assertEqual(value, "[self-hosted, macOS, ARM64, cassini-ios-release-drmeyers]")
-                elif (wf, job) == ("simulator-gate.yml", "simulator-gate"):
+                elif (wf, job) in {("simulator-gate.yml", "simulator-gate"), ("screenshots.yml", "screenshots")}:
                     self.assertEqual(value, "[self-hosted, macOS, ARM64, cm-mac-m4]")
                 else:
                     self.assertTrue(HOSTED_IMAGE.match(value) or RUNNER_SELECTOR.match(value), value)
                 self.assertNotIn("fromJSON(vars", value)
+
+    def test_screenshots_job_runs_only_for_same_repo_label_or_dispatch_on_main(self):
+        text = (WORKFLOWS / "screenshots.yml").read_text()
+        guard = re.search(r"(?m)^    if: (.+)$", text).group(1).replace("&&", " and ").replace("||", " or ")
+        self.assertNotIn("pull_request_target:", text)
+        self.assertIn("contents: read", text)
+        for event in ["push", "workflow_dispatch", "pull_request", "schedule", "pull_request_target"]:
+            for repo in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
+                for head in ["codemyriad/cassini-ios", "fork/cassini-ios"]:
+                    for label in ["screenshots", "full-ci"]:
+                        for ref in ["refs/heads/main", "refs/heads/feature"]:
+                            github = SimpleNamespace(event_name=event, repository=repo, ref=ref, event=SimpleNamespace(
+                                label=SimpleNamespace(name=label),
+                                pull_request=SimpleNamespace(head=SimpleNamespace(repo=SimpleNamespace(full_name=head)))))
+                            expected = repo == "codemyriad/cassini-ios" and (
+                                (event == "workflow_dispatch" and ref == "refs/heads/main") or
+                                (event == "pull_request" and label == "screenshots" and head == repo))
+                            with self.subTest(event=event, repo=repo, head=head, label=label, ref=ref):
+                                self.assertEqual(bool(eval(guard, {"__builtins__": {}}, dict(github=github))), expected)
 
     def test_simulator_job_rejects_forks_and_untrusted_events_before_checkout(self):
         text = (WORKFLOWS / "simulator-gate.yml").read_text()

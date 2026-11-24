@@ -1,6 +1,6 @@
 # Takes the README's screenshots (scripts/screenshots.sh) on the rented Mac pool and uploads them as an artifact,
 # for QA cards that need current screenshots from a machine without a simulator. Never commits anything.
-# Runs on demand (`gh workflow run screenshots.yml -f device=iphone`) or on a same-repo PR labelled `screenshots`.
+# Runs on demand on main (`gh workflow run screenshots.yml -f device=iphone`) or on a same-repo PR labelled `screenshots`.
 name: Screenshots
 
 on:
@@ -24,7 +24,7 @@ concurrency:
 jobs:
   screenshots:
     name: Screenshots (artifact only)
-    if: github.repository == 'codemyriad/cassini-ios' && (github.event_name == 'workflow_dispatch' || (github.event.label.name == 'screenshots' && github.event.pull_request.head.repo.full_name == github.repository))
+    if: github.repository == 'codemyriad/cassini-ios' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.label.name == 'screenshots' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: [self-hosted, macOS, ARM64, cm-mac-m4]
     timeout-minutes: 150
     env:
