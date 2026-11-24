@@ -105,6 +105,10 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         var cancelFlag: CancelFlag?
     }
 
+    /// Default cadence (in seconds of processed audio) between periodic Whistle precompute checkpoint disk writes
+    /// (`D111` §4). Pending settled state is always flushed immediately on Pause, Stop, Yield, or clean pass exit.
+    public static let defaultWhistleCheckpointIntervalSeconds: UInt64 = 10
+
     private let checkpoints: any CheckpointStoring
     private let budget: NativeBudget
     private let mode: @Sendable () -> TranscriptionMode
@@ -112,6 +116,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
     private let pressure: PrecomputePressure
     private let safetyMarginFrames: UInt64
     private let pollInterval: Duration
+    private let whistleCheckpointIntervalSeconds: UInt64
     private let onCheckpointSaved: (@Sendable (UUID, CheckpointState) -> Void)?
     private let state = Mutex(ActiveState())
 
@@ -123,6 +128,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         pressure: PrecomputePressure = PrecomputePressure(),
         safetyMarginFrames: UInt64 = LiveCAFReader.defaultSafetyMarginFrames,
         pollInterval: Duration = .milliseconds(500),
+        whistleCheckpointIntervalSeconds: UInt64 = defaultWhistleCheckpointIntervalSeconds,
         onCheckpointSaved: (@Sendable (UUID, CheckpointState) -> Void)? = nil
     ) {
         self.checkpoints = checkpoints
@@ -132,6 +138,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         self.pressure = pressure
         self.safetyMarginFrames = safetyMarginFrames
         self.pollInterval = pollInterval
+        self.whistleCheckpointIntervalSeconds = max(1, whistleCheckpointIntervalSeconds)
         self.onCheckpointSaved = onCheckpointSaved
     }
 
@@ -480,7 +487,7 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
 
         let sourceRate = reader.sampleRate
         guard sourceRate == 48_000 || sourceRate == 16_000 else { return }
-        guard var resampler = try? WhistleResampler(rate: sourceRate),
+        guard let resampler = try? WhistleResampler(rate: sourceRate),
               let vad = try? config.backend.makeVAD(config.bundle) else { return }
         do {
             try await config.backend.prepare(capability, config.bundle)
@@ -489,10 +496,17 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         }
         await followWhistleLoop(
             noteID: noteID, captureURL: captureURL, reader: reader,
-            config: config, capability: capability, resampler: &resampler, vad: vad,
+            config: config, capability: capability, resampler: resampler, vad: vad,
             cancel: cancel, continuous: continuous
         )
         _ = await config.backend.close()
+    }
+
+    private enum WhistlePersistOutcome {
+        case saved
+        case skipped
+        case cancelled
+        case encodeFailed
     }
 
     private func followWhistleLoop(
@@ -501,15 +515,19 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         reader: LiveCAFReader,
         config: WhistleEngine,
         capability: WhistleCapability,
-        resampler: inout WhistleResampler,
+        resampler initialResampler: WhistleResampler,
         vad: WhistleSessionBackend.VADHandle,
         cancel: CancelFlag,
         continuous: Bool
     ) async {
+        var resampler = initialResampler
         let sourceRate = reader.sampleRate
         let blockFrames = UInt64(sourceRate) // 1 second, matching WhistleAudioReader
+        let checkpointIntervalFrames = blockFrames * whistleCheckpointIntervalSeconds
         let lookahead = sourceRate == 48_000 ? Int(LiveCAFReader.firLookaheadFrames) : 0
         var framesRead: UInt64 = 0
+        var lastSavedFrames: UInt64 = 0
+        var lastSafeThrough: UInt64 = 0
         var raw: [Float] = []
         var base = 0
         var totalSamples = 0
@@ -520,11 +538,14 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
         let maximumRawSamples = 240_128 + 16_000 + 5_120
         let startedAt = TranscriptionJob.uptimeMs()
         var prefixHasher = LiveCAFReader.IncrementalPrefixHasher()
+        var stateConsistent = true
 
         while !cancel.isSet && !pressure.shouldYield(minMemoryBytes: Int64(WhistleCapability.windowHeadroom)) {
-            guard let safeThrough = try? reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames) else { return }
+            guard let safeThrough = try? reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames) else { break }
+            lastSafeThrough = max(lastSafeThrough, safeThrough)
             if framesRead + blockFrames <= safeThrough {
-                guard let block = try? reader.readFloats(fromFrame: framesRead, frameCount: blockFrames) else { return }
+                guard let block = try? reader.readFloats(fromFrame: framesRead, frameCount: blockFrames) else { break }
+                stateConsistent = false
                 framesRead += blockFrames
                 let pcm = resampler.feed(block, final: false)
                 guard pcm.allSatisfy(\.isFinite) else { return }
@@ -563,69 +584,42 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
                 raw.removeFirst(discard)
                 base += discard
                 guard raw.count <= maximumRawSamples else { return }
+                stateConsistent = true
 
-                let pipelineState = WhistlePipelineState(
-                    version: 1,
-                    finished: false,
-                    gate: gate,
-                    fir: resampler.state,
-                    vad: vad.state(),
-                    raw: raw.withUnsafeBufferPointer { Data(buffer: $0) }
-                )
-                let encoder = PropertyListEncoder()
-                encoder.outputFormat = .binary
-                guard let stateBytes = try? encoder.encode(pipelineState) else { return }
-                let whistleCP = WhistleCheckpoint(
-                    sourceFrame: Int64(framesRead),
-                    processedSamples: totalSamples,
-                    doneSamples: finalized,
-                    state: stateBytes
-                )
-                let minRequired = CommittedPrefix.minRequiredCafSourceFrames(
-                    consumed16kSamples: UInt64(max(0, totalSamples)),
-                    sourceSampleRateHz: sourceRate,
-                    resamplerLookaheadFrames: lookahead
-                )
-                let committedFrames = max(framesRead, minRequired)
-                if committedFrames <= safeThrough {
-                    let sha: String
-                    do {
-                        sha = try prefixHasher.advance(to: committedFrames, using: reader) {
-                            cancel.isSet || pressure.shouldYield(minMemoryBytes: Int64(WhistleCapability.windowHeadroom))
-                        }
-                    } catch is CancellationError {
-                        return
-                    } catch {
-                        continue
-                    }
-                    let now = TranscriptionJob.uptimeMs()
-                    var checkpoint = CheckpointState(
-                        source: captureURL.lastPathComponent,
-                        signature: CheckpointState.signature(of: captureURL),
-                        model: SpeechRecognizer.whistle.checkpointModel(language: ""),
+                if framesRead - lastSavedFrames >= checkpointIntervalFrames {
+                    let outcome = persistWhistleCheckpoint(
+                        noteID: noteID,
+                        captureURL: captureURL,
+                        reader: reader,
+                        sourceRate: sourceRate,
+                        lookahead: lookahead,
+                        framesRead: framesRead,
+                        safeThrough: safeThrough,
+                        totalSamples: totalSamples,
+                        finalized: finalized,
+                        gate: gate,
+                        firState: resampler.state,
+                        vadState: vad.state(),
+                        raw: raw,
                         segments: segments,
-                        doneMs: whistleCP.doneMs,
-                        totalMs: 0,
-                        elapsedMs: max(0, now - startedAt),
-                        inferenceMs: max(0, now - startedAt),
-                        resumedFromMs: 0,
-                        wordsComplete: false,
-                        recognition: nil,
-                        speakers: nil,
-                        origin: .precompute,
-                        recognitionSampleCount: Int64(totalSamples),
-                        committedPrefix: CommittedPrefix(
-                            kind: .cafPcm16LeFrames,
-                            sourceSampleRateHz: sourceRate,
-                            committedUnitCount: committedFrames,
-                            prefixSha256: sha
-                        )
+                        reportedLanguage: reportedLanguage,
+                        startedAt: startedAt,
+                        prefixHasher: &prefixHasher,
+                        cancel: cancel,
+                        allowWhenCancelled: false
                     )
-                    checkpoint.reportedLanguage = reportedLanguage
-                    checkpoint.whistle = whistleCP
-                    if (try? checkpoints.save(checkpoint, for: noteID)) != nil {
-                        onCheckpointSaved?(noteID, checkpoint)
+                    switch outcome {
+                    case .saved:
+                        lastSavedFrames = framesRead
+                    case .cancelled:
+                        // Cancelled mid-hash during periodic save: exit loop and flush cleanly below.
+                        break
+                    case .encodeFailed:
+                        return
+                    case .skipped:
+                        break
                     }
+                    if outcome == .cancelled { break }
                 }
             } else if continuous {
                 try? await Task.sleep(for: pollInterval)
@@ -633,5 +627,129 @@ public final class CAFPrefixPrecomputer: RecordingPrecomputing, Sendable {
                 break
             }
         }
+
+        // Always flush settled Whistle work accumulated since the last periodic checkpoint on
+        // Pause, Stop, Yield, or clean loop exit so no settled work is lost (`D111` §4).
+        if stateConsistent, framesRead > lastSavedFrames, lastSafeThrough > 0 {
+            let flushSafeThrough = (try? reader.safeThroughFrame(safetyMarginFrames: safetyMarginFrames)) ?? lastSafeThrough
+            let outcome = persistWhistleCheckpoint(
+                noteID: noteID,
+                captureURL: captureURL,
+                reader: reader,
+                sourceRate: sourceRate,
+                lookahead: lookahead,
+                framesRead: framesRead,
+                safeThrough: max(lastSafeThrough, flushSafeThrough),
+                totalSamples: totalSamples,
+                finalized: finalized,
+                gate: gate,
+                firState: resampler.state,
+                vadState: vad.state(),
+                raw: raw,
+                segments: segments,
+                reportedLanguage: reportedLanguage,
+                startedAt: startedAt,
+                prefixHasher: &prefixHasher,
+                cancel: cancel,
+                allowWhenCancelled: true
+            )
+            if outcome == .saved {
+                lastSavedFrames = framesRead
+            }
+        }
+    }
+
+    private func persistWhistleCheckpoint(
+        noteID: UUID,
+        captureURL: URL,
+        reader: LiveCAFReader,
+        sourceRate: Int,
+        lookahead: Int,
+        framesRead: UInt64,
+        safeThrough: UInt64,
+        totalSamples: Int,
+        finalized: Int,
+        gate: WhistleSpeechGate,
+        firState: WhistleResampler.State,
+        vadState: WhistleVAD.State,
+        raw: [Float],
+        segments: [TranscriptSegment],
+        reportedLanguage: String?,
+        startedAt: Int64,
+        prefixHasher: inout LiveCAFReader.IncrementalPrefixHasher,
+        cancel: CancelFlag,
+        allowWhenCancelled: Bool
+    ) -> WhistlePersistOutcome {
+        let minRequired = CommittedPrefix.minRequiredCafSourceFrames(
+            consumed16kSamples: UInt64(max(0, totalSamples)),
+            sourceSampleRateHz: sourceRate,
+            resamplerLookaheadFrames: lookahead
+        )
+        let committedFrames = max(framesRead, minRequired)
+        guard committedFrames <= safeThrough else { return .skipped }
+
+        let pipelineState = WhistlePipelineState(
+            version: 1,
+            finished: false,
+            gate: gate,
+            fir: firState,
+            vad: vadState,
+            raw: raw.withUnsafeBufferPointer { Data(buffer: $0) }
+        )
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        guard let stateBytes = try? encoder.encode(pipelineState) else { return .encodeFailed }
+        let whistleCP = WhistleCheckpoint(
+            sourceFrame: Int64(framesRead),
+            processedSamples: totalSamples,
+            doneSamples: finalized,
+            state: stateBytes
+        )
+        let sha: String
+        do {
+            sha = try prefixHasher.advance(
+                to: committedFrames,
+                using: reader,
+                checkTaskCancellation: !allowWhenCancelled
+            ) {
+                allowWhenCancelled
+                    ? false
+                    : (cancel.isSet || pressure.shouldYield(minMemoryBytes: Int64(WhistleCapability.windowHeadroom)))
+            }
+        } catch is CancellationError {
+            return .cancelled
+        } catch {
+            return .skipped
+        }
+        let now = TranscriptionJob.uptimeMs()
+        var checkpoint = CheckpointState(
+            source: captureURL.lastPathComponent,
+            signature: CheckpointState.signature(of: captureURL),
+            model: SpeechRecognizer.whistle.checkpointModel(language: ""),
+            segments: segments,
+            doneMs: whistleCP.doneMs,
+            totalMs: 0,
+            elapsedMs: max(0, now - startedAt),
+            inferenceMs: max(0, now - startedAt),
+            resumedFromMs: 0,
+            wordsComplete: false,
+            recognition: nil,
+            speakers: nil,
+            origin: .precompute,
+            recognitionSampleCount: Int64(totalSamples),
+            committedPrefix: CommittedPrefix(
+                kind: .cafPcm16LeFrames,
+                sourceSampleRateHz: sourceRate,
+                committedUnitCount: committedFrames,
+                prefixSha256: sha
+            )
+        )
+        checkpoint.reportedLanguage = reportedLanguage
+        checkpoint.whistle = whistleCP
+        if (try? checkpoints.save(checkpoint, for: noteID)) != nil {
+            onCheckpointSaved?(noteID, checkpoint)
+            return .saved
+        }
+        return .skipped
     }
 }

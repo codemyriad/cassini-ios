@@ -101,7 +101,7 @@ public final class SettingsStore {
     public private(set) var finalizationMs: Int64? { didSet { write(finalizationMs, SettingsKeys.finalizationMs) } }
     public private(set) var trashLastPurgeAt: Date? { didSet { write(trashLastPurgeAt, SettingsKeys.trashLastPurgeAt) } }
     public private(set) var voicesGeneration: Int { didSet { defaults.set(voicesGeneration, forKey: SettingsKeys.voicesGeneration) } }
-    /// Non-UI `TranscriptionMode` policy seam (`recordOnly`, `afterStop`, `transcribeWhileRecording`); defaults to `.afterStop`.
+    /// Non-UI `TranscriptionMode` policy seam (`recordOnly`, `afterStop`, `transcribeWhileRecording`); defaults to `.transcribeWhileRecording` (`D111`).
     public var transcriptionMode: TranscriptionMode {
         didSet {
             modeLock.withLock { $0 = transcriptionMode }
