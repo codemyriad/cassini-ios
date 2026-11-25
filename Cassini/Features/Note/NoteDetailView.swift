@@ -32,6 +32,7 @@ struct NoteDetailView: View {
     @State private var transcribingDetailsOpen = false
     @State private var exportOpen = false
     @State private var exportPresented = false
+    @State private var findFieldFocused = false
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -187,8 +188,9 @@ struct NoteDetailView: View {
                 InNoteSearchBar(query: searchQuery, current: current, total: matches.count,
                                 previous: { model.screen.search?.previous(of: matches.count) },
                                 next: { model.screen.search?.next(of: matches.count) },
-                                close: { model.screen.closeSearch() })
-                    .padding(.horizontal, Spacing.gutter).padding(.vertical, 8)
+                                close: { model.screen.closeSearch() },
+                                onFocusChange: { findFieldFocused = $0 })
+                    .padding(.horizontal, 14).padding(.vertical, 8)
                     .readableWidth()
                     .background(Color.paper)
             }
@@ -196,7 +198,7 @@ struct NoteDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 FollowChipHost(noteID: noteID, follow: model.screen.follow) { model.resumeFollowing() }
-                if mode.hasPlayer, note.audio.isPlayable {
+                if mode.hasPlayer, note.audio.isPlayable, !(model.screen.search != nil && findFieldFocused) {
                     NotePlayerBar(note: note, markMoment: { model.markMoment(at: $0) })
                 }
             }
