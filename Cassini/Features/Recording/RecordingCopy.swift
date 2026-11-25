@@ -12,18 +12,12 @@ enum RecordingCopy {
         paused ? String(localized: "Paused", table: "Recording") : String(localized: "Recording", table: "Recording")
     }
 
-    /// "Space for about 31 h more." after the fixed hint.
+    /// "Space for about 31 h more." on its own line after the fixed hint.
     static func hint(_ space: RecordingSpace?) -> String {
         let hint = String(localized: "Keeps recording with the screen off or in another app.", table: "Recording")
         guard let space else { return hint }
         let left = hoursMinutes(space.approx.totalMinutes)
-        return hint + " " + String(localized: "Space for about \(left) more.", table: "Recording")
-    }
-
-    /// "PCM 48 kHz".
-    static func format(_ format: CaptureFormat) -> String {
-        let rate = (format.sampleRate / 1000).formatted(.number.precision(.fractionLength(0...1)))
-        return String(localized: "\(format.codec) \(rate) kHz", table: "Recording")
+        return hint + "\n" + String(localized: "Space for about \(left) more.", table: "Recording")
     }
 
     /// "N min" below an hour, else "N h M min" ("N h" when M is 0).
