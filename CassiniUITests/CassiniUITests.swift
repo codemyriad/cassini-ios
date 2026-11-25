@@ -5,7 +5,7 @@ final class CassiniUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"] + (reset ? ["--reset-test-data"] : []) + (seed ? ["--seed-test-data"] : []) + arguments
         app.launchAndWait()
-        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         return app
     }
     @MainActor private func goBack(_ app: XCUIApplication) {
@@ -24,7 +24,8 @@ final class CassiniUITests: XCTestCase {
         let app = launch(seed: false)
         XCTAssertTrue(app.buttons["recordButton"].exists)
         XCTAssertTrue(app.scrollViews["libraryScroll"].waitForExistence(within: 5))
-        XCTAssertEqual(app.descendants(matching: .any)["libraryHeading"].label, "All meetings", "the Library names its meeting list")
+        XCTAssertFalse(app.textFields["librarySearch"].exists, "search is hidden before the first meeting")
+        XCTAssertTrue(app.staticTexts["heroTitle"].exists)
         capture("Empty library")
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
@@ -114,6 +115,8 @@ final class CassiniUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Deleted today · 30 days left"].exists)
         app.buttons["Restore"].tap()
         XCTAssertTrue(app.staticTexts["Recently Deleted is empty"].waitForExistence(within: 5))
+        goBack(app)
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
         goBack(app)
         XCTAssertTrue(row(app, "A quieter kind of productivity").waitForExistence(within: 5))
     }

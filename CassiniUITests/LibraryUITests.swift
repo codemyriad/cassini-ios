@@ -173,6 +173,8 @@ final class LibraryUITests: XCTestCase {
         }
         restore.tapWhenSettled()
         app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: uiWaitFloor))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         try assertRowPixels(second, contain: "2 speakers", excluding: "Recording")
         captureEvidence("Post-recording renamed and restored", app)
@@ -306,7 +308,7 @@ final class LibraryUITests: XCTestCase {
         app.buttons["retryImport"].tapWhenSettled()
         XCTAssertTrue(app.buttons["dismissImport"].waitForExistence(within: 15))
         app.buttons["dismissImport"].tapWhenSettled()
-        XCTAssertTrue(app.textFields["librarySearch"].exists)
+        XCTAssertTrue(app.buttons["settingsButton"].exists)
         XCTAssertFalse(card.exists)
     }
 
