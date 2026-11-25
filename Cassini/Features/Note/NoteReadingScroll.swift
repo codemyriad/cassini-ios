@@ -36,7 +36,7 @@ struct NoteReadingScroll: View {
         let headerTranscript = mode.showsDraft ? model.shownDraft.map { cache.draft($0) } ?? transcript : transcript
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 26) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerTranscript.headerSpeakers,
                                nameSpeaker: { model.speakerTapped($0) }, headerTitleVisible: headerTitleVisible,
                                titleContentBottomChanged: { bottom in

@@ -17,7 +17,7 @@ struct NoteHeader: View {
         #if DEBUG
         let _ = RenderProbe.rendered("header")
         #endif
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             observedTitle
             if let subtitle {
                 Text(NoteCopy.subtitle(subtitle, calendar: calendar))

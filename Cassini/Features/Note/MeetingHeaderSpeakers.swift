@@ -36,5 +36,6 @@ struct MeetingHeaderSpeakers: View {
         }
         .frame(minHeight: HitTarget.minimum, alignment: .leading)
         .contentShape(Rectangle())
+        .padding(.vertical, -11)
     }
 }
