@@ -40,6 +40,25 @@ struct SetMeetingDateTests {
         #expect(!prefill.showsSavedFileHint)
     }
 
+    @Test func prefillUsesGregorianForLocalWallClockOnBuddhistCalendar() throws {
+        let now = try #require(CassiniDocument.parseInstant("2026-11-25T12:00:00Z"))
+        var note = Note(title: "Bangkok local", createdAt: now)
+        note.meetingTime = .local("2026-11-09T09:31:48")
+
+        let bangkok = try #require(TimeZone(secondsFromGMT: 7 * 3600))
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = bangkok
+
+        let prefill = SetMeetingDatePrefill.of(note: note, now: now, calendar: buddhist)
+        let expected = try #require(CassiniDocument.parseInstant("2026-11-09T02:31:48Z"))
+        #expect(prefill.date == expected)
+        #expect(!prefill.showsSavedFileHint)
+
+        SetMeetingDate.apply(date: prefill.date, timeZone: bangkok, to: &note)
+        #expect(note.meetingTime == .instant(expected))
+        #expect(note.userStartedAt == "2026-11-09T09:31:48+07:00")
+    }
+
     @Test func prefillUsesSavedFileTimeMinusDurationWithHint() throws {
         let saved = try #require(CassiniDocument.parseInstant("2026-11-23T14:12:00Z"))
         let now = try #require(CassiniDocument.parseInstant("2026-11-25T12:00:00Z"))
@@ -228,5 +247,32 @@ struct SetMeetingDateTests {
         #expect(decoded.meetingTime == .instant(chosen))
         #expect(decoded.userStartedAt == "2026-11-23T14:36:00+01:00")
         #expect(decoded.sourceModifiedAt == modified)
+    }
+
+    @Test func userSetDateInvalidatesPreservesOriginalForPlainAudioAndVerifiedDocuments() throws {
+        let chosen = try #require(CassiniDocument.parseInstant("2026-11-23T13:36:00Z"))
+
+        var audioOnly = Note(title: "Audio only")
+        #expect(ArchiveContents.preservesOriginal(audioOnly))
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &audioOnly)
+        #expect(!ArchiveContents.preservesOriginal(audioOnly))
+
+        var verifiedEmpty = Note(title: "Empty verified", audioFilename: "empty.opus")
+        verifiedEmpty.document = DocumentInfo(state: .ok)
+        verifiedEmpty.origin = .importedDocument
+        #expect(ArchiveContents.preservesOriginal(verifiedEmpty))
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &verifiedEmpty)
+        #expect(!ArchiveContents.preservesOriginal(verifiedEmpty))
+
+        // Non-OK documents and unplayable audio still preserve original bytes.
+        var unknownDoc = Note(title: "Newer format", audioFilename: "future.opus")
+        unknownDoc.document = DocumentInfo(state: .unknownFormat)
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &unknownDoc)
+        #expect(ArchiveContents.preservesOriginal(unknownDoc))
+
+        var invalidDoc = Note(title: "Invalid", audioFilename: "broken.opus")
+        invalidDoc.document = DocumentInfo(state: .invalidMetadata)
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &invalidDoc)
+        #expect(ArchiveContents.preservesOriginal(invalidDoc))
     }
 }

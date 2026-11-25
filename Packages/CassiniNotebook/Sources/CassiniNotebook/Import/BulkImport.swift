@@ -77,12 +77,15 @@ public enum ArchiveContents {
     }
 
     public static func preservesOriginal(_ note: Note) -> Bool {
-        let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
-        if !note.hasFinishedTranscript { return true }
-        // An imported document already carries its empty default and any earlier variants.
-        if note.document != nil && note.transcript.isEmpty && !hasLocalWords { return true }
         if note.document?.state == .unknownFormat { return true }
         if case .unplayable = note.audio, note.holdsOnlyImportedVersions { return true }
+        // A user-set recording date must reach archiveSnapshot's document comparison (for verified
+        // documents) or seal a Cassini document (for plain audio), rather than copying raw bytes.
+        let sealsUserDate = note.userStartedAt != nil && (note.document == nil || note.document?.state == .ok)
+        let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
+        if !note.hasFinishedTranscript && !sealsUserDate { return true }
+        // An imported document already carries its empty default and any earlier variants.
+        if note.document != nil && note.transcript.isEmpty && !hasLocalWords && !sealsUserDate { return true }
         return false
     }
 }

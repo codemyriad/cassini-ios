@@ -36,6 +36,8 @@ public struct SetMeetingDatePrefill: Equatable, Sendable {
                          options: .regularExpression) != nil else { return nil }
         let numbers = text.split(whereSeparator: { "-T:".contains($0) }).compactMap { Int($0) }
         guard numbers.count == 6 else { return nil }
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
         var components = DateComponents()
         components.year = numbers[0]
         components.month = numbers[1]
@@ -43,7 +45,7 @@ public struct SetMeetingDatePrefill: Equatable, Sendable {
         components.hour = numbers[3]
         components.minute = numbers[4]
         components.second = numbers[5]
-        return calendar.date(from: components)
+        return gregorian.date(from: components)
     }
 }
 
