@@ -7,6 +7,7 @@ struct NoteHeader: View {
     let subtitle: NoteSubtitle?
     var speakers: [TranscriptSpeaker] = []
     var nameSpeaker: (String) -> Void = { _ in }
+    var openSpeakers: (() -> Void)? = nil
     var headerTitleVisible = true
     var titleContentBottomChanged: ((CGFloat) -> Void)? = nil
     static let readingContentSpace = "noteReadingContent"
@@ -25,7 +26,7 @@ struct NoteHeader: View {
                     .accessibilityIdentifier("noteSubtitle")
             }
             if !speakers.isEmpty {
-                MeetingHeaderSpeakers(speakers: speakers, nameSpeaker: nameSpeaker)
+                MeetingHeaderSpeakers(speakers: speakers, nameSpeaker: nameSpeaker, openSpeakers: openSpeakers)
             }
         }
     }

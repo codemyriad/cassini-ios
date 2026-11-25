@@ -5,18 +5,39 @@ import CassiniNotebook
 struct MeetingHeaderSpeakers: View {
     let speakers: [TranscriptSpeaker]
     let nameSpeaker: (String) -> Void
+    var openSpeakers: (() -> Void)? = nil
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
-        FlowLayout(spacing: 16, rowSpacing: 6) {
-            ForEach(speakers, id: \.byteID) { speaker in
-                if speaker.id == NoteTranscripts.draftOneVoice {
-                    label(speaker)
-                } else {
-                    Button { nameSpeaker(speaker.id) } label: { label(speaker) }
-                        .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityHint(NoteCopy.nameThisSpeaker)
-                        .accessibilityIdentifier("headerSpeaker-\(speaker.id)")
+        if dynamicType.isAccessibilitySize, let openSpeakers, speakers.contains(where: { $0.id != NoteTranscripts.draftOneVoice }) {
+            Button(action: openSpeakers) {
+                HStack(spacing: 4) {
+                    Text(NoteCopy.speakerCount(speakers.count))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color.ink)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.muted)
+                        .accessibilityHidden(true)
+                }
+                .frame(minHeight: HitTarget.minimum, alignment: .leading)
+                .contentShape(Rectangle())
+                .padding(.vertical, -8)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("headerSpeakersCollapsed")
+        } else {
+            FlowLayout(spacing: 16, rowSpacing: 6) {
+                ForEach(speakers, id: \.byteID) { speaker in
+                    if speaker.id == NoteTranscripts.draftOneVoice {
+                        label(speaker)
+                    } else {
+                        Button { nameSpeaker(speaker.id) } label: { label(speaker) }
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityHint(NoteCopy.nameThisSpeaker)
+                            .accessibilityIdentifier("headerSpeaker-\(speaker.id)")
+                    }
                 }
             }
         }

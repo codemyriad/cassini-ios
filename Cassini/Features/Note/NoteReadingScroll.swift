@@ -38,7 +38,8 @@ struct NoteReadingScroll: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerTranscript.headerSpeakers,
-                               nameSpeaker: { model.speakerTapped($0) }, headerTitleVisible: headerTitleVisible,
+                               nameSpeaker: { model.speakerTapped($0) }, openSpeakers: { model.perform(.speakers) },
+                               headerTitleVisible: headerTitleVisible,
                                titleContentBottomChanged: { bottom in
                                    geometry.titleContentBottom = bottom
                                    if let visible = geometry.titleVisibility.measured(bottom: Double(bottom)) {

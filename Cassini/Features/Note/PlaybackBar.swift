@@ -23,8 +23,8 @@ struct PlaybackBar: View {
             PlaybackScrubber(note: note)
             controls
         }
-        // Keep the established large-content viewer policy for the five controls.
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
+        // Controls stop growing below accessibility sizes and show the Large Content Viewer instead.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge).accessibilityShowsLargeContentViewer()
         .padding(.horizontal, 18).padding(.vertical, 14)
         .meetingGlass(cornerRadius: 26)
         .frame(maxWidth: ReadableWidth.content).frame(maxWidth: .infinity)

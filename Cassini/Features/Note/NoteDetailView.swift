@@ -152,7 +152,7 @@ struct NoteDetailView: View {
                 let headerSpeakers = mode == .processing ? [] : (model.shownDraft.map { cache.draft($0).headerSpeakers } ?? [])
                 ProcessingBody(note: note, isProcessing: mode == .processing, model: model, cache: cache) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerSpeakers,
-                               nameSpeaker: { model.speakerTapped($0) })
+                               nameSpeaker: { model.speakerTapped($0) }, openSpeakers: { model.perform(.speakers) })
                     ForEach(mode.sections, id: \.self) { section in
                         NoteSectionView(section: section, note: note, mode: mode, model: model,
                                         openDetails: openDetails)

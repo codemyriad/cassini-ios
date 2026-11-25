@@ -230,6 +230,7 @@ struct LibraryView: View {
                 searchControls(showsHero: showsHero)
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge).accessibilityShowsLargeContentViewer()
         .padding(.horizontal, 14).padding(.vertical, 6)
         .readableWidth()
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85), value: searchPresented)
