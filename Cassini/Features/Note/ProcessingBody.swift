@@ -42,7 +42,8 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                         if !pinned { topContent }
                         banners()
                         if !isProcessing, !note.bookmarks.isEmpty {
-                            BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
+                            let draftTranscript = model.shownDraft.map { cache.draft($0) } ?? .empty
+                            BookmarksSection(note: note, transcript: draftTranscript, isExpanded: $model.showBookmarks, model: model)
                         }
                         RunningDraft(model: model, cache: cache)
                     }

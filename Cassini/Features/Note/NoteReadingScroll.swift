@@ -49,7 +49,7 @@ struct NoteReadingScroll: View {
                         NoteSectionView(section: $0, note: note, mode: mode, model: model)
                     }
                     if mode.hasPlayer, !note.bookmarks.isEmpty {
-                        BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
+                        BookmarksSection(note: note, transcript: headerTranscript, isExpanded: $model.showBookmarks, model: model)
                     }
                     if mode.showsDraft, let draft = model.shownDraft, !draft.words.isEmpty {
                         DraftSection(draft: draft, transcript: cache.draft(draft), model: model)

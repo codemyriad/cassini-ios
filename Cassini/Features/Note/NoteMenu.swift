@@ -54,7 +54,8 @@ struct NoteMenu: View {
                 Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
             }
         } label: {
-            Image(systemName: "ellipsis").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            Image(systemName: "ellipsis")
+                .foregroundStyle(Color.ink)
         }
         .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
             ExportFormatSheet(note: note, jobPending: transcribeRow == .stop || transcribeRow == .removeFromQueue) {

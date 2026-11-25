@@ -214,12 +214,16 @@ struct NoteDetailView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if mode == .reading, !transcript.isEmpty {
                     Button(NoteCopy.searchInTranscript, systemImage: "magnifyingglass") { model.screen.openSearch() }
+                        .foregroundStyle(Color.ink)
+                        .tint(Color.ink)
                         .accessibilityIdentifier("searchTranscript")
                 }
                 NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), transcribeAction: model.transcribeAction,
                          exportingDocument: model.exportingDocument || model.exportingFile,
                          exportOpen: $exportOpen, exportPresented: $exportPresented,
                          perform: { model.perform($0) })
+                    .foregroundStyle(Color.ink)
+                    .tint(Color.ink)
             }
         }
     }
