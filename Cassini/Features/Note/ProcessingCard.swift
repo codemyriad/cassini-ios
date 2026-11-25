@@ -270,7 +270,7 @@ struct TranscribingDetailsSheet: View {
             .readableWidth()
         }
         .accessibilityIdentifier("transcribingDetailsSheet")
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .presentationDetents([.medium, .large])
         .presentationBackground(Color.raised)
     }

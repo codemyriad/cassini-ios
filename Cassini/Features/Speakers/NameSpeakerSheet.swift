@@ -59,7 +59,7 @@ struct NameSpeakerSheet: View {
                 }
             }
         }
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .tint(.accent)
         .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
