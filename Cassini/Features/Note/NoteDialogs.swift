@@ -35,6 +35,10 @@ private struct NoteSheetsAndDialogs: ViewModifier {
             }
             .onAppear { model.sheetAppeared(.voicesQuestion) }
         case .rename(let draft): RenameNoteDialog(noteID: noteID, draft: draft) { model.sheetDraft = $0 }
+        case .setDateTime:
+            SetDateTimeSheet(noteID: noteID) { date, timeZone in
+                model.setDateTime(to: date, timeZone: timeZone)
+            }
         case .speakers: SpeakersView(model: model)
         case .versions: TranscriptVersionsView(model: model)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)

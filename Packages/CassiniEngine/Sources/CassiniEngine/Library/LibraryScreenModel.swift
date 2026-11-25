@@ -287,6 +287,7 @@ public final class LibraryScreenModel {
         switch action {
         case .toggleStar: ports.update(id) { $0.isFavorite.toggle() }
         case .rename: dialog = .rename(id)
+        case .setDateTime: dialog = .setDateTime(id)
         case .transcribe: await transcribe(id, kind: .transcribe)
         case .transcribeAgain:
             if LibraryMapping.transcribeAgainRefused(note) { return }
@@ -314,7 +315,7 @@ public final class LibraryScreenModel {
     public func confirm(_ dialog: LibraryDialog) async {
         if self.dialog == dialog { self.dialog = nil }
         switch dialog {
-        case .rename: break
+        case .rename, .setDateTime: break
         case .startOver(let id): handle(await ports.startOver(id), for: id)
         case .transcribeFresh(let id): await transcribe(id, kind: .transcribeAgain)
         }
@@ -333,6 +334,13 @@ public final class LibraryScreenModel {
             ports.update(id) { $0.title = cleaned }
         }
         return true
+    }
+
+    /// Set date and time's Save (D112 / L-87): stores the user-chosen start instant and its explicit UTC offset.
+    public func setDateTime(_ id: UUID, to date: Date, timeZone: TimeZone? = nil) {
+        if dialog == .setDateTime(id) { dialog = nil }
+        let zone = timeZone ?? ports.calendar.timeZone
+        ports.update(id) { SetMeetingDate.apply(date: date, timeZone: zone, to: &$0) }
     }
 
     /// The app became active or the system says the day or the clock changed: a new local day redraws the rows,

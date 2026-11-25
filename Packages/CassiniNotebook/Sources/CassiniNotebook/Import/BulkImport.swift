@@ -43,7 +43,8 @@ public enum ArchiveContents {
     /// Compare portable content, not UUIDs assigned by the importer or Library-only fields such as bookmarks.
     public static func matchesImportedDocument(_ note: Note, _ document: PortableTranscript) -> Bool {
         guard note.document != nil, sameSegments(note.transcript, document.segments), sameSpeakers(note.speakers ?? [], document.speakers),
-              note.language == document.language else { return false }
+              note.language == document.language, note.meetingTime == document.meetingTime,
+              note.userStartedAt == document.userStartedAt else { return false }
         if let title = NoteTitles.fit(document.title), note.title != title { return false }
         let versions = (note.versions ?? []).filter { !$0.segments.isEmpty }
         var originals: [String: TranscriptVersion] = [:]

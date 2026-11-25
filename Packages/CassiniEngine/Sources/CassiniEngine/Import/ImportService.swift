@@ -98,7 +98,7 @@ public struct ImportService: Sendable {
         }
         let note = ImportedNote.make(id: id, displayName: copied.displayName, fallbackTitle: fallbackTitle,
                                      sha256: copied.sha256, importedAt: clock.now, audio: staged.audio,
-                                     document: staged.document)
+                                     document: staged.document, sourceModifiedAt: copied.modifiedAt)
         try Task.checkCancellation()
         do {
             if let existing = try await notes.insert(note, unlessLiveSourceIs: copied.sha256) { return .existing(existing) }

@@ -37,6 +37,8 @@ struct NoteMenu: View {
                 }
             }
             Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
+            Button(Wave6Copy.meetingSetDateTime, systemImage: "calendar") { perform(.setDateTime) }
+                .accessibilityIdentifier("setDateTimeButton")
             if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
             Divider()
             Button(LibraryCopy.export, systemImage: "square.and.arrow.up") {

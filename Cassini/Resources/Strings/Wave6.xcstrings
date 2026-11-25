@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "backup.includeSavedVoices.title": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.includeSavedVoices.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.includeSavedVoices.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "backup.info.icloud.body": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.icloud.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.icloud.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "backup.info.icloud.computerBody": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.icloud.computerBody.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.icloud.computerBody.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "backup.info.icloud.computerHeading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.icloud.computerHeading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.icloud.computerHeading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "backup.info.icloud.heading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.icloud.heading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.icloud.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -212,7 +212,7 @@
       }
     },
     "backup.info.manualCopy.heading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.manualCopy.heading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.manualCopy.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "backup.info.title": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -296,7 +296,7 @@
       }
     },
     "backup.info.what.body": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.info.what.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.info.what.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -338,7 +338,7 @@
       }
     },
     "backup.phoneOnlyCard.close.a11y": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.phoneOnlyCard.close.a11y.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.phoneOnlyCard.close.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -380,7 +380,7 @@
       }
     },
     "backup.settings.heading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.settings.heading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.settings.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -422,7 +422,7 @@
       }
     },
     "backup.settings.learnMore": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, backup.settings.learnMore.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, backup.settings.learnMore.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
       }
     },
     "common.cancel": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.cancel.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.cancel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -506,7 +506,7 @@
       }
     },
     "common.notNow": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.notNow.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.notNow.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -548,7 +548,7 @@
       }
     },
     "common.stop": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.stop.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.stop.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -589,8 +589,218 @@
         }
       }
     },
+    "meeting.setDateTime": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set date and time"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imposta data e ora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définir la date et l’heure"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Establecer fecha y hora"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir data e hora"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir data e hora"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.dateLabel": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.dateLabel.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fecha"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.prefillSavedHint": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.prefillSavedHint.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filled in from when the file was saved. Change it if it’s wrong."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compilato dalla data di salvataggio del file. Modificalo se non è corretto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prérempli à partir de la date d’enregistrement du fichier. Modifiez-le s’il est inexact."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rellenado según cuándo se guardó el archivo. Cámbialo si no es correcto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido com base em quando o arquivo foi salvo. Altere se estiver errado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido com base em quando o ficheiro foi guardado. Altere se estiver errado."
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.timeLabel": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.timeLabel.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Started at"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniziata alle"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Début à"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empezó a las"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciada às"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciada às"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.title": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When was this recorded?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando è stata registrata?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand cela a-t-il été enregistré ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Cuándo se grabó?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando isso foi gravado?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando foi gravado?"
+          }
+        }
+      }
+    },
     "savedVoices.privacy.phone": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.privacy.phone.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -632,7 +842,7 @@
       }
     },
     "savedVoices.row.forget": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.forget.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.forget.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -674,7 +884,7 @@
       }
     },
     "savedVoices.row.play": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.play.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.play.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -716,7 +926,7 @@
       }
     },
     "savedVoices.row.rename": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.rename.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.rename.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -758,7 +968,7 @@
       }
     },
     "savedVoices.row.sampleCount.one": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.sampleCount.one.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.sampleCount.one.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -800,7 +1010,7 @@
       }
     },
     "savedVoices.row.sampleCount.other": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.sampleCount.other.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.sampleCount.other.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -842,7 +1052,7 @@
       }
     },
     "savedVoices.row.stale": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.stale.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.stale.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -884,7 +1094,7 @@
       }
     },
     "savedVoices.row.status.ready": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.status.ready.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.status.ready.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -926,7 +1136,7 @@
       }
     },
     "savedVoices.row.stopSample": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, savedVoices.row.stopSample.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.row.stopSample.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -968,7 +1178,7 @@
       }
     },
     "settings.transfer.exportHint": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, settings.transfer.exportHint.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, settings.transfer.exportHint.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1010,7 +1220,7 @@
       }
     },
     "voices.enroll.addAction": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.addAction.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.addAction.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1052,7 +1262,7 @@
       }
     },
     "voices.enroll.fromTranscriptHint": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.fromTranscriptHint.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.fromTranscriptHint.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1094,7 +1304,7 @@
       }
     },
     "voices.enroll.instructions": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.instructions.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.instructions.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1136,7 +1346,7 @@
       }
     },
     "voices.enroll.ready": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.ready.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.ready.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1178,7 +1388,7 @@
       }
     },
     "voices.enroll.record": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.record.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.record.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1220,7 +1430,7 @@
       }
     },
     "voices.enroll.recording": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.recording.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.recording.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1262,7 +1472,7 @@
       }
     },
     "voices.enroll.save": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.save.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.save.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1304,7 +1514,7 @@
       }
     },
     "voices.enroll.testPhrase": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.testPhrase.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.testPhrase.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1346,7 +1556,7 @@
       }
     },
     "voices.enroll.testPhraseLabel": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.testPhraseLabel.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.testPhraseLabel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1388,7 +1598,7 @@
       }
     },
     "voices.enroll.title": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1430,7 +1640,7 @@
       }
     },
     "voices.enroll.tooShort": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.enroll.tooShort.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.enroll.tooShort.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1472,7 +1682,7 @@
       }
     },
     "voices.setup.body": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.setup.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.setup.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1514,7 +1724,7 @@
       }
     },
     "voices.setup.enable": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.setup.enable.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.setup.enable.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1556,7 +1766,7 @@
       }
     },
     "voices.setup.privacy.phone": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.setup.privacy.phone.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.setup.privacy.phone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1598,7 +1808,7 @@
       }
     },
     "voices.setup.title": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, voices.setup.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, voices.setup.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
