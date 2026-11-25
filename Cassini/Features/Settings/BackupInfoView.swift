@@ -27,10 +27,14 @@ struct BackupSection: View {
             .accessibilityIdentifier("includeSavedVoicesToggle")
         }
         .disabled(backup.updating || !backup.ready)
+        .listRowBackground(Color.card)
+        .listRowSeparatorTint(Color.line)
         Section {
             NavigationLink(SettingsPhase2Copy.backupMoreDetailRow) { BackupInfoView() }
                 .accessibilityIdentifier("backupInfoRow")
         } header: { Text(SettingsPhase2Copy.moreDetail) }
+        .listRowBackground(Color.card)
+        .listRowSeparatorTint(Color.line)
         Section {
             Button {
                 archiveExport.start(ArchiveSelection.ids(library.notes), exports: exports, errors: errors)
@@ -46,6 +50,8 @@ struct BackupSection: View {
             .disabled(!library.isLoaded || ArchiveSelection.ids(library.notes).isEmpty || archiveExport.progress != nil)
             ArchiveExportProgressView(model: archiveExport)
         } header: { Text(SettingsPhase2Copy.ownCopy) }
+        .listRowBackground(Color.card)
+        .listRowSeparatorTint(Color.line)
     }
 
     private func backupLabel(_ title: String, subtitle: String) -> some View {
