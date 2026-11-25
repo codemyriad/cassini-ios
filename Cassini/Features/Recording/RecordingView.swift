@@ -72,19 +72,27 @@ struct RecordingView: View {
 private struct RecordingCaption: View {
     let screen: RecordingScreenModel
     var body: some View {
-        if let caption {
-            Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        let lines = captionLines
+        if !lines.isEmpty {
+            VStack(spacing: 2) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.recordingSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
-    private var caption: String? {
+    private var captionLines: [String] {
         switch screen.phase {
-        case .needsPermission: nil
-        case .starting: String(localized: "Starting the microphone…", table: "Recording")
-        case .stopping: String(localized: "Saving the recording…", table: "Recording")
-        case .recording, .paused: RecordingCopy.hint(screen.space)
+        case .needsPermission: []
+        case .starting: [String(localized: "Starting the microphone…", table: "Recording")]
+        case .stopping: [String(localized: "Saving the recording…", table: "Recording")]
+        case .recording, .paused: RecordingCopy.hintLines(screen.space)
         }
     }
 }
