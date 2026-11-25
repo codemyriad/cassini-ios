@@ -32,6 +32,7 @@ struct NoteActionsMenu: View {
                         Label(TrashCopy.delete, systemImage: "trash")
                         Text(TrashCopy.recoverableFor30Days)
                     }
+                    .accessibilityIdentifier("Delete")
                 }
             }
         }
