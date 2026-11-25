@@ -19,32 +19,45 @@ struct NoteRow: View {
     let day: DayKey
     /// The note open beside the Library in split view.
     var selected = false
+    /// Selection mode (tick circle inside the card, tapping toggles selection).
+    var selecting = false
+    var isTicked = false
+    var toggleTick: (() -> Void)? = nil
     let perform: (NoteRowAction) -> Void
     @Environment(\.calendar) private var calendar
     @Environment(\.dynamicTypeSize) private var dynamicType
-    @ScaledMetric(relativeTo: .footnote) private var starSize: CGFloat = 16
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @ScaledMetric(relativeTo: .footnote) private var starSize: CGFloat = 12
+
+    private var sidePadding: CGFloat { sizeClass == .regular ? 11 : 12 }
 
     var body: some View {
         let format = LibraryFormat(calendar: calendar)
+        let cardFill = sizeClass == .regular ? Color.card : Color.cardRest
         ZStack {
             // The whole card is the row's button; the texts above it let taps through, the inline suffix does not.
-            Button { perform(.open) } label: { Color.canvasClear.contentShape(Rectangle()) }
+            Button {
+                if selecting, let toggleTick { toggleTick() } else { perform(.open) }
+            } label: { Color.canvasClear.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
-                .accessibilityLabel(format.rowLabel(row, day: day))
-                .accessibilityHint(LibraryCopy.openNote)
-                .accessibilityIdentifier("noteRow")
-                .accessibilityAddTraits(selected ? .isSelected : [])
-                .accessibilityActions { accessibilityActions }
+                .accessibilityLabel(selecting ? row.title : format.rowLabel(row, day: day))
+                .accessibilityHint(selecting ? "" : LibraryCopy.openNote)
+                .accessibilityIdentifier(selecting ? "selectArchiveNote-\(row.id)" : "noteRow")
+                .accessibilityAddTraits((selecting ? isTicked : selected) ? .isSelected : [])
+                .accessibilityActions { if !selecting { accessibilityActions } }
             content(format)
         }
-        .background(Color.cardRest,
+        .background(cardFill,
                     in: RoundedRectangle(cornerRadius: Radius.card))
         .overlay {
-            if selected {
+            if selected && !selecting {
                 RoundedRectangle(cornerRadius: Radius.card).stroke(Color.accentInk.opacity(0.6), lineWidth: 1.5)
                     .allowsHitTesting(false)
             } else if row.highlighted {
                 RoundedRectangle(cornerRadius: Radius.card).stroke(Tone.info.color.opacity(0.35), lineWidth: 1)
+                    .allowsHitTesting(false)
+            } else if sizeClass == .regular {
+                RoundedRectangle(cornerRadius: Radius.card).stroke(Color.lineSoft, lineWidth: 0.5)
                     .allowsHitTesting(false)
             }
         }
@@ -53,39 +66,64 @@ struct NoteRow: View {
     private func content(_ format: LibraryFormat) -> some View {
         let titleLayout = dynamicType.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
-        return VStack(alignment: .leading, spacing: 4) {
-            titleLayout {
-                let titleFont = Font.headline
-                Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
-                    .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("rowTitle").passive()
-                HStack(spacing: 6) {
-                    if row.isFavorite { Image(systemName: "star.fill").font(.system(size: starSize)).foregroundStyle(Color.accentInk) }
-                    Text(TimeText.clock(row.duration)).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted)
-                }.fixedSize().passive()
+        let meetingTime = format.meetingTime(row)
+        let hasBadge = RowBadge.presentation(row, text: { StatusBadgeCopy.template($0) }) != nil
+            || ({ if case .transcribed = row.status { return false }; return true }())
+        let hasLeadingMeta = meetingTime != nil || hasBadge
+        return HStack(alignment: .top, spacing: 10) {
+            if selecting, !row.isRecording {
+                Image(systemName: isTicked ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isTicked ? Color.accentInk : Color.muted)
+                    .padding(.top, 1)
+                    .passive()
             }
-            if let preview = row.displayedPreview {
-                // Search retains the two-line matching context, with its original highlights.
-                Text(HighlightedText.attributed(preview.singleLine, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
-                    .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
-            }
-            FlowLayout(spacing: 8, rowSpacing: 4) {
-                if let meetingTime = format.meetingTime(row) {
-                    Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
+            VStack(alignment: .leading, spacing: 6) {
+                titleLayout {
+                    let titleFont = Font.headline
+                    Text(HighlightedText.attributed(Highlighted(row.title, ranges: row.titleRanges), font: titleFont))
+                        .font(titleFont).foregroundStyle(Color.ink).lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("rowTitle").passive()
+                    HStack(spacing: 4) {
+                        if row.isFavorite { Image(systemName: "star.fill").font(.system(size: starSize)).foregroundStyle(Color.accentInk) }
+                        Text(TimeText.clock(row.duration)).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted)
+                    }.fixedSize().passive()
                 }
-                RowChip(row: row).passive()
-                suffix
-                if row.bookmarkCount > 0 {
-                    RowMetadataPill(text: Text(row.bookmarkCount, format: .number), systemImage: "bookmark.fill").passive()
+                if let preview = row.displayedPreview {
+                    // Search retains the two-line matching context, with its original highlights.
+                    Text(HighlightedText.attributed(preview.singleLine, font: .subheadline)).font(.subheadline).foregroundStyle(Color.muted)
+                        .lineLimit(2).accessibilityIdentifier("rowPreview").passive()
+                }
+                FlowLayout(spacing: 6, rowSpacing: 4) {
+                    if let meetingTime {
+                        Text(meetingTime).font(.footnote.monospacedDigit()).foregroundStyle(Color.muted).passive()
+                    }
+                    RowChip(row: row).passive()
+                    suffix(preceded: hasLeadingMeta)
+                    if row.bookmarkCount > 0 {
+                        HStack(spacing: 3) {
+                            if hasLeadingMeta || hasTextSuffix { Text(verbatim: "·") }
+                            Image(systemName: "bookmark.fill").font(.caption2)
+                            Text(row.bookmarkCount, format: .number).monospacedDigit()
+                        }
+                        .font(.footnote).foregroundStyle(Color.muted).passive()
+                    }
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, sidePadding).padding(.vertical, sidePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder private var suffix: some View {
+    private var hasTextSuffix: Bool {
+        switch row.status.suffix {
+        case .speakers, .noSpeech: true
+        case .resume, .tryAgain, .none: false
+        }
+    }
+
+    @ViewBuilder private func suffix(preceded: Bool) -> some View {
         switch row.status.suffix {
         case .resume, .tryAgain:
             Button { perform(.resume) } label: {
@@ -99,10 +137,12 @@ struct NoteRow: View {
                 : LibraryCopy.tryAgainDescription(row.title))
         case .speakers:
             if case .transcribed(let count, _) = row.status {
-                RowMetadataPill(text: Text(verbatim: LibraryPhase1Copy.speakerCount(count)), systemImage: "person.2.fill").passive()
+                Text(verbatim: (preceded ? "· " : "") + LibraryPhase1Copy.speakerCount(count))
+                    .font(.footnote).foregroundStyle(Color.muted).passive()
             }
         case .noSpeech:
-            RowMetadataPill(text: Text(verbatim: LibraryPhase1Copy.noSpeech)).passive()
+            Text(verbatim: (preceded ? "· " : "") + LibraryPhase1Copy.noSpeech)
+                .font(.footnote).foregroundStyle(Color.muted).passive()
         case .none:
             EmptyView()
         }
@@ -293,13 +333,17 @@ struct LibraryNoteRow: View {
     let row: LibraryRow
     let day: DayKey
     let selected: Bool
+    var selecting = false
+    var isTicked = false
+    var toggleTick: (() -> Void)? = nil
     let perform: (NoteRowAction) -> Void
 
     var body: some View {
         if row.isRecording {
-            LiveRecordingRow(row: row, day: day, selected: selected, perform: perform)
+            LiveRecordingRow(row: row, day: day, selected: selected, selecting: selecting, perform: perform)
         } else {
-            NoteRow(row: row, day: day, selected: selected, perform: perform)
+            NoteRow(row: row, day: day, selected: selected, selecting: selecting, isTicked: isTicked,
+                    toggleTick: toggleTick, perform: perform)
         }
     }
 }
@@ -308,12 +352,13 @@ private struct LiveRecordingRow: View {
     let row: LibraryRow
     let day: DayKey
     let selected: Bool
+    var selecting = false
     let perform: (NoteRowAction) -> Void
     @Environment(LibraryScreenModel.self) private var model
 
     var body: some View {
         var current = row
         if let card = model.recordingCard, card.noteID == row.id { current.duration = card.elapsed }
-        return NoteRow(row: current, day: day, selected: selected, perform: perform)
+        return NoteRow(row: current, day: day, selected: selected, selecting: selecting, perform: perform)
     }
 }

@@ -12,9 +12,17 @@ extension View {
 
     @ViewBuilder func meetingScrollEdge() -> some View {
         if #available(iOS 26.0, *) {
-            scrollEdgeEffectStyle(.soft, for: .top)
+            scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
         } else {
             self
+        }
+    }
+
+    @ViewBuilder func libraryBottomBar<Bar: View>(@ViewBuilder content: () -> Bar) -> some View {
+        if #available(iOS 26.0, *) {
+            safeAreaBar(edge: .bottom, spacing: 0, content: content)
+        } else {
+            safeAreaInset(edge: .bottom, spacing: 0, content: content)
         }
     }
 }

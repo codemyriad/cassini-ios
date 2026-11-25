@@ -28,6 +28,7 @@ struct LibraryView: View {
     @State private var dialogRestored = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedNotes: Set<UUID> = []
+    @State private var rowFrames: [UUID: CGRect] = [:]
     @State private var archiveExport = ArchiveExportModel()
     @State private var backupNoticeHeight: CGFloat = 0
     @State private var exportTarget: ExportTarget?
@@ -36,8 +37,9 @@ struct LibraryView: View {
     var body: some View {
         @Bindable var model = model
         let content = model.listContent
-        let exportable = Set(ArchiveSelection.ids(library.notes))
-        let showsBackupNotice = !model.isSearching && !searchPresented
+        let selectableIDs = library.notes.filter { !$0.isRecording }.map(\.id)
+        let selectable = Set(selectableIDs)
+        let showsBackupNotice = !model.isSearching && !searchPresented && !editMode.isEditing
             // Undo is time-limited and must remain reachable above the capture bar.
             && trashUndo.pending == nil && trashUndo.snackbar == nil
             && BackupPresentation(cloud: settings.cloudBackup, voices: settings.includeSavedVoicesInBackups)
@@ -46,14 +48,26 @@ struct LibraryView: View {
         let showsHero = content.hero != nil && !model.favoritesOnly
         GeometryReader { viewport in
             ScrollView {
-                libraryStack(content, exportable: exportable, showsHero: showsHero,
+                libraryStack(content, showsHero: showsHero,
                              minimumHeight: max(0, viewport.size.height - 40))
                 // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
                 .id(content.results != nil)
-                .padding(.horizontal, showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter).padding(.top, 12)
+                .padding(.horizontal, 14).padding(.top, 6)
                 // The notice floats over content, but the last row can still scroll fully above it.
                 .padding(.bottom, 28 + (showsBackupNotice ? backupNoticeHeight + 12 : 0))
                 .readableWidth()
+            }
+            .coordinateSpace(name: "libraryList")
+            .overlay {
+                if !showsHero && !selectable.isEmpty {
+                    TwoFingerSelectOverlay(
+                        frames: rowFrames,
+                        selectable: selectable,
+                        onBegin: { if !editMode.isEditing { editMode = .active } },
+                        onTouchRow: { id in
+                            if !selectedNotes.insert(id).inserted { selectedNotes.remove(id) }
+                        })
+                }
             }
             .accessibilityIdentifier("libraryScroll")
             .meetingScrollEdge()
@@ -77,14 +91,23 @@ struct LibraryView: View {
                         BackupNoticeCard(maximumHeight: max(0, geometry.size.height - 24))
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { backupNoticeHeight = $0 }
                             .frame(maxWidth: ReadableWidth.content)
-                            .padding(.horizontal, 12).padding(.bottom, 12)
+                            .padding(.horizontal, 14).padding(.bottom, 12)
                     }.frame(maxWidth: .infinity)
                 }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            CaptureBar(unavailable: content.emptyState == .unavailable,
-                       gutter: showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter) { importing = true }
+        .libraryBottomBar {
+            if editMode.isEditing {
+                LibrarySelectionBar(selectableIDs: selectableIDs, selectedNotes: $selectedNotes,
+                                    archiveExport: archiveExport) { ids in
+                    editMode = .inactive
+                    Task {
+                        for id in ids { await model.perform(.moveToTrash, on: id) }
+                    }
+                }
+            } else if !searchPresented && !model.isSearching {
+                CaptureBar(unavailable: content.emptyState == .unavailable, gutter: 14) { importing = true }
+            }
         }
         .librarySearchBar { searchHeader(showsHero: showsHero) }
         .navigationTitle(MeetingPhase1Copy.allMeetings)
@@ -92,7 +115,7 @@ struct LibraryView: View {
         .onAppear(perform: restoreSceneState)
         .environment(\.editMode, $editMode)
         .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
-        .onChange(of: exportable) { _, eligible in
+        .onChange(of: selectable) { _, eligible in
             selectedNotes.formIntersection(eligible)
             if eligible.isEmpty { editMode = .inactive }
         }
@@ -142,7 +165,7 @@ struct LibraryView: View {
 
     // MARK: - Layout
 
-    @ViewBuilder private func libraryStack(_ content: LibraryContent, exportable: Set<UUID>, showsHero: Bool,
+    @ViewBuilder private func libraryStack(_ content: LibraryContent, showsHero: Bool,
                                            minimumHeight: CGFloat) -> some View {
         if showsHero {
             // Fill the viewport when the copy fits; at large text sizes the stack grows and scrolls.
@@ -156,14 +179,14 @@ struct LibraryView: View {
         } else {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
                 libraryHeader(content)
-                libraryRows(content, exportable: exportable)
+                libraryRows(content)
             }
         }
     }
 
     @ViewBuilder private func libraryHeader(_ content: LibraryContent) -> some View {
         if content.facts.liveNotes > 0 || model.favoritesOnly || searchPresented || model.isSearching {
-            filters.padding(.top, 6)
+            filters
         }
         if model.isSearching, let count = content.facts.results {
             Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
@@ -174,7 +197,7 @@ struct LibraryView: View {
         ImportCardsView()
     }
 
-    @ViewBuilder private func libraryRows(_ content: LibraryContent, exportable: Set<UUID>) -> some View {
+    @ViewBuilder private func libraryRows(_ content: LibraryContent) -> some View {
         if !content.loading || content.emptyState == .unavailable {
             // Banners cover no-match and unavailable states; the empty Library uses the Wave 5 hero and Starred has its own.
             if content.emptyState == .noStarred { NoStarredState().padding(.top, 8) }
@@ -182,14 +205,14 @@ struct LibraryView: View {
             // model publishes new capture/job facts. The render key excludes live duration ticks
             // so they preserve taps and context menus; navigation and selection use the note UUID.
             if let results = content.results {
-                ForEach(results, id: \.renderKey) { row($0, day: $0.day ?? .today, exportable: exportable.contains($0.id)) }
+                ForEach(results, id: \.renderKey) { row($0, day: $0.day ?? .today) }
             } else {
                 ForEach(content.sections) { section in
                     Text(LibraryFormat(calendar: calendar).day(section.key).uppercased())
                         .font(.caption.weight(.semibold)).tracking(1.6).foregroundStyle(Color.muted)
                         .accessibilityAddTraits(.isHeader)
                         .padding(.top, 14)
-                    ForEach(section.rows, id: \.renderKey) { row($0, day: section.key, exportable: exportable.contains($0.id)) }
+                    ForEach(section.rows, id: \.renderKey) { row($0, day: section.key) }
                 }
             }
         }
@@ -296,13 +319,18 @@ struct LibraryView: View {
                             .accessibilityIdentifier("libraryRecordedByMe")
                     }
                 }.accessibilityIdentifier("librarySearchFilters")
+            } else if editMode.isEditing {
+                LibrarySelectionHeader(selectedCount: selectedNotes.count) {
+                    editMode = .inactive
+                }
             } else {
                 HStack {
                     Picker(LibraryPhase1Copy.filtersAccessibilityLabel, selection: $model.favoritesOnly) {
                         Text(LibraryPhase1Copy.all).tag(false)
                         Text(LibraryPhase1Copy.starred).tag(true)
-                    }.pickerStyle(.segmented)
-                    ArchiveExportControls(selectedNotes: $selectedNotes, archiveExport: archiveExport)
+                    }.pickerStyle(.segmented).fixedSize()
+                    Spacer(minLength: 8)
+                    ArchiveExportControls(editMode: $editMode)
                 }
             }
         }
@@ -338,32 +366,37 @@ struct LibraryView: View {
 
     // MARK: - Rows & actions
 
-    private func row(_ row: LibraryRow, day: DayKey, exportable: Bool) -> some View {
-        HStack {
-            if editMode.isEditing && exportable {
-                Button {
-                    if !selectedNotes.insert(row.id).inserted { selectedNotes.remove(row.id) }
-                } label: { Image(systemName: selectedNotes.contains(row.id) ? "checkmark.circle.fill" : "circle").frame(minWidth: 44, minHeight: 44) }
-                .accessibilityLabel(row.title)
-                .accessibilityIdentifier("selectArchiveNote-\(row.id)")
-                .accessibilityAddTraits(selectedNotes.contains(row.id) ? [.isSelected] : [])
+    private func row(_ row: LibraryRow, day: DayKey) -> some View {
+        LibraryNoteRow(
+            row: row,
+            day: day,
+            selected: router.selectedNoteID == row.id,
+            selecting: editMode.isEditing,
+            isTicked: selectedNotes.contains(row.id),
+            toggleTick: row.isRecording ? nil : {
+                if !selectedNotes.insert(row.id).inserted { selectedNotes.remove(row.id) }
             }
-            LibraryNoteRow(row: row, day: day, selected: router.selectedNoteID == row.id) { action in
+        ) { action in
             switch action {
             case .open: model.open(row.id)
             case .resume: Task { await model.resume(row.id) }
             case .rename: Task { await model.perform(.rename, on: row.id) }
             case .trash: Task { await model.perform(.moveToTrash, on: row.id) }
             }
-            }
-            .contextMenu {
-                NoteActionsMenu(noteID: row.id) {
-                    if #available(iOS 26.0, *) {
-                        exportTarget = ExportTarget(id: row.id)
-                    } else {
-                        // Like Rename, return from the context-menu action before presenting Export.
-                        Task { @MainActor in exportTarget = ExportTarget(id: row.id) }
-                    }
+        }
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("libraryList")) } action: { rect in
+            rowFrames[row.id] = rect
+        }
+        .contextMenu {
+            NoteActionsMenu(noteID: row.id, startSelecting: row.isRecording ? nil : {
+                selectedNotes = [row.id]
+                editMode = .active
+            }) {
+                if #available(iOS 26.0, *) {
+                    exportTarget = ExportTarget(id: row.id)
+                } else {
+                    // Like Rename, return from the context-menu action before presenting Export.
+                    Task { @MainActor in exportTarget = ExportTarget(id: row.id) }
                 }
             }
         }

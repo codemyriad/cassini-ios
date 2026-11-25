@@ -105,7 +105,7 @@ struct ProgressBannerCard: View {
 struct CaptureBar: View {
     @Environment(RecordingStore.self) private var recording
     let unavailable: Bool
-    var gutter: CGFloat = Spacing.gutter
+    var gutter: CGFloat = 14
     let importAudio: () -> Void
 
     var body: some View {
@@ -114,12 +114,11 @@ struct CaptureBar: View {
             HStack(spacing: 12) { importButton(collapsed: true); Spacer(minLength: 8); recordButton }
         }
         .disabled(unavailable)
-        // Pinned over the list, the bar stops growing at AX1 and shows the Large Content Viewer instead.
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1).accessibilityShowsLargeContentViewer()
+        // Pinned over the list, the bar stops growing at xxxLarge and shows the Large Content Viewer instead.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge).accessibilityShowsLargeContentViewer()
         .padding(.horizontal, gutter).padding(.vertical, 14)
         .readableWidth()
-        // Opaque, so its buttons keep their contrast over the list scrolling under it.
-        .background(Color.paper)
+        .captureBarBackground()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("captureBar")
     }
@@ -156,5 +155,15 @@ struct CaptureBar: View {
         .accessibilityLabel(active == nil ? LibraryCopy.recordDescription : LibraryCopy.returnToRecording)
         .accessibilityHint(unavailable ? LibraryCopy.unavailableTitle : "")
         .accessibilityIdentifier("recordButton")
+    }
+}
+
+private extension View {
+    @ViewBuilder func captureBarBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            background(Color.paper)
+        }
     }
 }

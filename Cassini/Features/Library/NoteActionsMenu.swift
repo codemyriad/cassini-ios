@@ -7,6 +7,7 @@ import CassiniNotebook
 /// confirmed exports and Document info open the Note screen, which runs the action.
 struct NoteActionsMenu: View {
     let noteID: UUID
+    var startSelecting: (() -> Void)? = nil
     @Environment(LibraryScreenModel.self) private var model
 
     let openExport: () -> Void
