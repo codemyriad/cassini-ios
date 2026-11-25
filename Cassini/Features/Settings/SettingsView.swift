@@ -190,6 +190,7 @@ private struct SettingsForm: View {
                             }
                         }
                     }
+                    .padding(.vertical, typeSize.isAccessibilitySize ? 6 : 0)
                 }.accessibilityIdentifier("aboutRow")
             }
             .listRowBackground(Color.card)

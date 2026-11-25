@@ -54,8 +54,14 @@ struct NoteMenu: View {
                 .accessibilityIdentifier("Delete")
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .foregroundStyle(Color.ink)
+            if #available(iOS 26.0, *) {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(Color.ink)
+            } else {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(Color.ink)
+                    .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            }
         }
         .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
             ExportFormatSheet(note: note, jobPending: transcribeRow == .stop || transcribeRow == .removeFromQueue) {
