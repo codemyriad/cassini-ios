@@ -20,7 +20,7 @@ struct RootView: View {
     #endif
 
     private var usesSplit: Bool {
-        sizeClass == .regular && !(library.isLoaded && library.notes.isEmpty)
+        sizeClass == .regular && !(library.isLoaded && !library.notes.contains(where: { $0.trashedAt == nil }))
     }
 
     var body: some View {

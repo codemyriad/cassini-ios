@@ -37,7 +37,7 @@ struct LibraryView: View {
     var body: some View {
         @Bindable var model = model
         let content = model.listContent
-        let selectableIDs = library.notes.filter { !$0.isRecording }.map(\.id)
+        let selectableIDs = library.notes.filter { $0.trashedAt == nil && !$0.isRecording }.map(\.id)
         let selectable = Set(selectableIDs)
         let showsBackupNotice = !model.isSearching && !searchPresented && !editMode.isEditing
             // Undo is time-limited and must remain reachable above the capture bar.

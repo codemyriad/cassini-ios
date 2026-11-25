@@ -9,7 +9,7 @@ struct ArchiveExportControls: View {
     @Binding var editMode: EditMode
 
     var body: some View {
-        if library.notes.contains(where: { !$0.isRecording }) {
+        if library.notes.contains(where: { $0.trashedAt == nil && !$0.isRecording }) {
             Button(LibraryCopy.select) {
                 editMode = .active
             }
@@ -58,7 +58,7 @@ struct LibrarySelectionBar: View {
     }
 
     private var deletableSelected: [UUID] {
-        library.notes.filter { !$0.isRecording && selectedNotes.contains($0.id) }.map(\.id)
+        library.notes.filter { $0.trashedAt == nil && !$0.isRecording && selectedNotes.contains($0.id) }.map(\.id)
     }
 
     var body: some View {
