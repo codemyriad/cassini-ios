@@ -122,11 +122,11 @@ struct TranscribingStatusView: View {
                     .font(.subheadline)
                     .monospacedDigit()
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.muted)
                     .accessibilityHidden(true)
+                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: HitTarget.minimum, alignment: .leading)
             .contentShape(Rectangle())
@@ -146,7 +146,7 @@ struct TranscribingStatusView: View {
             ZStack {
                 Text(MeetingPhase1Copy.stop)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.accentInk)
+                    .foregroundStyle(Color.ink)
                     .opacity(stopBusy ? 0 : 1)
                 if stopBusy {
                     spinner
