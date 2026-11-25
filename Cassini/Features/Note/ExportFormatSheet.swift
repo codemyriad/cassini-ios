@@ -57,7 +57,6 @@ struct ExportFormatSheet: View {
                 }
             }
             .accessibilityIdentifier("exportFormats")
-            .navigationTitle(ExportPhase2Copy.heading)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
