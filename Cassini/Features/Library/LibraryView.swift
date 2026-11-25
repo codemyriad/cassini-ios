@@ -86,7 +86,7 @@ struct LibraryView: View {
             CaptureBar(unavailable: content.emptyState == .unavailable,
                        gutter: showsHero ? FirstRunHeroMetrics.gutter : Spacing.gutter) { importing = true }
         }
-        .librarySearchBar { searchHeader }
+        .librarySearchBar { searchHeader(showsHero: showsHero) }
         .navigationTitle(MeetingPhase1Copy.allMeetings)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear(perform: restoreSceneState)
@@ -197,36 +197,40 @@ struct LibraryView: View {
 
     // MARK: - Search & filters
 
-    @ViewBuilder private var searchHeader: some View {
+    @ViewBuilder private func searchHeader(showsHero: Bool) -> some View {
         Group {
             if #available(iOS 26.0, *) {
                 GlassEffectContainer(spacing: 8) {
-                    searchControls
+                    searchControls(showsHero: showsHero)
                 }
             } else {
-                searchControls
+                searchControls(showsHero: showsHero)
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 6)
+        .padding(.horizontal, 14).padding(.vertical, 6)
         .readableWidth()
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85), value: searchPresented)
     }
 
-    private var searchControls: some View {
+    private func searchControls(showsHero: Bool) -> some View {
         @Bindable var model = model
         return HStack(spacing: 8) {
-            SearchField(query: $model.query, isPresented: $searchPresented)
-                .frame(maxWidth: .infinity)
+            if showsHero {
+                Spacer(minLength: 0)
+            } else {
+                SearchField(query: $model.query, isPresented: $searchPresented)
+                    .frame(maxWidth: .infinity)
+            }
             searchActions
         }
     }
 
     @ViewBuilder private var searchActions: some View {
         if #available(iOS 26.0, *) {
-            searchButtons.glassEffect(.regular, in: Capsule())
+            searchButtons.glassEffect(.regular, in: Circle())
                 .glassEffectID("libraryActions", in: searchGlass)
         } else {
-            searchButtons.background(.regularMaterial, in: Capsule())
+            searchButtons.background(.regularMaterial, in: Circle())
         }
     }
 
@@ -240,19 +244,15 @@ struct LibraryView: View {
                 .accessibilityIdentifier("closeLibrarySearch")
                 .transition(.opacity)
             } else {
-                HStack(spacing: 0) {
-                    Button(TrashCopy.title, systemImage: "trash") { router.show(.trash) }
-                        .accessibilityIdentifier("recentlyDeletedButton")
-                    Button(LibraryCopy.settings, systemImage: "slider.horizontal.3") { router.show(.settings) }
-                        .accessibilityIdentifier("settingsButton")
-                }
-                .transition(.opacity)
+                Button(LibraryCopy.settings, systemImage: "gearshape") { router.show(.settings) }
+                    .accessibilityIdentifier("settingsButton")
+                    .transition(.opacity)
             }
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: searchPresented)
-        .labelStyle(.iconOnly).font(.system(size: 20)).foregroundStyle(Color.ink)
+        .labelStyle(.iconOnly).font(.system(size: 19)).foregroundStyle(Color.ink)
         .buttonStyle(LibraryHeaderButtonStyle())
-        .padding(2).frame(width: searchPresented ? 48 : 92, height: 48)
+        .frame(width: 44, height: 44)
     }
 
     /// All real notices, the recording card, standalone downloads and import/export progress stay available.
