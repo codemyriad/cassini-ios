@@ -7,6 +7,7 @@ struct RootView: View {
     /// Restores the stack and the screens' scene storage (the library search); off for UI tests.
     var restoresNavigation = true
     @Environment(ExportStore.self) private var exports
+    @Environment(LibraryStore.self) private var library
     @Environment(Router.self) private var router
     @Environment(ErrorPresenter.self) private var errors
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -17,6 +18,10 @@ struct RootView: View {
     #if DEBUG
     @Environment(\.showsBadgeGallery) private var showsBadgeGallery
     #endif
+
+    private var usesSplit: Bool {
+        sizeClass == .regular && !(library.isLoaded && library.notes.isEmpty)
+    }
 
     var body: some View {
         @Bindable var router = router
@@ -50,10 +55,10 @@ struct RootView: View {
             Text(error.message)
         }
         .onAppear {
-            router.isSplit = sizeClass == .regular
+            router.isSplit = usesSplit
             if restoresNavigation { router.restore(savedPath) }
         }
-        .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
+        .onChange(of: usesSplit) { _, split in router.isSplit = split }
         .onChange(of: router.encodedPath) { _, path in if restoresNavigation { savedPath = path } }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { windowSize = $0 }
         .environment(\.restoresSceneState, restoresNavigation)
@@ -65,7 +70,7 @@ struct RootView: View {
 
     @ViewBuilder private var navigation: some View {
         @Bindable var router = router
-        if sizeClass == .regular {
+        if usesSplit {
             if #available(iOS 26.0, *) {
                 NavigationSplitView {
                     LibraryView()
