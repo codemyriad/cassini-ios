@@ -29,7 +29,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
             if pinned {
                 topContent
                     .padding(.horizontal, Spacing.gutter).padding(.top, Spacing.gutter).padding(.bottom, Spacing.tight)
-                    .readableWidth()
+                    .meetingReadableWidth()
                 if isProcessing, draftScrolled {
                     Rectangle().fill(Color.line).frame(height: 1)
                         .accessibilityIdentifier("transcribingScrolledDivider")
@@ -55,7 +55,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                             Color.canvasClear.frame(height: 1).id(Self.end).accessibilityHidden(true)
                         }
                     }
-                    .readableWidth()
+                    .meetingReadableWidth()
                 }
                 .accessibilityIdentifier("draftScroll")
                 .scrollPosition($position)

@@ -82,7 +82,7 @@ struct LibraryView: View {
             }
         }
         .trashUndoSnackbar()
-        .background(Color.paper)
+        .background(router.isSplit && !showsHero ? Color.canvasClear : Color.paper)
         .overlay(alignment: .bottom) {
             if showsBackupNotice {
                 GeometryReader { geometry in

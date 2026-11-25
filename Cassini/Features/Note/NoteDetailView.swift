@@ -191,7 +191,7 @@ struct NoteDetailView: View {
                                 close: { model.screen.closeSearch() },
                                 onFocusChange: { findFieldFocused = $0 })
                     .padding(.horizontal, 14).padding(.vertical, 8)
-                    .readableWidth()
+                    .meetingReadableWidth()
                     .background(Color.paper)
             }
         }

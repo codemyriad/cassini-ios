@@ -27,7 +27,7 @@ struct PlaybackBar: View {
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge).accessibilityShowsLargeContentViewer()
         .padding(.horizontal, 18).padding(.vertical, 14)
         .meetingGlass(cornerRadius: 26)
-        .frame(maxWidth: ReadableWidth.content).frame(maxWidth: .infinity)
+        .meetingReadableWidth()
         .padding(.horizontal, 12).padding(.bottom, 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Playback", tableName: "Playback"))

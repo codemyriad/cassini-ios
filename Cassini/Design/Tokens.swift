@@ -42,6 +42,8 @@ enum Spacing {
 /// at it, centred, and its background still fills the window. On a phone it changes nothing.
 enum ReadableWidth {
     static let content: CGFloat = 560
+    /// Wider reading column in landscape on a 13-inch iPad (690 pt); portrait keeps `content` (560 pt).
+    static let meetingLandscape: CGFloat = 690
 }
 
 extension View {
@@ -50,9 +52,30 @@ extension View {
         frame(maxWidth: ReadableWidth.content).frame(maxWidth: .infinity)
     }
 
+    /// Caps a meeting's reading column and player at 690 pt when the detail column is wide (iPad landscape),
+    /// otherwise 560 pt (iPad portrait and phone).
+    func meetingReadableWidth() -> some View {
+        modifier(MeetingReadableWidth())
+    }
+
     /// Caps a list's or form's rows at `ReadableWidth.content` with side margins, so the list still scrolls (and
     /// shows its indicator) across the window.
     func readableListWidth() -> some View { modifier(ReadableListWidth()) }
+}
+
+private struct MeetingReadableWidth: ViewModifier {
+    @State private var containerWidth: CGFloat = 0
+
+    private var cap: CGFloat {
+        containerWidth >= 730 ? ReadableWidth.meetingLandscape : ReadableWidth.content
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: cap)
+            .frame(maxWidth: .infinity)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { containerWidth = $0 }
+    }
 }
 
 private struct ReadableListWidth: ViewModifier {

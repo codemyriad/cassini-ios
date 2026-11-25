@@ -66,7 +66,7 @@ struct NoteReadingScroll: View {
                     }
                 }
                 .padding(.horizontal, Spacing.gutter).padding(.top, 8).padding(.bottom, Spacing.gutter)
-                .coordinateSpace(name: NoteHeader.readingContentSpace).readableWidth()
+                .coordinateSpace(name: NoteHeader.readingContentSpace).meetingReadableWidth()
             }
             .accessibilityIdentifier("noteReadingScroll")
             .meetingScrollEdge()

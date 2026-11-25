@@ -13,6 +13,7 @@ struct RootView: View {
     @SceneStorage("navigation.path") private var savedPath: Data?
     /// The split view's columns below iOS 26 (see `body`).
     @State private var columns: NavigationSplitViewVisibility = .all
+    @State private var windowSize: CGSize = .zero
     #if DEBUG
     @Environment(\.showsBadgeGallery) private var showsBadgeGallery
     #endif
@@ -54,17 +55,28 @@ struct RootView: View {
         }
         .onChange(of: sizeClass) { _, size in router.isSplit = size == .regular }
         .onChange(of: router.encodedPath) { _, path in if restoresNavigation { savedPath = path } }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { windowSize = $0 }
         .environment(\.restoresSceneState, restoresNavigation)
+    }
+
+    private var sidebarIdealWidth: CGFloat {
+        windowSize.width > windowSize.height ? 440 : 360
     }
 
     @ViewBuilder private var navigation: some View {
         @Bindable var router = router
         if sizeClass == .regular {
             if #available(iOS 26.0, *) {
-                NavigationSplitView { LibraryView() } detail: { detail(path: $router.path) }
+                NavigationSplitView {
+                    LibraryView()
+                        .navigationSplitViewColumnWidth(min: 300, ideal: sidebarIdealWidth, max: 460)
+                } detail: { detail(path: $router.path) }
             } else {
                 // iPadOS 18 needs both columns and the balanced style to keep the Library beside the note.
-                NavigationSplitView(columnVisibility: $columns) { LibraryView() } detail: { detail(path: $router.path) }
+                NavigationSplitView(columnVisibility: $columns) {
+                    LibraryView()
+                        .navigationSplitViewColumnWidth(min: 300, ideal: sidebarIdealWidth, max: 460)
+                } detail: { detail(path: $router.path) }
                     .navigationSplitViewStyle(.balanced)
             }
         } else {
