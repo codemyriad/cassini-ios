@@ -388,9 +388,15 @@ final class AccessibilityAuditTests: XCTestCase {
             screenshot.name = "largest-about-before-audit-\(language)"
             screenshot.lifetime = .keepAlways
             add(screenshot)
-            // Exercise the card below the fold at the actual largest size. Do not apply the
-            // iOS 18 List prediction allowance used by the default-size audits.
-            audit(app, screen: "largest-about-\(language)", .textClipped)
+            // Exercise the card below the fold at the actual largest size. On iPhone no List-row
+            // prediction allowance is needed; on iPad portrait (< iOS 26) four Form rows sit on
+            // screen alongside the About card and iOS 18's List audit emits a second unattributed
+            // prediction even though all text wraps (verified in the attached screenshots).
+            // Bounding to `listRows: UIDevice.current.userInterfaceIdiom == .pad` allows at most
+            // two unattributed predictions on iOS 18 iPad (zero on iOS 26+ and iPhone); any
+            // attributed clipping issue still fails everywhere.
+            audit(app, screen: "largest-about-\(language)", .textClipped,
+                  listRows: UIDevice.current.userInterfaceIdiom == .pad)
             app.terminate()
         }
     }

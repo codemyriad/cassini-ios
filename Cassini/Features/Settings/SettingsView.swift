@@ -380,6 +380,7 @@ private struct SettingsAnswerRow: View {
                     Text(title).foregroundStyle(Color.ink)
                     if !answer.isEmpty { Text(answer).foregroundStyle(Color.muted) }
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             } else {
                 Text(title).foregroundStyle(Color.ink)
