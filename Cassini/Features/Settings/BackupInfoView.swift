@@ -8,8 +8,9 @@ struct BackupSection: View {
     @Environment(ErrorPresenter.self) private var errors
     @Environment(LibraryStore.self) private var library
     @Environment(ExportStore.self) private var exports
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Bindable var archiveExport: ArchiveExportModel
-    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var pad: Bool { sizeClass == .regular }
 
     var body: some View {
         Section {
@@ -176,6 +177,7 @@ struct BackupNoticeCard: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(BackupModel.self) private var backup
     @Environment(ErrorPresenter.self) private var errors
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         ScrollView {
@@ -193,7 +195,7 @@ struct BackupNoticeCard: View {
         .accessibilityIdentifier("backupNotice")
     }
 
-    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var pad: Bool { sizeClass == .regular }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {

@@ -97,8 +97,9 @@ private struct SettingsForm: View {
     @Environment(Router.self) private var router
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var pad: Bool { sizeClass == .regular }
     private var privacy: String {
         (pad ? LibraryWave5Copy.firstRunPrivacyIpad : LibraryWave5Copy.firstRunPrivacyIphone)
             + " " + LibraryWave5Copy.firstRunPrivacyBackups

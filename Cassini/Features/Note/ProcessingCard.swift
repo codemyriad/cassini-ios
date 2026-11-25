@@ -312,9 +312,11 @@ private struct DownloadRow: View {
 
 /// The memory check's hint, naming the kind of device it runs on.
 private struct LowMemoryHint: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
     var body: some View {
         Group {
-            if UIDevice.current.userInterfaceIdiom == .pad {
+            if sizeClass == .regular {
                 Text("This iPad is low on memory. Close other apps if transcription stops.", tableName: "Processing",
                      comment: "The memory hint on the processing card of an iPad")
             } else {
