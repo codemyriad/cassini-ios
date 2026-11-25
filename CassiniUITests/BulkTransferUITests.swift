@@ -67,6 +67,26 @@ final class BulkTransferUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 15))
     }
 
+    @MainActor func testStarredSelectAllDeletesOnlyStarredNotes() {
+        let app = launch()
+        app.buttons["Starred"].tapWhenSettled()
+        app.buttons["selectNotesForExport"].tap()
+        XCTAssertTrue(app.buttons["selectAllNotes"].waitForExistence(within: 15))
+        app.buttons["selectAllNotes"].tap()
+        XCTAssertEqual(app.staticTexts["selectedCountLabel"].label, "1 selected")
+        app.buttons["deleteSelectedNotes"].tap()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 15))
+        app.buttons["All"].tapWhenSettled()
+        let unstarred = app.buttons.matching(
+            NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "Thoughts from the morning walk")
+        ).firstMatch
+        let starred = app.buttons.matching(
+            NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "A quieter kind of productivity")
+        ).firstMatch
+        XCTAssertTrue(unstarred.waitForExistence(within: 15), "Unstarred meeting must survive Starred → Select All → Delete")
+        XCTAssertFalse(starred.exists)
+    }
+
     @MainActor func testOnlyALiveRecordingOffersNoSelectAction() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "recording", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

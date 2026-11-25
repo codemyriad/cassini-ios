@@ -3,13 +3,71 @@ import UIKit
 import CassiniEngine
 import CassiniNotebook
 
+/// Pure selection rules for the Library: derives candidates from the currently visible (filtered) content,
+/// reconciles active selection and cached row frames when filters change, and filters export/delete targets
+/// and two-finger pan hit-testing so hidden notes can never be selected, exported, or deleted.
+enum LibrarySelection {
+    /// Selectable note IDs from the current filtered `LibraryContent` (flat search results or day sections),
+    /// excluding live recordings and trashed notes.
+    static func selectableIDs(from content: LibraryContent, notes: [Note]) -> [UUID] {
+        let eligibleNotes = Set(notes.lazy.filter { $0.trashedAt == nil && !$0.isRecording }.map(\.id))
+        let rows: [LibraryRow]
+        if content.loading && content.emptyState != .unavailable {
+            rows = []
+        } else if let results = content.results {
+            rows = results
+        } else {
+            rows = content.sections.flatMap(\.rows)
+        }
+        return rows.compactMap { row in
+            (!row.isRecording && eligibleNotes.contains(row.id)) ? row.id : nil
+        }
+    }
+
+    /// Reconciles the current selection against the currently visible selectable IDs,
+    /// dropping any note hidden by a filter, trashed, or removed.
+    static func reconcile(_ selected: Set<UUID>, selectable: Set<UUID>) -> Set<UUID> {
+        selected.intersection(selectable)
+    }
+
+    /// Selects all currently visible selectable IDs while dropping any hidden IDs.
+    static func selectAll(_ selected: Set<UUID>, selectableIDs: [UUID]) -> Set<UUID> {
+        reconcile(selected, selectable: Set(selectableIDs)).union(selectableIDs)
+    }
+
+    /// Prunes cached row frames to only the currently visible selectable IDs,
+    /// discarding stale frames left behind when filtering hides rows.
+    static func pruneFrames(_ frames: [UUID: CGRect], selectable: Set<UUID>) -> [UUID: CGRect] {
+        frames.filter { selectable.contains($0.key) }
+    }
+
+    /// Returns the IDs hit by a two-finger swipe point, restricted to currently visible selectable rows.
+    static func hitRowIDs(at point: CGPoint, frames: [UUID: CGRect], selectable: Set<UUID>) -> [UUID] {
+        frames.compactMap { id, rect in
+            (selectable.contains(id) && rect.contains(point)) ? id : nil
+        }
+    }
+
+    /// Exportable IDs for the current selection, restricted to currently visible selectable notes.
+    static func exportableIDs(selected: Set<UUID>, selectableIDs: [UUID], notes: [Note]) -> [UUID] {
+        let allowed = selected.intersection(selectableIDs)
+        return notes.filter { allowed.contains($0.id) && ArchiveSelection.isExportable($0) }.map(\.id)
+    }
+
+    /// Deletable IDs for the current selection, restricted to currently visible selectable notes.
+    static func deletableIDs(selected: Set<UUID>, selectableIDs: [UUID], notes: [Note]) -> [UUID] {
+        let allowed = selected.intersection(selectableIDs)
+        return notes.filter { allowed.contains($0.id) && $0.trashedAt == nil && !$0.isRecording }.map(\.id)
+    }
+}
+
 /// The Select button on the Library filter row: enters selection mode in the normal text colour.
 struct ArchiveExportControls: View {
-    @Environment(LibraryStore.self) private var library
+    let hasSelectable: Bool
     @Binding var editMode: EditMode
 
     var body: some View {
-        if library.notes.contains(where: { $0.trashedAt == nil && !$0.isRecording }) {
+        if hasSelectable {
             Button(LibraryCopy.select) {
                 editMode = .active
             }
@@ -54,17 +112,17 @@ struct LibrarySelectionBar: View {
     let deleteSelected: ([UUID]) -> Void
 
     private var exportableSelected: [UUID] {
-        library.notes.filter { ArchiveSelection.isExportable($0) && selectedNotes.contains($0.id) }.map(\.id)
+        LibrarySelection.exportableIDs(selected: selectedNotes, selectableIDs: selectableIDs, notes: library.notes)
     }
 
     private var deletableSelected: [UUID] {
-        library.notes.filter { $0.trashedAt == nil && !$0.isRecording && selectedNotes.contains($0.id) }.map(\.id)
+        LibrarySelection.deletableIDs(selected: selectedNotes, selectableIDs: selectableIDs, notes: library.notes)
     }
 
     var body: some View {
         HStack(spacing: 12) {
             Button(LibraryCopy.selectAll) {
-                selectedNotes.formUnion(selectableIDs)
+                selectedNotes = LibrarySelection.selectAll(selectedNotes, selectableIDs: selectableIDs)
             }
             .buttonStyle(ArchiveSelectionButtonStyle())
             .font(.subheadline.weight(.medium))
@@ -159,7 +217,7 @@ struct TwoFingerSelectOverlay: UIViewRepresentable {
         }
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
-            guard let view = referenceView else { return }
+            guard let view = referenceView, !parent.selectable.isEmpty else { return }
             switch gesture.state {
             case .began:
                 touched.removeAll()
@@ -174,8 +232,8 @@ struct TwoFingerSelectOverlay: UIViewRepresentable {
             }
         }
 
-        private func hit(at point: CGPoint) {
-            for (id, rect) in parent.frames where parent.selectable.contains(id) && rect.contains(point) {
+        func hit(at point: CGPoint) {
+            for id in LibrarySelection.hitRowIDs(at: point, frames: parent.frames, selectable: parent.selectable) {
                 if touched.insert(id).inserted {
                     parent.onTouchRow(id)
                 }

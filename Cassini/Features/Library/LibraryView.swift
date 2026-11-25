@@ -29,6 +29,7 @@ struct LibraryView: View {
     @State private var editMode: EditMode = .inactive
     @State private var selectedNotes: Set<UUID> = []
     @State private var rowFrames: [UUID: CGRect] = [:]
+    @State private var rowFrameKeys: [UUID: LibraryRow.RenderKey] = [:]
     @State private var archiveExport = ArchiveExportModel()
     @State private var backupNoticeHeight: CGFloat = 0
     @State private var exportTarget: ExportTarget?
@@ -37,8 +38,10 @@ struct LibraryView: View {
     var body: some View {
         @Bindable var model = model
         let content = model.listContent
-        let selectableIDs = library.notes.filter { $0.trashedAt == nil && !$0.isRecording }.map(\.id)
+        let selectableIDs = LibrarySelection.selectableIDs(from: content, notes: library.notes)
         let selectable = Set(selectableIDs)
+        let visibleFrames = LibrarySelection.pruneFrames(rowFrames, selectable: selectable)
+        let activeSelectedCount = LibrarySelection.reconcile(selectedNotes, selectable: selectable).count
         let showsBackupNotice = !model.isSearching && !searchPresented && !editMode.isEditing
             // Undo is time-limited and must remain reachable above the capture bar.
             && trashUndo.pending == nil && trashUndo.snackbar == nil
@@ -49,6 +52,8 @@ struct LibraryView: View {
         GeometryReader { viewport in
             ScrollView {
                 libraryStack(content, showsHero: showsHero,
+                             hasSelectable: !selectable.isEmpty,
+                             selectedCount: activeSelectedCount,
                              minimumHeight: max(0, viewport.size.height - 40))
                 // iOS 18 otherwise retains ordinary row bodies when the same notes become flat search results.
                 .id(content.results != nil)
@@ -61,10 +66,11 @@ struct LibraryView: View {
             .overlay {
                 if !showsHero && !selectable.isEmpty {
                     TwoFingerSelectOverlay(
-                        frames: rowFrames,
+                        frames: visibleFrames,
                         selectable: selectable,
                         onBegin: { if !editMode.isEditing { editMode = .active } },
                         onTouchRow: { id in
+                            guard selectable.contains(id) else { return }
                             if !selectedNotes.insert(id).inserted { selectedNotes.remove(id) }
                         })
                 }
@@ -116,7 +122,9 @@ struct LibraryView: View {
         .environment(\.editMode, $editMode)
         .onChange(of: editMode) { _, mode in if !mode.isEditing { selectedNotes.removeAll() } }
         .onChange(of: selectable) { _, eligible in
-            selectedNotes.formIntersection(eligible)
+            selectedNotes = LibrarySelection.reconcile(selectedNotes, selectable: eligible)
+            rowFrames = LibrarySelection.pruneFrames(rowFrames, selectable: eligible)
+            rowFrameKeys = rowFrameKeys.filter { eligible.contains($0.key) }
             if eligible.isEmpty { editMode = .inactive }
         }
         .shareSheet(item: $archiveExport.shareItem)
@@ -166,11 +174,12 @@ struct LibraryView: View {
     // MARK: - Layout
 
     @ViewBuilder private func libraryStack(_ content: LibraryContent, showsHero: Bool,
+                                           hasSelectable: Bool, selectedCount: Int,
                                            minimumHeight: CGFloat) -> some View {
         if showsHero {
             // Fill the viewport when the copy fits; at large text sizes the stack grows and scrolls.
             VStack(alignment: .leading, spacing: Spacing.row) {
-                libraryHeader(content)
+                libraryHeader(content, hasSelectable: hasSelectable, selectedCount: selectedCount)
                 Spacer(minLength: 0)
                 FirstRunHeroView()
             }
@@ -178,15 +187,16 @@ struct LibraryView: View {
             .frame(minHeight: minimumHeight, alignment: .bottom)
         } else {
             LazyVStack(alignment: .leading, spacing: Spacing.row) {
-                libraryHeader(content)
+                libraryHeader(content, hasSelectable: hasSelectable, selectedCount: selectedCount)
                 libraryRows(content)
             }
         }
     }
 
-    @ViewBuilder private func libraryHeader(_ content: LibraryContent) -> some View {
+    @ViewBuilder private func libraryHeader(_ content: LibraryContent,
+                                            hasSelectable: Bool, selectedCount: Int) -> some View {
         if content.facts.liveNotes > 0 || model.favoritesOnly || searchPresented || model.isSearching {
-            filters
+            filters(hasSelectable: hasSelectable, selectedCount: selectedCount)
         }
         if model.isSearching, let count = content.facts.results {
             Text(LibraryPhase1Copy.template("format.searchCount.meetings", count: count))
@@ -288,7 +298,7 @@ struct LibraryView: View {
         ArchiveExportProgressView(model: archiveExport)
     }
 
-    private var filters: some View {
+    private func filters(hasSelectable: Bool, selectedCount: Int) -> some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 8) {
             if searchPresented || model.isSearching {
@@ -321,7 +331,7 @@ struct LibraryView: View {
                     }
                 }.accessibilityIdentifier("librarySearchFilters")
             } else if editMode.isEditing {
-                LibrarySelectionHeader(selectedCount: selectedNotes.count) {
+                LibrarySelectionHeader(selectedCount: selectedCount) {
                     editMode = .inactive
                 }
             } else {
@@ -331,7 +341,7 @@ struct LibraryView: View {
                         Text(LibraryPhase1Copy.starred).tag(true)
                     }.pickerStyle(.segmented).fixedSize()
                     Spacer(minLength: 8)
-                    ArchiveExportControls(editMode: $editMode)
+                    ArchiveExportControls(hasSelectable: hasSelectable, editMode: $editMode)
                 }
             }
         }
@@ -386,7 +396,14 @@ struct LibraryView: View {
             }
         }
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("libraryList")) } action: { rect in
+            rowFrameKeys[row.id] = row.renderKey
             rowFrames[row.id] = rect
+        }
+        .onDisappear {
+            if rowFrameKeys[row.id] == row.renderKey {
+                rowFrameKeys.removeValue(forKey: row.id)
+                rowFrames.removeValue(forKey: row.id)
+            }
         }
         .contextMenu {
             NoteActionsMenu(noteID: row.id, startSelecting: row.isRecording ? nil : {
