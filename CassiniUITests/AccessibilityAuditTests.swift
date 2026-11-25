@@ -79,9 +79,8 @@ final class AccessibilityAuditTests: XCTestCase {
 
     @MainActor private func trash(_ extra: [String] = []) -> XCUIApplication {
         let app = launch(["--seed", "trash"] + extra)
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].waitForExistence(within: 15))
-        let draft = app.staticTexts["Old interview draft"]
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].tapWhenInteractive(in: app, until: { draft.exists }),
+        app.openRecentlyDeleted()
+        XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 15),
                       "Recently Deleted did not open")
         return app
     }

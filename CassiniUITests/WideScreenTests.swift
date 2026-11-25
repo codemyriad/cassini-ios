@@ -12,6 +12,7 @@ import XCTest
 // ports: DialogLandscapeTest#theScrimCoversAWideWindow (the Rename form stays within its 560 pt band in landscape)
 final class WideScreenTests: XCTestCase {
     private static let cap: CGFloat = 560
+    private static let meetingLandscapeCap: CGFloat = 690
 
     @MainActor private func launch(_ arguments: [String]) throws -> XCUIApplication {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "a wide window")
@@ -36,10 +37,10 @@ final class WideScreenTests: XCTestCase {
 
     /// Every element lies in the band of `cap` centred in `column`, and the widest of them is wider than a phone's
     /// content would leave, so the band is really used.
-    @MainActor private func assertCentred(_ elements: [XCUIElement], in column: CGRect,
+    @MainActor private func assertCentred(_ elements: [XCUIElement], in column: CGRect, cap: CGFloat = WideScreenTests.cap,
                                           file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssertGreaterThan(column.width, Self.cap + 40, "the column is wider than the cap", file: file, line: line)
-        let band = CGRect(x: column.midX - Self.cap / 2, y: column.minY, width: Self.cap, height: .greatestFiniteMagnitude)
+        XCTAssertGreaterThan(column.width, cap + 40, "the column is wider than the cap", file: file, line: line)
+        let band = CGRect(x: column.midX - cap / 2, y: column.minY, width: cap, height: .greatestFiniteMagnitude)
         for element in elements {
             XCTAssertTrue(element.waitForExistence(within: 5), "\(element)", file: file, line: line)
             let frame = element.frame
@@ -52,15 +53,16 @@ final class WideScreenTests: XCTestCase {
         let app = try launch(["--seed", "library", "--open-fixture", "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"])
         XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 10))
         let turns = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "turn-"))
-        assertCentred([app.staticTexts["noteTitle"], turns.element(boundBy: 0), app.buttons["playButton"]], in: detailColumn(app))
+        assertCentred([app.staticTexts["noteTitle"], turns.element(boundBy: 0), app.buttons["playButton"]],
+                      in: detailColumn(app), cap: Self.meetingLandscapeCap)
     }
 
     @MainActor func testIPadSettingsAndRecentlyDeletedAreCappedAndCentred() throws {
         let app = try launch(["--seed", "trash"])
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         assertCentred([app.staticTexts["Old interview draft"], app.buttons["Restore"].firstMatch], in: detailColumn(app))
-        app.buttons["Settings"].tap()
+        app.buttons["settingsButton"].tap()
         let firstTopic = app.buttons["transcriptionRow"]
         assertCentred([firstTopic], in: detailColumn(app))
     }

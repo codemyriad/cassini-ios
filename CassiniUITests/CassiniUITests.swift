@@ -104,12 +104,12 @@ final class CassiniUITests: XCTestCase {
         let app = launch()
         openFixture(app)
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["“A quieter kind of productivity” moved to Recently Deleted"].waitForExistence(within: 5),
                       "every move lands on the Library with its snackbar")
         XCTAssertFalse(row(app, "A quieter kind of productivity").exists)
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.buttons["Restore"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Deleted today · 30 days left"].exists)
         app.buttons["Restore"].tap()
@@ -123,7 +123,7 @@ final class CassiniUITests: XCTestCase {
         let note = row(app, "Thoughts from the morning walk")
         XCTAssertTrue(note.waitForExistence(within: 5))
         note.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         let snackbar = app.staticTexts["“Thoughts from the morning walk” moved to Recently Deleted"]
         XCTAssertTrue(snackbar.waitForExistence(within: 5))
         XCTAssertFalse(row(app, "Thoughts from the morning walk").exists)
@@ -143,13 +143,13 @@ final class CassiniUITests: XCTestCase {
         // drops a tap that lands then. Its last result is 29:53 processed; after it the job is frozen.
         XCTAssertTrue(app.staticTexts["uiTestState-transcribingAudioDone"].waitForValue("29:53 of 48:13"))
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         let alert = app.alerts["Stop transcription and move to Recently Deleted?"]
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["noteTitle"].exists, "Cancel keeps the note where it is")
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(alert.waitForExistence(within: 5))
         alert.buttons["Move to Recently Deleted"].tap()
         XCTAssertTrue(app.staticTexts["“Weekly planning call” moved to Recently Deleted"].waitForExistence(within: 10))
@@ -234,8 +234,8 @@ final class CassiniUITests: XCTestCase {
     }
     @MainActor func testEmptyTrashRequiresConfirmationAndRemovesRecording() {
         let app = launch(); openFixture(app)
-        app.buttons["Share and more"].tap(); app.buttons["Move to Recently Deleted"].tap()
-        XCTAssertTrue(app.buttons["Recently Deleted"].waitForExistence(within: 5)); app.buttons["Recently Deleted"].tap()
+        app.buttons["Share and more"].tap(); app.buttons["Delete"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.buttons["Empty"].waitForExistence(within: 5)); app.buttons["Empty"].tap()
         let alert = app.alerts["Delete 1 meeting for good?"]
         XCTAssertTrue(alert.waitForExistence(within: 5))
@@ -247,7 +247,7 @@ final class CassiniUITests: XCTestCase {
     }
     @MainActor func testDeleteNowAsksAboutTheNoteAndRemovesOnlyIt() {
         let app = launch(seed: false, arguments: ["--seed", "trash"])
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         app.buttons.matching(identifier: "Delete now").firstMatch.tap()
         let alert = app.alerts["Delete “Old interview draft” for good?"]
@@ -260,7 +260,7 @@ final class CassiniUITests: XCTestCase {
 
     @MainActor func testSeededTrashShowsDaysLeftFromTheFixedClock() {
         let app = launch(seed: false, arguments: ["--seed", "trash"])
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         XCTAssertTrue(app.staticTexts["Deleted 1 Oct · 23 days left"].exists)
         XCTAssertTrue(app.staticTexts["Deleted yesterday · 29 days left"].exists)
@@ -282,7 +282,7 @@ final class CassiniUITests: XCTestCase {
         let title = app.textFields["recordingTitle"]
         XCTAssertEqual(title.value as? String, "Voice note 8 Oct, 09:41", "the field starts with the default title")
         XCTAssertTrue(app.images["Microphone level, last 7 seconds"].exists || app.otherElements["Microphone level, last 7 seconds"].exists)
-        XCTAssertTrue(app.staticTexts["PCM 48 kHz"].exists)
+        XCTAssertFalse(app.staticTexts["PCM 48 kHz"].exists)
         capture("Recording")
         pause.tap()
         XCTAssertTrue(app.buttons["Resume recording"].waitForExistence(within: 3))

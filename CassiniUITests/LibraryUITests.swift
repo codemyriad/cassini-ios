@@ -78,7 +78,7 @@ final class LibraryUITests: XCTestCase {
             let count = app.buttons.matching(identifier: "noteRow").count
             let note = app.buttons.matching(identifier: "noteRow").firstMatch
             note.press(forDuration: 1)
-            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            app.buttons["Delete"].tapWhenSettled()
             XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
             XCTAssertTrue(poll(within: uiWaitFloor) { app.buttons.matching(identifier: "noteRow").count < count })
         }
@@ -154,14 +154,14 @@ final class LibraryUITests: XCTestCase {
         let second = row(app, "Second capture")
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         second.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
         app.buttons["Undo"].tap()
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         second.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.buttons["Restore"].firstMatch.waitForExistence(within: uiWaitFloor))
         // The fixed test clock gives all trash entries the same deletion date; locate this card by title.
         let deletedTitle = app.staticTexts["Second capture"]
@@ -898,7 +898,7 @@ final class LibraryUITests: XCTestCase {
         close.tap()
         let settings = app.buttons["settingsButton"]
         XCTAssertTrue(settings.waitForExistence(within: 5))
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        XCTAssertFalse(app.buttons["recentlyDeletedButton"].exists)
         settings.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "Settings replaces only the detail column")
@@ -941,7 +941,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5))
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5))
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        XCTAssertFalse(app.buttons["recentlyDeletedButton"].exists)
         XCTAssertFalse(close.exists)
         XCTAssertTrue(poll(within: uiWaitFloor) { (search.value as? String).map { $0.isEmpty || $0 == emptyQueryValue } ?? false },
                       "Close clears the query")
@@ -1026,7 +1026,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
         garden.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
         // Undo is available before the asynchronous search results have rendered the removal.
         XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))

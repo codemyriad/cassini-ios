@@ -299,4 +299,18 @@ extension XCUIApplication {
         staticTexts.matching(NSPredicate(format: "identifier == %@ AND value == %@",
             "uiTestState-settingsLoaded", page)).firstMatch.waitForValue(page, within: 15)
     }
+
+    /// Opens Recently Deleted from Settings (where it now lives instead of the Library top bar).
+    @MainActor func openRecentlyDeleted(file: StaticString = #filePath, line: UInt = #line) {
+        let settings = buttons["settingsButton"]
+        let firstTopic = buttons["transcriptionRow"]
+        XCTAssertTrue(settings.waitForExistence(within: 15), "Settings button not found", file: file, line: line)
+        XCTAssertTrue(settings.tapWhenInteractive(in: self, until: { firstTopic.exists }),
+                      "Settings did not open", file: file, line: line)
+        XCTAssertTrue(waitForSettingsPage("map"), "Settings has not finished loading", file: file, line: line)
+        let row = buttons["recentlyDeletedRow"]
+        XCTAssertTrue(scroll(attempts: 8) { row.exists && row.isHittable },
+                      "Recently Deleted row not found in Settings", file: file, line: line)
+        row.tap()
+    }
 }
