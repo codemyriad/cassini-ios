@@ -15,6 +15,7 @@ import CassiniNotebook
 struct NoteDetailView: View {
     let noteID: UUID
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(ProcessingStore.self) private var processing
     @Environment(Router.self) private var router
     @Environment(VoicesStore.self) private var voices
@@ -106,7 +107,7 @@ struct NoteDetailView: View {
         )) {
             TranscribingDetailsSheet(noteID: noteID, stop: model.stopJob, cancelDownload: model.cancelJobDownload)
         }
-        .noteSheetsAndDialogs(model: model)
+        .noteSheetsAndDialogs(model: model, cache: cache)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog, ready: $overlayReady)
         .shareSheet(item: $model.shareItem)
@@ -197,12 +198,30 @@ struct NoteDetailView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
+                if let toast = model.speakerToast, let kind = toast.summary.toastKind {
+                    let message = SpeakersCopy.toastMessage(kind)
+                    Snackbar(message: message, actionTitle: SpeakersCopy.undo) {
+                        model.undoSpeakerToast()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    .readableWidth()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .task(id: toast.id) {
+                        AccessibilityNotification.Announcement(message).post()
+                        let duration = TrashPolicy.undoDuration(voiceOverRunning: voiceOver)
+                        guard (try? await Task.sleep(for: duration, clock: .continuous)) != nil else { return }
+                        model.dismissSpeakerToast(toast.id)
+                    }
+                    .accessibilityIdentifier("speakerUndoSnackbar")
+                }
                 FollowChipHost(noteID: noteID, follow: model.screen.follow) { model.resumeFollowing() }
                 if mode.hasPlayer, note.audio.isPlayable, !(model.screen.search != nil && findFieldFocused) {
                     NotePlayerBar(note: note, markMoment: { model.markMoment(at: $0) })
                 }
             }
             .animation(reduceMotion ? nil : .default, value: model.screen.follow)
+            .animation(reduceMotion ? nil : .snappy, value: model.speakerToast?.id)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {

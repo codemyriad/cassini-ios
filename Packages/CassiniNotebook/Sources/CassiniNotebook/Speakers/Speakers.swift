@@ -120,6 +120,9 @@ extension Note {
         return (count + 1, count + 2)
     }
 
+    /// The id of the selected version when it holds the transcript and speakers shown.
+    public var shownVersionID: UUID? { shownVersionIndex.flatMap { versions?[$0].id } }
+
     /// The index of the selected version when it holds the transcript and speakers shown.
     var shownVersionIndex: Int? {
         guard let id = selectedVersionID, let index = versions?.firstIndex(where: { $0.id == id }),
@@ -155,6 +158,195 @@ extension Note {
         guard !trimmed.isEmpty else { return }
         changeShownSpeakers { note in
             note.speakers?[index].name = trimmed; note.speakers?[index].provenance = .user; note.refreshSpeakerLabels()
+        }
+    }
+
+    /// Marks or unmarks a speaker as a background voice, keeping its name and provenance intact (D112 / L-86).
+    public mutating func setSpeakerBackground(_ id: String, _ background: Bool) {
+        backfillSpeakerColours()
+        guard let index = speakers?.firstIndex(where: { $0.byteID == Data(id.utf8) }) else { return }
+        changeShownSpeakers { note in
+            note.speakers?[index].background = background
+        }
+    }
+
+    /// One speaker's before/after state for a version-bound Name a speaker batch Undo (D112 / L-86).
+    public struct SpeakerUndoEntry: Equatable, Hashable, Sendable {
+        public let speakerID: String
+        public let before: NoteSpeaker
+        public let after: NoteSpeaker
+        public init(speakerID: String, before: NoteSpeaker, after: NoteSpeaker) {
+            self.speakerID = speakerID; self.before = before; self.after = after
+        }
+    }
+
+    /// Restores the shown speakers (and refreshes passage labels) from an Undo snapshot without adding a version.
+    public mutating func restoreShownSpeakers(_ previous: [NoteSpeaker]?) {
+        changeShownSpeakers { note in
+            note.speakers = previous
+            note.refreshSpeakerLabels()
+        }
+    }
+
+    /// Whether `entries` can be safely undone on the target version (`versionID`, or the unversioned shown transcript
+    /// when `versionID` is nil) without overwriting another version or newer edits to those speakers.
+    public func canRestoreSpeakers(_ entries: [SpeakerUndoEntry], versionID: UUID?,
+                                   expectedAfterSpeakers: [NoteSpeaker]? = nil) -> Bool {
+        guard !entries.isEmpty else { return false }
+        func matches(_ list: [NoteSpeaker]) -> Bool {
+            entries.allSatisfy { entry in
+                list.first(where: { $0.byteID == Data(entry.speakerID.utf8) }) == entry.after
+            }
+        }
+        if let targetVersionID = versionID {
+            if shownVersionID == targetVersionID {
+                return speakers.map(matches) ?? false
+            }
+            if let version = versions?.first(where: { $0.id == targetVersionID }) {
+                return matches(version.speakers)
+            }
+            return false
+        }
+        if shownVersionID == nil {
+            return speakers.map(matches) ?? false
+        }
+        if let expected = expectedAfterSpeakers,
+           let version = versions?.last(where: { $0.id != selectedVersionID && $0.speakers == expected }) {
+            return matches(version.speakers)
+        }
+        return false
+    }
+
+    /// Restores only the speakers in `entries` on their original transcript version (`versionID`), leaving any other
+    /// currently displayed version untouched. Returns true if the target version matched the expected revision.
+    @discardableResult
+    public mutating func restoreSpeakers(_ entries: [SpeakerUndoEntry], versionID: UUID?,
+                                         expectedAfterSpeakers: [NoteSpeaker]? = nil) -> Bool {
+        guard !entries.isEmpty else { return false }
+        func matches(_ list: [NoteSpeaker]) -> Bool {
+            entries.allSatisfy { entry in
+                list.first(where: { $0.byteID == Data(entry.speakerID.utf8) }) == entry.after
+            }
+        }
+        func patch(_ list: inout [NoteSpeaker], segments: inout [TranscriptSegment]) {
+            for entry in entries {
+                if let index = list.firstIndex(where: { $0.byteID == Data(entry.speakerID.utf8) }) {
+                    list[index] = entry.before
+                }
+            }
+            for index in segments.indices {
+                if let id = segments[index].speakerID {
+                    segments[index].speaker = list.first { $0.byteID == Data(id.utf8) }?.name
+                }
+            }
+        }
+        if let targetVersionID = versionID {
+            if shownVersionID == targetVersionID, let shown = shownVersionIndex {
+                guard var list = speakers, matches(list) else { return false }
+                patch(&list, segments: &transcript)
+                speakers = list
+                versions?[shown].segments = transcript
+                versions?[shown].speakers = list
+                return true
+            }
+            if var history = versions, let index = history.firstIndex(where: { $0.id == targetVersionID }) {
+                var version = history[index]
+                guard matches(version.speakers) else { return false }
+                patch(&version.speakers, segments: &version.segments)
+                history[index] = version
+                versions = history
+                return true
+            }
+            return false
+        }
+        if shownVersionID == nil {
+            guard var list = speakers, matches(list) else { return false }
+            patch(&list, segments: &transcript)
+            speakers = list
+            return true
+        }
+        if let expected = expectedAfterSpeakers, var history = versions,
+           let index = history.lastIndex(where: { $0.id != selectedVersionID && $0.speakers == expected }) {
+            var version = history[index]
+            guard matches(version.speakers) else { return false }
+            patch(&version.speakers, segments: &version.segments)
+            history[index] = version
+            versions = history
+            return true
+        }
+        return false
+    }
+
+    /// Rolls back partially committed speakers on `versionID` after a mid-batch failure.
+    public mutating func rollbackSpeakers(_ previous: [NoteSpeaker], versionID: UUID?) {
+        guard !previous.isEmpty else { return }
+        func patch(_ list: inout [NoteSpeaker], segments: inout [TranscriptSegment]) {
+            for speaker in previous {
+                if let index = list.firstIndex(where: { $0.byteID == speaker.byteID }) {
+                    list[index] = speaker
+                }
+            }
+            for index in segments.indices {
+                if let id = segments[index].speakerID {
+                    segments[index].speaker = list.first { $0.byteID == Data(id.utf8) }?.name
+                }
+            }
+        }
+        if let targetVersionID = versionID {
+            if shownVersionID == targetVersionID, let shown = shownVersionIndex {
+                guard var list = speakers else { return }
+                patch(&list, segments: &transcript)
+                speakers = list
+                versions?[shown].segments = transcript
+                versions?[shown].speakers = list
+            } else if var history = versions, let index = history.firstIndex(where: { $0.id == targetVersionID }) {
+                var version = history[index]
+                patch(&version.speakers, segments: &version.segments)
+                history[index] = version
+                versions = history
+            }
+        } else if shownVersionID == nil, var list = speakers {
+            patch(&list, segments: &transcript)
+            speakers = list
+        }
+    }
+
+    /// Restores a voice link that `unlinkVoice` scrubbed when a voice's last sample was temporarily removed.
+    /// Bound to the originating `versionID` (or the unversioned shown transcript matching `expectedUnversionedSpeakers`
+    /// when `versionID` is nil), so switching versions never corrupts another version's speakers.
+    /// Only restores links that are currently `.unmatched`, never overwriting a newer match or rejection.
+    public mutating func restoreVoiceLink(speakerID: String, versionID: UUID?, match: VoiceMatchState,
+                                          expectedUnversionedSpeakers: [NoteSpeaker]? = nil) {
+        let key = Data(speakerID.utf8)
+        if let versionID {
+            let isShown = shownVersionID == versionID
+            if var history = versions, let vIndex = history.firstIndex(where: { $0.id == versionID }),
+               let sIndex = history[vIndex].speakers.firstIndex(where: { $0.byteID == key }),
+               history[vIndex].speakers[sIndex].match == .unmatched {
+                history[vIndex].speakers[sIndex].match = match
+                versions = history
+                if isShown,
+                   var shownList = speakers,
+                   let shownIndex = shownList.firstIndex(where: { $0.byteID == key }),
+                   shownList[shownIndex].match == .unmatched {
+                    shownList[shownIndex].match = match
+                    speakers = shownList
+                }
+            }
+        } else if shownVersionID == nil {
+            if var list = speakers,
+               let index = list.firstIndex(where: { $0.byteID == key }),
+               list[index].match == .unmatched {
+                list[index].match = match
+                speakers = list
+            }
+        } else if let expected = expectedUnversionedSpeakers,
+                  var history = versions,
+                  let vIndex = history.lastIndex(where: { $0.id != selectedVersionID && $0.speakers == expected }),
+                  let sIndex = history[vIndex].speakers.firstIndex(where: { $0.byteID == key }),
+                  history[vIndex].speakers[sIndex].match == .unmatched {
+            history[vIndex].speakers[sIndex].match = match
+            versions = history
         }
     }
 

@@ -17,17 +17,18 @@ public struct TranscriptSpeaker: Identifiable, Hashable, Sendable {
     public let name: SpeakerName
     public let tint: SpeakerTint
     public let auto: Bool
+    public let background: Bool
 
-    public init(id: String, name: SpeakerName, tint: SpeakerTint, auto: Bool) {
-        self.id = id; self.name = name; self.tint = tint; self.auto = auto
+    public init(id: String, name: SpeakerName, tint: SpeakerTint, auto: Bool, background: Bool = false) {
+        self.id = id; self.name = name; self.tint = tint; self.auto = auto; self.background = background
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.byteID == rhs.byteID && lhs.name == rhs.name && lhs.tint == rhs.tint && lhs.auto == rhs.auto
+        lhs.byteID == rhs.byteID && lhs.name == rhs.name && lhs.tint == rhs.tint && lhs.auto == rhs.auto && lhs.background == rhs.background
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(byteID); hasher.combine(name); hasher.combine(tint); hasher.combine(auto)
+        hasher.combine(byteID); hasher.combine(name); hasher.combine(tint); hasher.combine(auto); hasher.combine(background)
     }
 
 }
@@ -57,12 +58,14 @@ public struct TurnInterjection: Hashable, Sendable {
     public let nameRange: Range<Int>
     public let crosstalk: Bool
     public let auto: Bool
+    public let isBackground: Bool
 
     public init(speakerID: String?, name: SpeakerName, tint: SpeakerTint, wordRange: Range<Int>,
-                textRange: Range<Int>, nameRange: Range<Int>, crosstalk: Bool, auto: Bool = false) {
+                textRange: Range<Int>, nameRange: Range<Int>, crosstalk: Bool, auto: Bool = false,
+                isBackground: Bool = false) {
         self.speakerID = speakerID; self.name = name; self.tint = tint
         self.wordRange = wordRange; self.textRange = textRange; self.nameRange = nameRange
-        self.crosstalk = crosstalk; self.auto = auto
+        self.crosstalk = crosstalk; self.auto = auto; self.isBackground = isBackground
     }
 }
 
@@ -79,6 +82,8 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     public let start: TimeInterval
     /// The speaker carries a saved voice's name that Cassini gave it ("auto" badge).
     public let auto: Bool
+    /// The speaker is marked as a background voice (D112 / L-86).
+    public let isBackground: Bool
     public let words: [TurnWord]
     public let text: String
     public let offsets: [Int]
@@ -105,6 +110,38 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     /// voice (`NoteTranscripts.draftOneVoice`), which the job names only once it saves the words under the run's id
     /// (D59), so its header is only a label.
     public var nameableSpeakerID: String? { speakerID == NoteTranscripts.draftOneVoice ? nil : speakerID }
+
+    /// Whether word `index` belongs to a background voice (its inline interjection's speaker, or the turn's host).
+    public func isWordBackground(_ index: Int) -> Bool {
+        if let chip = interjections.first(where: { $0.wordRange.contains(index) }) {
+            return chip.isBackground
+        }
+        return isBackground
+    }
+
+    /// True when every word in this turn belongs to a background voice (a background host with no foreground
+    /// interjections). Mixed turns with a foreground interjection stay visible and searchable.
+    public var isFullyBackground: Bool {
+        isBackground && !interjections.contains { !$0.isBackground }
+    }
+
+    /// Text copied by the paragraph's Copy action: foreground speech only, preserving punctuation spacing.
+    /// Returns `text` unchanged when no words belong to a background voice, and `""` when every word is background.
+    public var copyableText: String {
+        guard isBackground || interjections.contains(where: \.isBackground) else { return text }
+        guard !isFullyBackground else { return "" }
+        var result = ""
+        result.reserveCapacity(text.utf8.count)
+        var previousEnd = 0
+        for (index, word) in words.enumerated() {
+            if isWordBackground(index) { continue }
+            let offset = offsets[index]
+            if !result.isEmpty && offset > previousEnd { result.append(" ") }
+            result.append(word.text)
+            previousEnd = max(previousEnd, offset + word.text.count)
+        }
+        return result
+    }
 
     /// The character range of word `index` in `text`.
     public func range(ofWord index: Int) -> Range<Int> {
@@ -145,7 +182,9 @@ public struct NoteTranscript: Hashable, Sendable {
     public let turns: [NoteTurn]
     /// IDs in first canonical word order, cached while constructing the playback index.
     public let speakers: [String]
-    /// Header metadata includes speakers who only appear in inline interjections.
+    /// Every speaker in canonical word order, including background voices (for the Name a speaker row).
+    public let allHeaderSpeakers: [TranscriptSpeaker]
+    /// Header metadata includes speakers who only appear in inline interjections, excluding background voices.
     public let headerSpeakers: [TranscriptSpeaker]
     public let speakerTints: [String: SpeakerTint]
     private let speakerTintsByID: [Data: SpeakerTint]
@@ -166,18 +205,18 @@ public struct NoteTranscript: Hashable, Sendable {
         var exactTints: [Data: SpeakerTint] = [:]
         var firstWords: [Data: (id: String, source: Int, encounter: Int)] = [:]
         var metadata: [Data: TranscriptSpeaker] = [:]
-        func remember(_ id: String?, name: SpeakerName, tint: SpeakerTint, auto: Bool) {
+        func remember(_ id: String?, name: SpeakerName, tint: SpeakerTint, auto: Bool, background: Bool) {
             guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   name != .unknown else { return }
             let key = Data(id.utf8)
             guard metadata[key] == nil else { return }
-            metadata[key] = TranscriptSpeaker(id: id, name: name, tint: tint, auto: auto)
+            metadata[key] = TranscriptSpeaker(id: id, name: name, tint: tint, auto: auto, background: background)
         }
         for (position, turn) in turns.enumerated() {
             positions[turn.id] = position
-            remember(turn.speakerID, name: turn.name, tint: turn.tint, auto: turn.auto)
+            remember(turn.speakerID, name: turn.name, tint: turn.tint, auto: turn.auto, background: turn.isBackground)
             for chip in turn.interjections {
-                remember(chip.speakerID, name: chip.name, tint: chip.tint, auto: chip.auto)
+                remember(chip.speakerID, name: chip.name, tint: chip.tint, auto: chip.auto, background: chip.isBackground)
             }
             if let id = turn.speakerID { speakerTints[id] = turn.tint; exactTints[Data(id.utf8)] = turn.tint }
             for chip in turn.interjections { if let id = chip.speakerID { speakerTints[id] = chip.tint; exactTints[Data(id.utf8)] = chip.tint } }
@@ -196,7 +235,9 @@ public struct NoteTranscript: Hashable, Sendable {
             return lhs.source == rhs.source ? lhs.encounter < rhs.encounter : lhs.source < rhs.source
         }
         self.speakers = speakerOrder.map { firstWords[$0]!.id }
-        self.headerSpeakers = speakerOrder.compactMap { metadata[$0] }
+        let allHeaderSpeakers = speakerOrder.compactMap { metadata[$0] }
+        self.allHeaderSpeakers = allHeaderSpeakers
+        self.headerSpeakers = allHeaderSpeakers.filter { !$0.background }
         self.speakerTints = speakerTints
         self.speakerTintsByID = exactTints
         // Reading order keeps each turn together; playback order remains chronological.
@@ -315,14 +356,16 @@ public enum NoteTranscripts {
         var suggested = Set<Data>()
         return build(words, endsBoundedByAudio: !note.transcript.isEmpty && note.transcript.allSatisfy { $0.wordEndsBoundedByAudio == true }) { speaker, first in
             guard let speaker else { return Template(name: .unknown, tint: .stone) }
-            let name = names[Data(speaker.utf8)] ?? unlabeled(1)
+            let key = Data(speaker.utf8)
+            let name = names[key] ?? unlabeled(1)
+            let isBackground = speakers[key]?.background == true
             var auto = false
-            if case .auto(let voice, _) = speakers[Data(speaker.utf8)]?.match, case .named(let label) = name,
+            if case .auto(let voice, _) = speakers[key]?.match, case .named(let label) = name,
                let voiceName = voiceNames[voice] {
                 auto = NameMatch.same(label, voiceName)
             }
-            let suggestion = first && !name.isNamed && suggested.insert(Data(speaker.utf8)).inserted ? cards[Data(speaker.utf8)] : nil
-            return Template(name: name, tint: tints[Data(speaker.utf8)] ?? .stone, auto: auto, suggestion: suggestion)
+            let suggestion = !isBackground && first && !name.isNamed && suggested.insert(key).inserted ? cards[key] : nil
+            return Template(name: name, tint: tints[key] ?? .stone, auto: auto, isBackground: isBackground, suggestion: suggestion)
         }
     }
 
@@ -423,6 +466,7 @@ public enum NoteTranscripts {
         var name: SpeakerName
         var tint: SpeakerTint
         var auto = false
+        var isBackground = false
         var suggestion: SpeakerSuggestion?
     }
 
@@ -458,9 +502,12 @@ public enum NoteTranscripts {
                 return template(speaker, seen.insert(speaker.map { Data($0.utf8) }).inserted).suggestion
             }
             return NoteTurn(id: "w\(indices.min()!)", speakerID: speaker, name: made.name, tint: made.tint,
-                            start: row.startMs / 1000, auto: made.auto, source: words, row: row,
+                            start: row.startMs / 1000, auto: made.auto, isBackground: made.isBackground,
+                            source: words, row: row,
                             over: over, suggestion: made.suggestion, inlineSuggestions: inlineSuggestions, passages: passages,
-                            automatic: { template(sourceSpeaker($0), false).auto }, template: {
+                            automatic: { template(sourceSpeaker($0), false).auto },
+                            background: { template(sourceSpeaker($0), false).isBackground },
+                            template: {
                 let value = template(sourceSpeaker($0), false)
                 return (value.name, value.tint)
             })
@@ -483,9 +530,12 @@ extension SpeakerName {
 
 extension NoteTurn {
     init(id: String, speakerID: String?, name: SpeakerName, tint: SpeakerTint, start: TimeInterval, auto: Bool,
+         isBackground: Bool = false,
          source: [TranscriptWord], row: TurnModel.Row, over: [SpeakerName], suggestion: SpeakerSuggestion?,
          inlineSuggestions: [SpeakerSuggestion], passages: [PassageRef],
-         automatic: (String?) -> Bool = { _ in false }, template: (String?) -> (SpeakerName, SpeakerTint)) {
+         automatic: (String?) -> Bool = { _ in false },
+         background: (String?) -> Bool = { _ in false },
+         template: (String?) -> (SpeakerName, SpeakerTint)) {
         var text = "", offsets: [Int] = [], words: [TurnWord] = [], chips: [TurnInterjection] = []
         for member in row.members {
             guard !member.wordIndices.isEmpty else { continue }
@@ -514,11 +564,12 @@ extension NoteTurn {
                 text += ")"
                 chips.append(TurnInterjection(speakerID: member.speaker, name: chipName, tint: chipTint,
                                               wordRange: wordFrom..<words.count, textRange: from..<text.count,
-                                              nameRange: nameRange, crosstalk: member.crosstalk, auto: automatic(member.speaker)))
+                                              nameRange: nameRange, crosstalk: member.crosstalk, auto: automatic(member.speaker),
+                                              isBackground: background(member.speaker)))
             }
         }
         self.id = id; self.speakerID = speakerID; self.name = name; self.tint = tint; self.start = start
-        self.auto = auto; self.words = words; self.text = text; self.offsets = offsets
+        self.auto = auto; self.isBackground = isBackground; self.words = words; self.text = text; self.offsets = offsets
         self.unsettledFrom = nil; self.unsettledWordIndices = []
         self.continuation = row.continuation; self.over = over; self.crosstalk = row.crosstalk
         self.interjections = chips; self.suggestion = suggestion; self.inlineSuggestions = inlineSuggestions; self.passages = passages

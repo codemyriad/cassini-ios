@@ -132,7 +132,12 @@ extension Note {
     /// in the note. Building a prefix before grouping could mistake a partial run for a short interjection.
     public var transcriptPreview: Preview? {
         let positionMs = Int64((playbackPosition * 1000).rounded())
-        let words = transcript.flatMap(PreviewWord.of)
+        let backgroundIDs = Set((speakers ?? []).filter(\.background).map(\.byteID))
+        let visibleSegments = backgroundIDs.isEmpty ? transcript : transcript.filter { segment in
+            guard let id = segment.speakerID else { return true }
+            return !backgroundIDs.contains(Data(id.utf8))
+        }
+        let words = visibleSegments.flatMap(PreviewWord.of)
         let stored = Dictionary((speakers ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
         let passageLabels = Dictionary(transcript.compactMap { segment in
             segment.speakerID.flatMap { id in segment.speaker.map { (id, $0) } }

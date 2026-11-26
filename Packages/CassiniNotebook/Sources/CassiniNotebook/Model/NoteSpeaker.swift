@@ -47,11 +47,14 @@ public struct NoteSpeaker: Identifiable, Hashable, Sendable {
     }
     public var match: VoiceMatchState = .unmatched
     public var excludedVoiceIDs: [UUID] = []
+    /// D112 (L-86): speaker marked as a background voice. Encoded only when `true` (never `false`).
+    public var background: Bool = false
     public init(id: String, name: String, match: VoiceMatchState = .unmatched,
-                colourIndex: Int? = nil, provenance: Provenance? = nil) {
+                colourIndex: Int? = nil, provenance: Provenance? = nil, background: Bool = false) {
         self.id = id; self.name = name; self.match = match
         self.colourIndex = colourIndex
         self.provenance = provenance ?? (DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user)
+        self.background = background
     }
 
     /// The saved voice whose name this speaker carries: an automatic or a confirmed match.
@@ -73,7 +76,7 @@ public struct NoteSpeaker: Identifiable, Hashable, Sendable {
 
 extension NoteSpeaker: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, match, excludedVoiceIDs, colourIndex, provenance
+        case id, name, match, excludedVoiceIDs, colourIndex, provenance, background
         // Schema 1 kept the link and the suggestion as two optional ids.
         case voiceID, suggestedVoiceID
     }
@@ -90,6 +93,7 @@ extension NoteSpeaker: Codable {
         provenance = try container.decodeIfPresent(Provenance.self, forKey: .provenance)
             ?? (DefaultLabels.isDefault(id: id, label: name) ? .unnamed : .user)
         excludedVoiceIDs = try container.decodeIfPresent([UUID].self, forKey: .excludedVoiceIDs) ?? []
+        background = (try container.decodeIfPresent(Bool.self, forKey: .background)) == true
         if let match = try container.decodeIfPresent(VoiceMatchState.self, forKey: .match) {
             self.match = match
         } else {
@@ -107,6 +111,7 @@ extension NoteSpeaker: Codable {
         try container.encode(provenance, forKey: .provenance)
         try container.encode(match, forKey: .match)
         try container.encode(excludedVoiceIDs, forKey: .excludedVoiceIDs)
+        if background { try container.encode(true, forKey: .background) }
     }
 
     /// Schema 1 set both ids for an automatic name, only the link after the user saved one, and only the suggestion otherwise.

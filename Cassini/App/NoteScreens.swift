@@ -80,6 +80,12 @@ extension AppGraph {
         ports.savedVoices = { voices.savedVoices }
         ports.voicesReadOnly = { voices.isReadOnly }
         ports.rememberDefault = { settings.rememberPeopleIName }
+        ports.performNamingBatch = { writes, noteID throws(VoicesStore.SaveFailure) in
+            try await voices.performBatch(writes, noteID: noteID)
+        }
+        ports.undoSpeakerChanges = { noteID, snapshot throws(VoicesStore.SaveFailure) in
+            try await voices.undoSpeakerChanges(snapshot, noteID: noteID)
+        }
         return NoteScreens(ports: ports)
     }
 }

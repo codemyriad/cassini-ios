@@ -9,6 +9,7 @@ import CassiniNotebook
 /// trust is not verified) the speakers and Add a speaker are disabled, and Identify speakers waits.
 struct SpeakersView: View {
     let model: NoteScreenModel
+    var cache: TranscriptCache? = nil
     @Environment(JobProgress.self) private var progress
     @Environment(\.dismiss) private var dismiss
     @State private var naming: SpeakerRef?
@@ -61,7 +62,13 @@ struct SpeakersView: View {
             .paperListBackground()
             .navigationTitle(SpeakersCopy.speakersTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
-            .sheet(item: $naming) { NameSpeakerSheet(model: model.naming($0.speakerID)) }
+            .sheet(item: $naming) {
+                NameSpeakerSheet(model: model.naming($0.speakerID,
+                                                     allHeaderSpeakers: model.note.flatMap { cache?.allHeaderSpeakers(for: $0) },
+                                                     displayLabel: {
+                    NoteCopy.speakerLabel($0.label, id: $0.speakerID, ordinal: $0.ordinal)
+                }))
+            }
             .alert(SpeakersCopy.addSpeaker, isPresented: $adding) {
                 TextField(SpeakersCopy.nameField, text: $newName)
                 Button(SpeakersCopy.cancel, role: .cancel) {}

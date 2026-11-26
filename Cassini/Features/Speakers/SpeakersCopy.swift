@@ -125,6 +125,25 @@ enum SpeakersCopy {
     static var mergeInto: String { MeetingPhase1Copy.speakerMergeInto }
     static var saveName: String { MeetingPhase1Copy.speakerSaveName }
     static var cancel: String { MeetingPhase1Copy.cancel }
+    static var undo: String { MeetingPhase1Copy.undo }
+    static var backgroundVoice: String { MeetingPhase1Copy.speakerBackgroundVoice }
+    static var backgroundVoiceDescription: String { MeetingPhase1Copy.speakerBackgroundVoiceDescription }
+    static var backgroundVoiceNamePlaceholder: String { MeetingPhase1Copy.speakerBackgroundVoiceNamePlaceholder }
+
+    static func backgroundHidden(_ count: Int) -> String {
+        MeetingPhase1Copy.speakerBackgroundHidden(singular: count == 1, n: "\(count)")
+    }
+
+    static func toastMessage(_ kind: SpeakerSheetSession.SaveSummary.ToastKind) -> String {
+        switch kind {
+        case .singleBackground(let name):
+            MeetingPhase1Copy.speakerBackgroundToastSingle(name)
+        case .namedAndBackground(let name, let count):
+            MeetingPhase1Copy.speakerBackgroundToastNamedAndBackground(singular: count == 1, name: name, n: "\(count)")
+        case .multipleBackground(let count):
+            MeetingPhase1Copy.speakerBackgroundToastCount(singular: count == 1, n: "\(count)")
+        }
+    }
     static let done = String(localized: "Done", table: "Speakers")
     static let nameThisSpeaker = String(localized: "Name this speaker", table: "Speakers")
     static let couldNotSave = String(localized: "Could not save the speaker", table: "Speakers")

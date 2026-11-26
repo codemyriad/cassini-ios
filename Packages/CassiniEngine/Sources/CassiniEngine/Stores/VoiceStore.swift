@@ -83,6 +83,16 @@ public actor VoiceStore {
         return voices
     }
 
+    /// Applies `change` to the saved voices, persists them when changed, and returns the closure's result.
+    public func mutateReturning<T: Sendable>(_ change: @Sendable (inout [SavedVoice]) -> T) throws -> T {
+        library.refreshed()
+        let previous = library.voices
+        var voices = previous
+        let result = change(&voices)
+        if voices != previous { try library.save(voices) }
+        return result
+    }
+
     /// Works out the voice side of a naming commit against the saved voices as they are now, and writes it, in one step:
     /// a change made meanwhile by another commit, a rename, Forget or a permanent delete is kept rather than written
     /// over. Returns the commit; throws `VoiceLibraryError.readOnly` when the voices cannot be changed now.

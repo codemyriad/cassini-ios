@@ -342,4 +342,45 @@ import CassiniNotebook
         model.removeBookmark(bookmark)
         #expect(fake.calls == ["markMoment:4.0", "removeBookmark:\(bookmark)"])
     }
+
+    @Test func openingNameSpeakerOnLongTranscriptUsesCachedHeaderSpeakersOrPreparesOffMain() async throws {
+        // Catalog order is [s1, s2, s3], while canonical word order is [s2, s3, s1] over a long transcript.
+        var longNote = Note(title: "Long meeting", audioFilename: "audio.m4a")
+        longNote.status = .ready
+        longNote.duration = 2_400
+        longNote.speakers = [
+            NoteSpeaker(id: "s1", name: "Alpha", colourIndex: 0, provenance: .user),
+            NoteSpeaker(id: "s2", name: "Beta", colourIndex: 1, provenance: .user),
+            NoteSpeaker(id: "s3", name: "Gamma", colourIndex: 2, provenance: .user),
+        ]
+        let order = ["s2", "s3", "s1"]
+        longNote.transcript = (0..<1_200).map { i in
+            let spk = order[i % order.count]
+            let start = Double(i * 2)
+            return TranscriptSegment(
+                text: "word\(i) more\(i)", start: start, end: start + 1.5,
+                speaker: spk, speakerID: spk,
+                words: [
+                    TimedWord(text: "word\(i)", start: start, end: start + 0.7),
+                    TimedWord(text: "more\(i)", start: start + 0.8, end: start + 1.5),
+                ]
+            )
+        }
+        let longFake = FakeNoteScreen(note: longNote)
+        let longModel = NoteScreenModel(noteID: longNote.id, ports: longFake.ports)
+
+        // 1. With a prepared TranscriptCache, naming(...) derives the canonical roster immediately without rebuilding.
+        let cache = TranscriptCache()
+        await cache.prepareSealed(TranscriptCache.SealedKey(longNote, voices: [], suggestions: []))
+        let cachedHeaders = try #require(cache.allHeaderSpeakers(for: longNote))
+        let cachedSheet = longModel.naming("s1", allHeaderSpeakers: cachedHeaders)
+        #expect(cachedSheet.displayedRoster.map(\.speakerID) == ["s2", "s3", "s1"])
+
+        // 2. Without a cached snapshot, naming(...) does not rebuild synchronously on MainActor (starts with catalog
+        //    fallback) and upgrades to canonical word order off-main when open(...) runs.
+        let uncachedSheet = longModel.naming("s1")
+        #expect(uncachedSheet.displayedRoster.map(\.speakerID) == ["s1", "s2", "s3"])
+        await uncachedSheet.open(draft: nil) { _ in }
+        #expect(uncachedSheet.displayedRoster.map(\.speakerID) == ["s2", "s3", "s1"])
+    }
 }

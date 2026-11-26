@@ -4,13 +4,14 @@ import CassiniNotebook
 
 extension View {
     /// The Note screen's sheets (`NoteScreenModel.sheet`) and its question (`NoteScreenState.dialog`).
-    func noteSheetsAndDialogs(model: NoteScreenModel) -> some View {
-        modifier(NoteSheetsAndDialogs(model: model))
+    func noteSheetsAndDialogs(model: NoteScreenModel, cache: TranscriptCache? = nil) -> some View {
+        modifier(NoteSheetsAndDialogs(model: model, cache: cache))
     }
 }
 
 private struct NoteSheetsAndDialogs: ViewModifier {
     let model: NoteScreenModel
+    var cache: TranscriptCache? = nil
     @Environment(SettingsStore.self) private var settings
 
     private var noteID: UUID { model.noteID }
@@ -39,11 +40,15 @@ private struct NoteSheetsAndDialogs: ViewModifier {
             SetDateTimeSheet(noteID: noteID) { date, timeZone in
                 model.setDateTime(to: date, timeZone: timeZone)
             }
-        case .speakers: SpeakersView(model: model)
+        case .speakers: SpeakersView(model: model, cache: cache)
         case .versions: TranscriptVersionsView(model: model)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
         case .naming(let speakerID, let draft):
-            NameSpeakerSheet(model: model.naming(speakerID), draft: draft) { model.sheetDraft = $0 }
+            NameSpeakerSheet(model: model.naming(speakerID,
+                                                 allHeaderSpeakers: model.note.flatMap { cache?.allHeaderSpeakers(for: $0) },
+                                                 displayLabel: {
+                NoteCopy.speakerLabel($0.label, id: $0.speakerID, ordinal: $0.ordinal)
+            }), draft: draft) { model.sheetDraft = $0 }
         case .editing(let segment): SegmentEditor(model: model, segment: segment)
         }
     }

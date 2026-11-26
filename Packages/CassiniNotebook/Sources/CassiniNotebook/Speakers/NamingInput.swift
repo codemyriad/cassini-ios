@@ -57,6 +57,7 @@ public struct NamingInput: Hashable, Sendable {
     public var quote: String
     public var rememberDefault: Bool
     public var remembered: Bool?
+    public var isBackground: Bool
 
     public init(speakerID: String, label: String, ordinal: Int = 0, speakingTime: Double = 0, sample: SampleWindow? = nil,
                 print: SpeakerPrint? = nil, match: VoiceMatchState = .unmatched, voices: [SavedVoice] = [],
@@ -65,7 +66,8 @@ public struct NamingInput: Hashable, Sendable {
                 mergeTargets: [MergeTarget] = [], versions: MergeVersions = MergeVersions(shown: 1, added: 2), canSample: Bool = true,
                 draft: Bool = false, willHavePrint: Bool = false,
                 colourIndex: Int? = nil, provenance: NoteSpeaker.Provenance? = nil,
-                quote: String = "", rememberDefault: Bool = true, remembered: Bool? = nil) {
+                quote: String = "", rememberDefault: Bool = true, remembered: Bool? = nil,
+                isBackground: Bool = false) {
         self.speakerID = speakerID; self.label = label; self.ordinal = ordinal; self.speakingTime = speakingTime
         self.sample = sample; self.print = print; self.match = match; self.voices = voices
         self.voicesReadOnly = voicesReadOnly; self.voiceModelReady = voiceModelReady; self.currentModel = currentModel
@@ -74,6 +76,7 @@ public struct NamingInput: Hashable, Sendable {
         self.colourIndex = colourIndex; self.provenance = provenance
         self.quote = quote
         self.rememberDefault = rememberDefault; self.remembered = remembered
+        self.isBackground = isBackground
     }
 
     /// The same fixed slots and explicit naming provenance as transcript headers.
@@ -124,6 +127,6 @@ public struct NamingInput: Hashable, Sendable {
             voiceModelReady: print != nil || voiceModelReady,
             mergeTargets: targets, versions: MergeVersions(shown: versions.shown, added: versions.added),
             canSample: note.audio.isPlayable, colourIndex: speaker.colourIndex, provenance: speaker.provenance,
-            quote: quote, rememberDefault: rememberDefault)
+            quote: quote, rememberDefault: rememberDefault, isBackground: speaker.background)
     }
 }

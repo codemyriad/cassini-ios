@@ -131,7 +131,10 @@ struct TurnView: View, Equatable {
             }
         }
         Button(NoteCopy.markThisMoment, systemImage: "bookmark") { actions.markMoment(turn.start) }
-        Button(NoteCopy.copyText, systemImage: "doc.on.doc") { UIPasteboard.general.string = turn.text }
+        let copied = turn.copyableText
+        if !turn.isFullyBackground, !copied.isEmpty {
+            Button(NoteCopy.copyText, systemImage: "doc.on.doc") { UIPasteboard.general.string = copied }
+        }
     }
 
     // MARK: Text
@@ -149,7 +152,7 @@ struct TurnView: View, Equatable {
             ? turn.linkedText(activeWord: activeIndex, scheme: Self.scheme)
             : AttributedString(turn.text)
         // Use per-run foregrounds: a paragraph-wide link tint would color named chips like an unnamed host.
-        result.foregroundColor = Color.ink
+        result.foregroundColor = turn.isBackground ? Color.muted : Color.ink
         let characters = result.characters
         func range(_ offsets: Range<Int>) -> Range<AttributedString.Index>? {
             guard offsets.lowerBound >= 0, offsets.upperBound <= characters.count else { return nil }
@@ -159,11 +162,15 @@ struct TurnView: View, Equatable {
         // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
-                result[span].foregroundColor = Color.ink
-                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.wash
+                result[span].foregroundColor = chip.isBackground ? Color.muted : Color.ink
+                if chip.crosstalk {
+                    result[span].backgroundColor = Color.warnTint
+                } else if !chip.isBackground {
+                    result[span].backgroundColor = chip.tint.wash
+                }
             }
             if let name = range(chip.nameRange) {
-                result[name].foregroundColor = chip.tint.color
+                result[name].foregroundColor = chip.isBackground ? Color.muted : chip.tint.color
                 result[name].font = .system(.body, weight: .semibold)
             }
         }
@@ -202,8 +209,13 @@ private struct TurnHeader: View {
         let name = NoteCopy.speakerName(turn.name)
         let line = HStack(spacing: 6) {
             if !turn.continuation {
-                Circle().fill(turn.tint.color).frame(width: 8, height: 8)
-                Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+                if turn.isBackground {
+                    Circle().strokeBorder(Color.muted, lineWidth: 1.5).frame(width: 8, height: 8)
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.muted).lineLimit(1)
+                } else {
+                    Circle().fill(turn.tint.color).frame(width: 8, height: 8)
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(turn.tint.color).lineLimit(1)
+                }
             }
             Text(TimeText.clock(turn.start)).font(.caption.monospacedDigit()).foregroundStyle(Color.muted)
             if !turn.over.isEmpty {

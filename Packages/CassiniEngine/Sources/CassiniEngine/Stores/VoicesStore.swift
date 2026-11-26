@@ -41,6 +41,10 @@ import CassiniNotebook
     @ObservationIgnored public var printsReady: @Sendable () async -> Bool = { false }
     /// The draft names of running and paused jobs, which Forget and Forget everyone scrub too.
     @ObservationIgnored public var drafts: DraftNamesStore?
+    /// Test-only hook invoked right before each batch step executes (after staging/validation).
+    @ObservationIgnored var beforeBatchStep: (@MainActor (_ stepIndex: Int, _ speakerID: String) async throws(SaveFailure) -> Void)?
+    /// Test-only hook invoked during Undo after inverse voice ops persist and before note restoration commits.
+    @ObservationIgnored var beforeUndoNoteCommit: (@MainActor () async -> Void)?
     /// The saved voices for a running job's live matching, readable from any thread.
     public nonisolated let liveVoices = LiveVoices()
 
@@ -210,6 +214,357 @@ import CassiniNotebook
         }
     }
 
+    /// Pending rollback snapshots retained when a mid-batch failure also could not persist its inverse voice writes
+    /// (e.g. voice storage remained unwritable). Cleared only after `retryPendingRollback(noteID:)` succeeds.
+    public private(set) var pendingRollback: [UUID: SpeakerUndoSnapshot] = [:]
+    /// Pending cross-note scrubbed-link restorations whose note write failed during Undo or batch rollback, keyed by
+    /// the originating snapshot so retrying finishes only the remaining links without re-reversing voices/primary note.
+    @ObservationIgnored private var pendingScrubbedLinks: [SpeakerUndoSnapshot: [ScrubbedVoiceLink]] = [:]
+
+    /// A voice link scrubbed by `unlinkVoice` when a voice's last sample was removed, bound to its originating
+    /// transcript version (or unversioned revision when `versionID` is nil) so Undo/rollback never corrupts another version.
+    public struct ScrubbedVoiceLink: Hashable, Sendable {
+        public let noteID: UUID
+        public let versionID: UUID?
+        public let speakerID: String
+        public let match: VoiceMatchState
+        public let expectedUnversionedSpeakers: [NoteSpeaker]?
+        public init(noteID: UUID, versionID: UUID?, speakerID: String, match: VoiceMatchState,
+                    expectedUnversionedSpeakers: [NoteSpeaker]? = nil) {
+            self.noteID = noteID; self.versionID = versionID; self.speakerID = speakerID; self.match = match
+            self.expectedUnversionedSpeakers = expectedUnversionedSpeakers
+        }
+    }
+
+    /// One recorded inverse voice operation with any cross-note links scrubbed when its voice was forgotten.
+    public struct RecordedVoiceUndoOp: Hashable, Sendable {
+        public let op: NamingCommit.VoiceUndoOp
+        public let scrubbedLinks: [ScrubbedVoiceLink]
+        public init(op: NamingCommit.VoiceUndoOp, scrubbedLinks: [ScrubbedVoiceLink] = []) {
+            self.op = op; self.scrubbedLinks = scrubbedLinks
+        }
+    }
+
+    /// Version-bound snapshot of a Name a speaker batch Save, for Undo (D112 / L-86).
+    public struct SpeakerUndoSnapshot: Hashable, Sendable {
+        public let versionID: UUID?
+        public let afterSpeakers: [NoteSpeaker]?
+        public let speakerEntries: [Note.SpeakerUndoEntry]
+        public let voiceOps: [RecordedVoiceUndoOp]
+        public init(versionID: UUID? = nil, afterSpeakers: [NoteSpeaker]? = nil,
+                    speakerEntries: [Note.SpeakerUndoEntry] = [], voiceOps: [RecordedVoiceUndoOp] = []) {
+            self.versionID = versionID
+            self.afterSpeakers = afterSpeakers
+            self.speakerEntries = speakerEntries
+            self.voiceOps = voiceOps
+        }
+    }
+
+    /// Carries out a batch of speaker saves with upfront staging/validation, transaction-level rollback on failure,
+    /// and a version-bound Undo snapshot recording inverse voice operations in effect order. Any pending rollback
+    /// retained from an earlier failed batch on `noteID` is resolved before staging the new batch.
+    public func performBatch(_ writes: [SpeakerSheetSession.BatchWrite], noteID: UUID) async throws(SaveFailure) -> SpeakerUndoSnapshot {
+        await retryUnreadable()
+        if pendingRollback[noteID] != nil {
+            try await retryPendingRollback(noteID: noteID)
+        }
+        guard let beforeNote = library.note(noteID) else { return SpeakerUndoSnapshot() }
+        let targetVersionID = beforeNote.shownVersionID
+        let allPrints = (try? await store?.prints(noteID: noteID)) ?? []
+        var latestPrintBySpeaker: [Data: SpeakerPrint] = [:]
+        for item in allPrints { latestPrintBySpeaker[Data(item.speakerID.utf8)] = item }
+
+        // Stage and validate the full batch before mutating any note or voice file.
+        struct StagedWrite {
+            let write: SpeakerSheetSession.BatchWrite
+            let print: SpeakerPrint?
+            let newVoiceID: UUID
+            let stamp: VersionStamp
+        }
+        var simNote = beforeNote
+        var simVoices = savedVoices
+        let readOnly = isReadOnly
+        var staged: [StagedWrite] = []
+        staged.reserveCapacity(writes.count)
+        for write in writes {
+            guard let simSpeaker = simNote.speaker(write.speakerID) else { continue }
+            let speakerPrint = latestPrintBySpeaker[Data(write.speakerID.utf8)]
+            let newVoiceID = UUID(), stamp = VersionStamp(date: clock.now)
+            let commit = NamingCommit.plan(write.effects, noteID: noteID, speaker: simSpeaker, print: speakerPrint,
+                                           voices: simVoices, voicesReadOnly: readOnly,
+                                           newVoiceID: newVoiceID, stamp: stamp)
+            switch commit.refused {
+            case .readOnly?: throw SaveFailure(reason: .voicesReadOnly)
+            case .noPrint?: throw SaveFailure(reason: .tooLittleSpeech)
+            case nil:
+                simNote.apply(commit.changes)
+                simVoices = commit.voices
+                for voice in commit.forgotten { simNote.unlinkVoice(voice) }
+                staged.append(StagedWrite(write: write, print: speakerPrint, newVoiceID: newVoiceID, stamp: stamp))
+            }
+        }
+
+        // Capture each touched speaker's original pre-batch state before any step writes.
+        var beforeByID: [Data: NoteSpeaker] = [:]
+        var touchedOrder: [String] = []
+        for item in staged {
+            let key = Data(item.write.speakerID.utf8)
+            if beforeByID[key] == nil, let speaker = beforeNote.speaker(item.write.speakerID) {
+                beforeByID[key] = speaker
+                touchedOrder.append(item.write.speakerID)
+            }
+        }
+
+        var recordedVoiceOps: [RecordedVoiceUndoOp] = []
+        var committedSpeakers: [NoteSpeaker] = []
+        var committedKeys = Set<Data>()
+        var committedOrder: [String] = []
+        var failedStepSpeaker: NoteSpeaker?
+
+        do throws(SaveFailure) {
+            for (index, item) in staged.enumerated() {
+                if let hook = beforeBatchStep { try await hook(index, item.write.speakerID) }
+                guard let currentNote = library.note(noteID),
+                      let currentSpeaker = currentNote.speaker(item.write.speakerID) else { continue }
+                let effects = item.write.effects
+                let speakerPrint = item.print
+                let newVoiceID = item.newVoiceID
+                let stamp = item.stamp
+                let plan: @Sendable ([SavedVoice], Bool) -> NamingCommit = { voices, readOnly in
+                    NamingCommit.plan(effects, noteID: noteID, speaker: currentSpeaker, print: speakerPrint,
+                                      voices: voices, voicesReadOnly: readOnly,
+                                      newVoiceID: newVoiceID, stamp: stamp)
+                }
+                let commit = plan(savedVoices, isReadOnly)
+                switch commit.refused {
+                case .readOnly?: throw SaveFailure(reason: .voicesReadOnly)
+                case .noPrint?: throw SaveFailure(reason: .tooLittleSpeech)
+                case nil:
+                    let key = Data(item.write.speakerID.utf8)
+                    failedStepSpeaker = committedKeys.contains(key) ? nil : currentSpeaker
+                    let ops = try await writeWithUndo(commit, plan: plan, noteID: noteID, before: currentNote)
+                    failedStepSpeaker = nil
+                    recordedVoiceOps.append(contentsOf: ops)
+                    if committedKeys.insert(key).inserted, let original = beforeByID[key] {
+                        committedSpeakers.append(original)
+                        committedOrder.append(item.write.speakerID)
+                    }
+                }
+            }
+        } catch {
+            // If the failing step itself already wrote non-link fields before its voice write failed, try to restore it
+            // immediately (its voice write did not land, so its pre-step links remain valid in VoiceStore).
+            var unrolledFailedStepID: String?
+            if let failedStepSpeaker {
+                let rolledBack = await library.commit(noteID) {
+                    $0.rollbackSpeakers([failedStepSpeaker], versionID: targetVersionID)
+                } != nil
+                if !rolledBack { unrolledFailedStepID = failedStepSpeaker.id }
+            }
+            // Transaction-level rollback: persist inverse voice ops in strict reverse order, then restore the note.
+            // If note persistence fails, compensate VoiceStore back to its pre-rollback voices so no confirmed link
+            // ever points to a deleted voice, and retain pendingRollback[noteID] until both stores agree.
+            var failedScrubbedLinks: [ScrubbedVoiceLink] = []
+            do throws(SaveFailure) {
+                let replay = try await replayInverseVoiceOps(recordedVoiceOps)
+                if !committedSpeakers.isEmpty {
+                    let toRollback = committedSpeakers
+                    guard await library.commit(noteID, {
+                        $0.rollbackSpeakers(toRollback, versionID: targetVersionID)
+                    }) != nil else {
+                        await compensateVoices(replay?.compensationOps ?? [])
+                        throw SaveFailure(reason: .noteNotSaved)
+                    }
+                }
+                if unrolledFailedStepID != nil {
+                    throw SaveFailure(reason: .noteNotSaved)
+                }
+                unlinkDeletedVoices(replay?.deletedVoiceIDs ?? [])
+                let failed = await restoreScrubbedLinks(recordedVoiceOps.reversed().flatMap(\.scrubbedLinks))
+                if !failed.isEmpty {
+                    failedScrubbedLinks = failed
+                    throw SaveFailure(reason: .noteNotSaved)
+                }
+                pendingRollback[noteID] = nil
+            } catch {
+                let partialNote = library.note(noteID)
+                var restoreIDs = committedOrder
+                if let failedID = unrolledFailedStepID,
+                   !restoreIDs.contains(where: { Data($0.utf8) == Data(failedID.utf8) }) {
+                    restoreIDs.append(failedID)
+                }
+                let entries: [Note.SpeakerUndoEntry] = restoreIDs.compactMap { id in
+                    guard let before = beforeByID[Data(id.utf8)], let after = partialNote?.speaker(id) else { return nil }
+                    return Note.SpeakerUndoEntry(speakerID: id, before: before, after: after)
+                }
+                let rollbackSnapshot = SpeakerUndoSnapshot(
+                    versionID: targetVersionID,
+                    afterSpeakers: partialNote?.speakers,
+                    speakerEntries: entries,
+                    voiceOps: recordedVoiceOps
+                )
+                pendingRollback[noteID] = rollbackSnapshot
+                if !failedScrubbedLinks.isEmpty {
+                    pendingScrubbedLinks[rollbackSnapshot] = failedScrubbedLinks
+                }
+            }
+            throw error
+        }
+
+        let afterNote = library.note(noteID)
+        let entries: [Note.SpeakerUndoEntry] = touchedOrder.compactMap { id in
+            guard let before = beforeByID[Data(id.utf8)], let after = afterNote?.speaker(id) else { return nil }
+            return Note.SpeakerUndoEntry(speakerID: id, before: before, after: after)
+        }
+        return SpeakerUndoSnapshot(versionID: targetVersionID, afterSpeakers: afterNote?.speakers,
+                                   speakerEntries: entries, voiceOps: recordedVoiceOps)
+    }
+
+    /// Retries a retained mid-batch rollback once storage is writable again. Clears `pendingRollback[noteID]`
+    /// only after voice and note restoration both succeed.
+    public func retryPendingRollback(noteID: UUID) async throws(SaveFailure) {
+        guard let snapshot = pendingRollback[noteID] else { return }
+        try await undoSpeakerChanges(snapshot, noteID: noteID)
+        pendingRollback[noteID] = nil
+    }
+
+    /// Reverts a Name a speaker batch Save on its original version, replaying inverse voice operations in strict
+    /// reverse order and restoring note speakers and scrubbed links only when both voice and note persistence succeed.
+    /// If note persistence fails or a concurrent edit superseded the snapshot's revision after voice restoration,
+    /// `VoiceStore` is compensated back to its pre-undo state so both stores remain consistent. If a secondary note's
+    /// scrubbed-link write fails, the remaining links are tracked so retrying the same snapshot finishes only them.
+    public func undoSpeakerChanges(_ snapshot: SpeakerUndoSnapshot, noteID: UUID) async throws(SaveFailure) {
+        if let remainingLinks = pendingScrubbedLinks[snapshot] {
+            let stillFailed = await restoreScrubbedLinks(remainingLinks)
+            if !stillFailed.isEmpty {
+                pendingScrubbedLinks[snapshot] = stillFailed
+                throw SaveFailure(reason: .noteNotSaved)
+            }
+            pendingScrubbedLinks[snapshot] = nil
+            return
+        }
+        guard let note = library.note(noteID),
+              note.canRestoreSpeakers(snapshot.speakerEntries, versionID: snapshot.versionID,
+                                      expectedAfterSpeakers: snapshot.afterSpeakers)
+        else { return }
+        let replay = try await replayInverseVoiceOps(snapshot.voiceOps)
+        if let hook = beforeUndoNoteCommit { await hook() }
+        let entries = snapshot.speakerEntries
+        let versionID = snapshot.versionID
+        let expected = snapshot.afterSpeakers
+        let restoredFlag = SendableBool()
+        guard await library.commit(noteID, { note in
+            let applied = note.restoreSpeakers(entries, versionID: versionID, expectedAfterSpeakers: expected)
+            restoredFlag.set(applied)
+        }) != nil else {
+            await compensateVoices(replay?.compensationOps ?? [])
+            throw SaveFailure(reason: .noteNotSaved)
+        }
+        guard restoredFlag.value else {
+            // A concurrent speaker edit superseded the snapshot's revision while voice ops were in flight.
+            await compensateVoices(replay?.compensationOps ?? [])
+            return
+        }
+        unlinkDeletedVoices(replay?.deletedVoiceIDs ?? [])
+        let failedLinks = await restoreScrubbedLinks(snapshot.voiceOps.reversed().flatMap(\.scrubbedLinks))
+        if !failedLinks.isEmpty {
+            pendingScrubbedLinks[snapshot] = failedLinks
+            throw SaveFailure(reason: .noteNotSaved)
+        }
+    }
+
+    /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`, returning the
+    /// per-operation compensation ops (to reverse only this replay against current voices if note persistence fails)
+    /// and any voice IDs deleted by the replay.
+    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> (compensationOps: [NamingCommit.VoiceUndoOp], deletedVoiceIDs: [UUID])? {
+        guard !recorded.isEmpty else { return nil }
+        guard let store else { throw SaveFailure(reason: .voicesReadOnly) }
+        let ops = recorded.reversed().map(\.op)
+        let result: (compensation: [NamingCommit.VoiceUndoOp], deleted: [UUID])
+        do {
+            result = try await store.mutateReturning { voices in
+                let beforeIDs = voices.map(\.id)
+                var compensation: [NamingCommit.VoiceUndoOp] = []
+                for op in ops {
+                    compensation.append(contentsOf: NamingCommit.applyInverse(op, to: &voices))
+                }
+                let remaining = Set(voices.map(\.id))
+                let deleted = beforeIDs.filter { !remaining.contains($0) }
+                return (compensation, deleted)
+            }
+        } catch {
+            await refresh()
+            throw SaveFailure(reason: .voiceNotSaved(error))
+        }
+        await refresh()
+        return (result.compensation, result.deleted)
+    }
+
+    /// Scrubs links to voices deleted by inverse operations across every note, version, and running draft.
+    private func unlinkDeletedVoices(_ voiceIDs: [UUID]) {
+        for voice in voiceIDs {
+            library.updateAll { $0.unlinkVoice(voice) }
+            drafts?.mutateAll { $0.forgetting(voice) }
+        }
+    }
+
+    /// Reverses only this operation's inverse voice ops against the current `VoiceStore` state when a dependent note
+    /// write fails, preserving any concurrent voice enrollments or edits that landed in the meantime.
+    private func compensateVoices(_ compensationOps: [NamingCommit.VoiceUndoOp]) async {
+        guard !compensationOps.isEmpty, let store else { return }
+        let ops = Array(compensationOps.reversed())
+        _ = try? await store.mutate { voices in
+            for op in ops { _ = NamingCommit.applyInverse(op, to: &voices) }
+        }
+        await refresh()
+    }
+
+    /// Captures all non-rejection links to `voiceID` across every note and kept version before `unlinkVoice` scrubs them,
+    /// recording the originating `versionID` (and never emitting a `nil` version record for a kept version).
+    private func captureScrubbedLinks(for voiceID: UUID) -> [ScrubbedVoiceLink] {
+        var links: [ScrubbedVoiceLink] = []
+        for note in library.notes {
+            if note.shownVersionID == nil, let shown = note.speakers {
+                let postUnlink = shown.map { speaker -> NoteSpeaker in
+                    var copy = speaker
+                    if copy.match.voiceID == voiceID && !copy.match.isRejection { copy.match = .unmatched }
+                    return copy
+                }
+                for speaker in shown where speaker.match.voiceID == voiceID && !speaker.match.isRejection {
+                    links.append(ScrubbedVoiceLink(noteID: note.id, versionID: nil, speakerID: speaker.id,
+                                                   match: speaker.match, expectedUnversionedSpeakers: postUnlink))
+                }
+            }
+            for version in note.versions ?? [] {
+                for speaker in version.speakers {
+                    if speaker.match.voiceID == voiceID && !speaker.match.isRejection {
+                        links.append(ScrubbedVoiceLink(noteID: note.id, versionID: version.id,
+                                                       speakerID: speaker.id, match: speaker.match))
+                    }
+                }
+            }
+        }
+        return links
+    }
+
+    /// Restores voice links that were scrubbed when a voice's last sample was temporarily removed.
+    /// Returns any links whose target note could not be written so the caller can surface the failure and retry them.
+    private func restoreScrubbedLinks(_ links: [ScrubbedVoiceLink]) async -> [ScrubbedVoiceLink] {
+        guard !links.isEmpty else { return [] }
+        let byNote = Dictionary(grouping: links, by: \.noteID)
+        var failed: [ScrubbedVoiceLink] = []
+        for (targetNoteID, noteLinks) in byNote {
+            let committed = await library.commit(targetNoteID) { note in
+                for link in noteLinks {
+                    note.restoreVoiceLink(speakerID: link.speakerID, versionID: link.versionID, match: link.match,
+                                          expectedUnversionedSpeakers: link.expectedUnversionedSpeakers)
+                }
+            }
+            if committed == nil { failed.append(contentsOf: noteLinks) }
+        }
+        return failed
+    }
+
     /// "Yes, Luca": names the speaker after the voice and confirms it, remembering the speaker's print in it.
     public func accept(_ suggestion: SpeakerSuggestion, noteID: UUID) async throws(SaveFailure) {
         try await perform([.relabel(speakerID: suggestion.speakerID, name: suggestion.voiceName),
@@ -229,9 +584,14 @@ import CassiniNotebook
     /// notes drop their links to forgotten voices only once the voices are written.
     private func write(_ commit: NamingCommit, plan: @escaping @Sendable ([SavedVoice], Bool) -> NamingCommit,
                        noteID: UUID, before: Note) async throws(SaveFailure) {
+        _ = try await writeWithUndo(commit, plan: plan, noteID: noteID, before: before)
+    }
+
+    private func writeWithUndo(_ commit: NamingCommit, plan: @escaping @Sendable ([SavedVoice], Bool) -> NamingCommit,
+                               noteID: UUID, before: Note) async throws(SaveFailure) -> [RecordedVoiceUndoOp] {
         let changes = commit.changes
         guard await library.commit(noteID, { $0.apply(changes) }) != nil else { throw SaveFailure(reason: .noteNotSaved) }
-        guard let store else { return }
+        guard let store else { return [] }
         let written: NamingCommit
         do {
             written = try await store.commit(plan)
@@ -246,9 +606,17 @@ import CassiniNotebook
             await library.commit(noteID) { $0.apply(current) }
         }
         await refresh()
+        var scrubbedByVoice: [UUID: [ScrubbedVoiceLink]] = [:]
         for voice in written.forgotten {
+            scrubbedByVoice[voice] = captureScrubbedLinks(for: voice)
             library.updateAll { $0.unlinkVoice(voice) }
             drafts?.mutateAll { $0.forgetting(voice) }
+        }
+        return written.voiceUndoOps.map { op in
+            if case .undoUnenrol(let voiceID, _, _, true) = op {
+                return RecordedVoiceUndoOp(op: op, scrubbedLinks: scrubbedByVoice[voiceID] ?? [])
+            }
+            return RecordedVoiceUndoOp(op: op)
         }
     }
 
@@ -347,6 +715,12 @@ public final class LiveVoices: Sendable {
     public func voices(generation: Int) -> [SavedVoice] {
         state.withLock { $0.generation == generation ? $0.voices : [] }
     }
+}
+
+private final class SendableBool: Sendable {
+    private let state = Mutex(false)
+    func set(_ value: Bool) { state.withLock { $0 = value } }
+    var value: Bool { state.withLock { $0 } }
 }
 
 extension VoicesStore: VoiceEvidence {
