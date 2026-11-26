@@ -589,6 +589,216 @@
         }
       }
     },
+    "meeting.setDateTime": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set date and time"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imposta data e ora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Définir la date et l’heure"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Establecer fecha y hora"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir data e hora"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir data e hora"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.dateLabel": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.dateLabel.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fecha"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.prefillSavedHint": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.prefillSavedHint.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filled in from when the file was saved. Change it if it’s wrong."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compilato dalla data di salvataggio del file. Modificalo se non è corretto."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prérempli à partir de la date d’enregistrement du fichier. Modifiez-le s’il est inexact."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rellenado según cuándo se guardó el archivo. Cámbialo si no es correcto."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido com base em quando o arquivo foi salvo. Altere se estiver errado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido com base em quando o ficheiro foi guardado. Altere se estiver errado."
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.timeLabel": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.timeLabel.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Started at"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniziata alle"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Début à"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empezó a las"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciada às"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciada às"
+          }
+        }
+      }
+    },
+    "meeting.setDateTime.title": {
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.setDateTime.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When was this recorded?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando è stata registrata?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand cela a-t-il été enregistré ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Cuándo se grabó?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando isso foi gravado?"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando foi gravado?"
+          }
+        }
+      }
+    },
     "savedVoices.privacy.phone": {
       "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, savedVoices.privacy.phone.",
       "extractionState": "manual",

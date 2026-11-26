@@ -33,6 +33,8 @@ public enum NoteEffect: Hashable, Sendable {
     case toggleStar
     /// Open Rename.
     case rename
+    /// Open Set date and time.
+    case setDateTime
     /// Open Document info.
     case documentInfo
     /// Share the transcript in `format`.
@@ -167,6 +169,7 @@ public struct NoteScreenState: Hashable, Sendable {
         case .speakers: return speakersTapped(readOnly: readOnly)
         case .versions: return versionsTapped(readOnly: readOnly)
         case .rename: return .rename
+        case .setDateTime: return .setDateTime
         case .documentInfo: return .documentInfo
         case .exportTranscript(let format): return .exportTranscript(format)
         case .exportDocument: return .exportDocument

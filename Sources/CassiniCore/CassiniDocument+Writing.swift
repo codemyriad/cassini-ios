@@ -15,9 +15,10 @@ extension CassiniDocument {
                               existing: CassiniDocument? = nil, speakerLabels: [String: String] = [:],
                               speakerHints: [String: JSONObject] = [:],
                               carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              userStartedAt: String? = nil,
                               speakerLabelsByID: [Data: String] = [:], speakerHintsByID: [Data: JSONObject] = [:]) throws -> [UInt8] {
         let (comments, digest) = try seal(OggOpus.scan(ArraySource(audioBytes)), transcript, title, processing,
-                                          existing, speakerLabels, source, recordedAt, speakerHints,
+                                          existing, speakerLabels, source, recordedAt, userStartedAt, speakerHints,
                                           speakerLabelsByID, speakerHintsByID)
         let out = ArraySink()
         try check(try OggOpus.rewrite(ArraySource(audioBytes), tags: comments.packet, to: out).digest() == digest, "Audio changed while sealing")
@@ -30,10 +31,11 @@ extension CassiniDocument {
     public static func create(_ audio: URL, transcript: Transcript, title: String, processing: JSONObject, existing: CassiniDocument?,
                               speakerLabels: [String: String], speakerHints: [String: JSONObject] = [:],
                               carrying source: CassiniDocument? = nil, recordedAt: Date? = nil,
+                              userStartedAt: String? = nil,
                               speakerLabelsByID: [Data: String] = [:], speakerHintsByID: [Data: JSONObject] = [:],
                               target: URL) throws -> CassiniDocument {
         let (comments, digest) = try seal(OggOpus.scan(audio), transcript, title, processing,
-                                          existing, speakerLabels, source, recordedAt, speakerHints,
+                                          existing, speakerLabels, source, recordedAt, userStartedAt, speakerHints,
                                           speakerLabelsByID, speakerHintsByID)
         do {
             try writeWithTags(audio, comments, digest, target)
@@ -146,6 +148,7 @@ extension CassiniDocument {
     public static func carriedMeeting(of source: CassiniDocument?) -> JSONObject? {
         guard var meeting = source?.manifest?["meeting"]?.object, meeting["id"]?.string?.isEmpty == false else { return nil }
         if source?.state == .staleAudio {
+            meeting["startedAt"] = nil
             meeting["recordedAtUtc"] = nil
             meeting["recordedAtLocal"] = nil
         }
@@ -184,6 +187,7 @@ extension CassiniDocument {
     static func seal(_ stream: OggOpus.Info, _ transcript: Transcript, _ title: String, _ processing: JSONObject,
                      _ existing: CassiniDocument?, _ speakerLabels: [String: String],
                      _ source: CassiniDocument? = nil, _ recordedAt: Date? = nil,
+                     _ userStartedAt: String? = nil,
                      _ speakerHints: [String: JSONObject] = [:],
                      _ speakerLabelsByID: [Data: String] = [:],
                      _ speakerHintsByID: [Data: JSONObject] = [:]) throws -> (comments: Comments, digest: String) {
@@ -263,6 +267,25 @@ extension CassiniDocument {
         }
         manifest["provenance"] = .object(provenance)
         if existing == nil { for (key, value) in carriedMembers(of: source) { manifest[key] = value } }
+        // D112 (L-87): a user-set recording time wins over every other start timestamp, travels in
+        // x["codemyriad.io"].meeting.{startedAt, startedAtSource} and projects to meeting.{startedAt, recordedAtLocal, recordedAtUtc} and DATE.
+        if let userStartedAt, isValidStartedAt(userStartedAt),
+           let parsedStart = parseInstant(userStartedAt), let localStart = localPart(of: userStartedAt) {
+            if var updatedMeeting = manifest["meeting"]?.object {
+                updatedMeeting["startedAt"] = .string(userStartedAt)
+                updatedMeeting["recordedAtLocal"] = .string(localStart)
+                updatedMeeting["recordedAtUtc"] = .string(instantText(parsedStart))
+                manifest["meeting"] = .object(updatedMeeting)
+            }
+            var x = manifest["x"]?.object ?? JSONObject()
+            var codemyriad = x["codemyriad.io"]?.object ?? JSONObject()
+            var xMeeting = codemyriad["meeting"]?.object ?? JSONObject()
+            xMeeting["startedAt"] = .string(userStartedAt)
+            xMeeting["startedAtSource"] = .string("user")
+            codemyriad["meeting"] = .object(xMeeting)
+            x["codemyriad.io"] = .object(codemyriad)
+            manifest["x"] = .object(x)
+        }
         var comments: Comments
         if let existing {
             // A verified document's transcript chunks stay; every copy of its manifest is rebuilt from the new one.

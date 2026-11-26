@@ -212,6 +212,93 @@ struct ExportServiceTests {
         #expect(try Data(contentsOf: output) == bytes)
     }
 
+    @Test func archiveSnapshotRoundTripsUserSetDateForAudioOnlyMeeting() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let source = base.appendingPathComponent("source.m4a")
+        let original = Data(ImportFixtures.m4a)
+        try original.write(to: source)
+
+        let cet = try #require(TimeZone(secondsFromGMT: 3600))
+        let chosen = try #require(CassiniDocument.parseInstant("2026-11-23T13:36:00Z"))
+        var note = Note(title: "Audio only dated", audioFilename: "source.m4a")
+        note.status = .audioOnly
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &note)
+
+        let portable = PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+        let zipURL = try await BulkExportService(folder: base.appendingPathComponent("exports")) { snapshot, work in
+            try await portable.archiveSnapshot(snapshot, original: source, playable: source, into: work)
+        }.export([note])
+
+        let zip = try ZIPArchive(url: zipURL)
+        let entry = try #require(zip.entries.first)
+        #expect(entry.name.hasSuffix(".opus"))
+        var bytes = Data(); try zip.read(entry, remainingBytes: 1_000_000) { bytes.append($0) }
+        #expect(bytes != original)
+        let document = CassiniDocument.read(Array(bytes))
+        #expect(document.state == .ok)
+        let restored = try #require(PortableTranscript(document))
+        #expect(restored.meetingTime == .instant(chosen))
+        #expect(restored.userStartedAt == "2026-11-23T14:36:00+01:00")
+    }
+
+    @Test func archiveSnapshotRoundTripsUserSetDateForImportedEmptyTranscriptDocument() async throws {
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let originalDate = try #require(CassiniDocument.parseInstant("2026-11-20T10:00:00Z"))
+        let originalBytes = Data(try CassiniDocument.create(
+            ImportFixtures.opus(packets: 100),
+            transcript: Transcript([]),
+            title: "Empty imported",
+            processing: JSONObject(),
+            recordedAt: originalDate
+        ))
+        let original = base.appendingPathComponent("empty.opus")
+        try originalBytes.write(to: original)
+        let imported = try #require(PortableTranscript(CassiniDocument.read(original)))
+        #expect(imported.segments.isEmpty)
+
+        var note = ImportedNote.make(
+            id: UUID(), displayName: nil, fallbackTitle: "Import", sha256: "hash",
+            importedAt: originalDate,
+            audio: ImportedAudio(filename: "empty.opus", originalFilename: "empty.opus", duration: 1),
+            document: imported
+        )
+        let cet = try #require(TimeZone(secondsFromGMT: 3600))
+        let chosen = try #require(CassiniDocument.parseInstant("2026-11-23T13:36:00Z"))
+        SetMeetingDate.apply(date: chosen, timeZone: cet, to: &note)
+
+        let portable = PortableExportService(audio: FakeAudioProcessing(), provenance: FakeProvenance(), unassignedLabel: "Unknown speaker")
+        let zipURL = try await BulkExportService(folder: base.appendingPathComponent("exports")) { snapshot, work in
+            try await portable.archiveSnapshot(snapshot, original: original, playable: original, into: work)
+        }.export([note])
+
+        let zip = try ZIPArchive(url: zipURL)
+        let entry = try #require(zip.entries.first)
+        #expect(entry.name.hasSuffix(".opus"))
+        var archivedBytes = Data(); try zip.read(entry, remainingBytes: 1_000_000) { archivedBytes.append($0) }
+        #expect(archivedBytes != originalBytes)
+        let document = CassiniDocument.read(Array(archivedBytes))
+        #expect(document.state == .ok)
+        let restored = try #require(PortableTranscript(document))
+        #expect(restored.meetingTime == .instant(chosen))
+        #expect(restored.userStartedAt == "2026-11-23T14:36:00+01:00")
+
+        // A clean re-import of that dated empty document still deduplicates by copying original bytes.
+        let datedURL = base.appendingPathComponent("dated.opus")
+        try archivedBytes.write(to: datedURL)
+        let cleanNote = ImportedNote.make(
+            id: UUID(), displayName: nil, fallbackTitle: "Import", sha256: "hash2",
+            importedAt: originalDate,
+            audio: ImportedAudio(filename: "dated.opus", originalFilename: "dated.opus", duration: 1),
+            document: restored
+        )
+        let dedupDir = base.appendingPathComponent("dedup", isDirectory: true)
+        try FileManager.default.createDirectory(at: dedupDir, withIntermediateDirectories: true)
+        let dedupOutput = try await portable.archiveSnapshot(cleanNote, original: datedURL, playable: datedURL, into: dedupDir)
+        #expect(try Data(contentsOf: dedupOutput) == archivedBytes)
+    }
+
     // ports: DocumentRepositoryTest#exportsEqualTheExpectedBytes
     @Test func exportsEqualTheExpectedBytes() async throws {
         defer { try? FileManager.default.removeItem(at: base) }

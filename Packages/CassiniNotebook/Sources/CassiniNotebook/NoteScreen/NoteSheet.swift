@@ -5,7 +5,7 @@ import Foundation
 public enum NoteSheet: Identifiable, Hashable, Sendable {
     /// Rename, starting from `draft` when one was being typed before Cassini was closed.
     case rename(draft: String?)
-    case speakers, versions, documentInfo, voicesQuestion
+    case setDateTime, speakers, versions, documentInfo, voicesQuestion
     /// Name this speaker, starting from `draft` when one was being typed before Cassini was closed.
     case naming(String, draft: String?)
     /// Edit passage, of the passage as it was when the editor opened.
@@ -14,6 +14,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public var id: String {
         switch self {
         case .rename: "rename"
+        case .setDateTime: "setDateTime"
         case .voicesQuestion: "voicesQuestion"
         case .speakers: "speakers"
         case .versions: "versions"
@@ -26,7 +27,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.rename(let a), .rename(let b)): a == b
-        case (.voicesQuestion, .voicesQuestion), (.speakers, .speakers), (.versions, .versions), (.documentInfo, .documentInfo): true
+        case (.setDateTime, .setDateTime), (.voicesQuestion, .voicesQuestion), (.speakers, .speakers), (.versions, .versions), (.documentInfo, .documentInfo): true
         case (.naming(let a, let firstDraft), .naming(let b, let secondDraft)):
             Data(a.utf8) == Data(b.utf8) && firstDraft == secondDraft
         case (.editing(let a), .editing(let b)): a == b
@@ -37,6 +38,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public func hash(into hasher: inout Hasher) {
         switch self {
         case .rename(let draft): hasher.combine(0); hasher.combine(draft)
+        case .setDateTime: hasher.combine(7)
         case .voicesQuestion: hasher.combine(6)
         case .speakers: hasher.combine(1)
         case .versions: hasher.combine(2)
@@ -50,6 +52,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
         switch self {
         case .voicesQuestion: nil
         case .rename: .rename
+        case .setDateTime: .setDateTime
         case .speakers: .speakers
         case .versions: .versions
         case .documentInfo: .documentInfo
@@ -62,6 +65,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public init?(_ overlay: NoteOverlay, draft: String?, in note: Note) {
         switch overlay {
         case .rename: self = .rename(draft: draft)
+        case .setDateTime: self = .setDateTime
         case .speakers: self = .speakers
         case .versions: self = .versions
         case .documentInfo: self = .documentInfo
@@ -79,6 +83,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
         case .openVersions: self = .versions
         case .openSpeakers: self = .speakers
         case .rename: self = .rename(draft: nil)
+        case .setDateTime: self = .setDateTime
         case .documentInfo: self = .documentInfo
         case .editPassage(let id):
             guard let segment = note?.transcript.first(where: { $0.id == id }) else { return nil }
@@ -92,7 +97,7 @@ public enum NoteSheet: Identifiable, Hashable, Sendable {
     public var draft: String? {
         switch self {
         case .naming(_, let draft), .rename(let draft): draft
-        case .speakers, .versions, .documentInfo, .editing, .voicesQuestion: nil
+        case .setDateTime, .speakers, .versions, .documentInfo, .editing, .voicesQuestion: nil
         }
     }
 }

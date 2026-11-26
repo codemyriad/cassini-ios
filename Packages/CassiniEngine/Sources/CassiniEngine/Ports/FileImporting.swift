@@ -4,8 +4,9 @@ public struct ImportedFile: Hashable, Sendable {
     public var displayName: String
     public var byteCount: Int64
     public var sha256: String
-    public init(displayName: String, byteCount: Int64, sha256: String) {
-        self.displayName = displayName; self.byteCount = byteCount; self.sha256 = sha256
+    public var modifiedAt: Date?
+    public init(displayName: String, byteCount: Int64, sha256: String, modifiedAt: Date? = nil) {
+        self.displayName = displayName; self.byteCount = byteCount; self.sha256 = sha256; self.modifiedAt = modifiedAt
     }
 }
 

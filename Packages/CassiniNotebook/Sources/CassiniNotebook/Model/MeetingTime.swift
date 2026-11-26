@@ -43,20 +43,42 @@ public enum MeetingTime: Hashable, Codable, Sendable {
         return key(day) >= key(lower) && key(day) < key(upper)
     }
 
+    public static func readUserStartedAt(_ document: CassiniDocument) -> String? {
+        guard PortableTranscript.readableStates.contains(document.state),
+              let xMeeting = document.manifest?["x"]?.object?["codemyriad.io"]?.object?["meeting"]?.object,
+              xMeeting["startedAtSource"]?.string == "user",
+              let startedAt = xMeeting["startedAt"]?.string,
+              CassiniDocument.isValidStartedAt(startedAt) else { return nil }
+        return startedAt
+    }
+
     public static func read(_ document: CassiniDocument) -> MeetingTime {
         // A DATE tag alone cannot restore metadata that failed verification or names an unknown format.
         guard PortableTranscript.readableStates.contains(document.state),
               let meeting = document.manifest?["meeting"]?.object else { return .unknown }
+        // D112 (L-87): a date the person set wins over everything, including legacy import-time markers.
+        if let userStartedAt = readUserStartedAt(document), let date = parse(userStartedAt) {
+            return .instant(date)
+        }
+        let isImportTimePrefix = document.manifest?["x"]?.object?["codemyriad.io"]?.object?["namePrefixSource"]?.string == "import-time"
+        if !isImportTimePrefix,
+           let text = meeting["startedAt"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+           CassiniDocument.isValidStartedAt(text), let date = parse(text) {
+            return .instant(date)
+        }
         if let text = meeting["recordedAtUtc"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines),
            text.hasSuffix("Z"), let date = parse(text) {
             return .instant(date)
         }
+        if isImportTimePrefix {
+            return .unknown
+        }
         let created = meeting["createdAtUtc"]?.string.flatMap(parse)
-        // DATE must explicitly carry a zone; an offset-less label cannot establish an instant.
+        // DATE must explicitly carry a zone (never -00:00); an offset-less label cannot establish an instant.
         if let comment = document.comments.first(where: { $0.split(separator: "=", maxSplits: 1).first?.uppercased() == "DATE" }),
            let equal = comment.firstIndex(of: "=") {
             let text = String(comment[comment.index(after: equal)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if let date = parse(text), date != created { return .instant(date) }
+            if !text.hasSuffix("-00:00"), let date = parse(text), date != created { return .instant(date) }
         }
         if let text = meeting["recordedAtLocal"]?.string, !text.isEmpty { return .local(text) }
         return .unknown

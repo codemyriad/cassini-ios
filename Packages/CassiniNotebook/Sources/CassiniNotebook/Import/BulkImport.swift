@@ -43,7 +43,8 @@ public enum ArchiveContents {
     /// Compare portable content, not UUIDs assigned by the importer or Library-only fields such as bookmarks.
     public static func matchesImportedDocument(_ note: Note, _ document: PortableTranscript) -> Bool {
         guard note.document != nil, sameSegments(note.transcript, document.segments), sameSpeakers(note.speakers ?? [], document.speakers),
-              note.language == document.language else { return false }
+              note.language == document.language, note.meetingTime == document.meetingTime,
+              note.userStartedAt == document.userStartedAt else { return false }
         if let title = NoteTitles.fit(document.title), note.title != title { return false }
         let versions = (note.versions ?? []).filter { !$0.segments.isEmpty }
         var originals: [String: TranscriptVersion] = [:]
@@ -76,12 +77,15 @@ public enum ArchiveContents {
     }
 
     public static func preservesOriginal(_ note: Note) -> Bool {
-        let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
-        if !note.hasFinishedTranscript { return true }
-        // An imported document already carries its empty default and any earlier variants.
-        if note.document != nil && note.transcript.isEmpty && !hasLocalWords { return true }
         if note.document?.state == .unknownFormat { return true }
         if case .unplayable = note.audio, note.holdsOnlyImportedVersions { return true }
+        // A user-set recording date must reach archiveSnapshot's document comparison (for verified
+        // documents) or seal a Cassini document (for plain audio), rather than copying raw bytes.
+        let sealsUserDate = note.userStartedAt != nil && (note.document == nil || note.document?.state == .ok)
+        let hasLocalWords = note.versions?.contains { $0.portableID == nil && !$0.segments.isEmpty } ?? false
+        if !note.hasFinishedTranscript && !sealsUserDate { return true }
+        // An imported document already carries its empty default and any earlier variants.
+        if note.document != nil && note.transcript.isEmpty && !hasLocalWords && !sealsUserDate { return true }
         return false
     }
 }

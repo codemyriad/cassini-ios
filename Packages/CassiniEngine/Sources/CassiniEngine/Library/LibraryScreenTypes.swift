@@ -5,6 +5,7 @@ import CassiniNotebook
 /// open one with the scene and it comes back after Cassini was closed.
 public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
     case rename(UUID)
+    case setDateTime(UUID)
     /// "Start over?": the saved progress goes.
     case startOver(UUID)
     /// Transcribe again on a document whose versions cannot be kept.
@@ -14,7 +15,7 @@ public enum LibraryDialog: Identifiable, Hashable, Codable, Sendable {
 
     public var noteID: UUID {
         switch self {
-        case .rename(let id), .startOver(let id), .transcribeFresh(let id): id
+        case .rename(let id), .setDateTime(let id), .startOver(let id), .transcribeFresh(let id): id
         }
     }
 
@@ -52,6 +53,7 @@ public struct SavedLibraryDialog: Codable, Hashable, Sendable {
 public enum NoteAction: Hashable, Sendable {
     case toggleStar
     case rename
+    case setDateTime
     case transcribe
     case transcribeAgain
     /// Stop and keep progress.

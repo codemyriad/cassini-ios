@@ -24,6 +24,7 @@ struct NoteActionsMenu: View {
                 }
                 Button(LibraryCopy.rename, systemImage: "pencil") { perform(.rename) }
                 if !menu.recording {
+                    Button(Wave6Copy.meetingSetDateTime, systemImage: "calendar") { perform(.setDateTime) }
                     transcribeItems(menu)
                     exportMenu(menu)
                     Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }

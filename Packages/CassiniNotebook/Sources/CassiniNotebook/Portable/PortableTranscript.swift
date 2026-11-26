@@ -18,6 +18,8 @@ public struct PortableTranscript: Hashable, Sendable {
     public let title: String
     /// File creation time, only a sorting fallback.
     public let meetingTime: MeetingTime
+    /// D112 (L-87): RFC 3339 timestamp with explicit offset when `startedAtSource == "user"`.
+    public let userStartedAt: String?
     /// `meeting.createdAtUtc`.
     public let createdAt: Date?
     /// `meeting.durationMs`, in seconds.
@@ -61,6 +63,7 @@ public struct PortableTranscript: Hashable, Sendable {
         meetingID = meeting?["id"]?.string.flatMap { $0.isEmpty ? nil : $0 }
         title = document.title
         meetingTime = MeetingTime.read(document)
+        userStartedAt = MeetingTime.readUserStartedAt(document)
         createdAt = meeting?["createdAtUtc"]?.string.flatMap(Self.instant)
         duration = (try? meeting?.number("durationMs")).map { Double($0) / 1000 }
         var unavailable: [String: String] = [:]
@@ -272,6 +275,7 @@ extension PortableTranscript {
         return try CassiniDocument.create(opus, transcript: transcript, title: note.title, processing: processing,
                                           existing: existing, speakerLabels: [:], carrying: carried,
                                           recordedAt: (note.origin == .recorded || note.origin == .recovered) ? note.meetingTime.instant : nil,
+                                          userStartedAt: note.userStartedAt,
                                           speakerLabelsByID: newLabels, speakerHintsByID: hints, target: destination).defaultId
     }
 
