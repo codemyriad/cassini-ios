@@ -1,48 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ %@ kHz": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ %@ kHz"
-          }
-        }
-      },
-      "comment": "The format chip: codec and sample rate, e.g. “PCM 48 kHz”."
-    },
     "%lld h": {
       "extractionState": "manual",
       "localizations": {

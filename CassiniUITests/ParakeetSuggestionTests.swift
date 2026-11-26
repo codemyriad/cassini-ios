@@ -73,9 +73,12 @@ final class ParakeetSuggestionTests: XCTestCase {
         back.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         app.buttons["settingsButton"].tap()
-        XCTAssertTrue(app.staticTexts["Whistle"].firstMatch.waitForExistence(within: 15))
         XCTAssertTrue(app.waitForSettingsPage("map"))
         XCTAssertFalse(app.staticTexts[title].exists)
+        let transcription = app.buttons["transcriptionRow"]
+        XCTAssertTrue(transcription.waitForExistence(within: 15))
+        transcription.tap()
+        XCTAssertTrue(app.staticTexts["Whistle"].firstMatch.waitForExistence(within: 15))
         XCTAssertFalse(app.staticTexts["Parakeet Ultra"].exists)
     }
 }

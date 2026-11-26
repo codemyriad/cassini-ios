@@ -122,11 +122,11 @@ struct TranscribingStatusView: View {
                     .font(.subheadline)
                     .monospacedDigit()
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.muted)
                     .accessibilityHidden(true)
+                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: HitTarget.minimum, alignment: .leading)
             .contentShape(Rectangle())
@@ -146,7 +146,7 @@ struct TranscribingStatusView: View {
             ZStack {
                 Text(MeetingPhase1Copy.stop)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.accentInk)
+                    .foregroundStyle(Color.ink)
                     .opacity(stopBusy ? 0 : 1)
                 if stopBusy {
                     spinner
@@ -270,7 +270,7 @@ struct TranscribingDetailsSheet: View {
             .readableWidth()
         }
         .accessibilityIdentifier("transcribingDetailsSheet")
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .presentationDetents([.medium, .large])
         .presentationBackground(Color.raised)
     }
@@ -312,9 +312,11 @@ private struct DownloadRow: View {
 
 /// The memory check's hint, naming the kind of device it runs on.
 private struct LowMemoryHint: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
     var body: some View {
         Group {
-            if UIDevice.current.userInterfaceIdiom == .pad {
+            if sizeClass == .regular {
                 Text("This iPad is low on memory. Close other apps if transcription stops.", tableName: "Processing",
                      comment: "The memory hint on the processing card of an iPad")
             } else {

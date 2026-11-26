@@ -7,6 +7,7 @@ import CassiniNotebook
 /// confirmed exports and Document info open the Note screen, which runs the action.
 struct NoteActionsMenu: View {
     let noteID: UUID
+    var startSelecting: (() -> Void)? = nil
     @Environment(LibraryScreenModel.self) private var model
 
     let openExport: () -> Void
@@ -14,6 +15,10 @@ struct NoteActionsMenu: View {
     var body: some View {
         Group {
             if let menu = model.menu(noteID) {
+                if let startSelecting {
+                    Button(LibraryCopy.select, systemImage: "checkmark.circle") { startSelecting() }
+                    Divider()
+                }
                 Button(menu.isFavorite ? LibraryCopy.removeStar : LibraryCopy.star, systemImage: menu.isFavorite ? "star.slash" : "star") {
                     perform(.toggleStar)
                 }
@@ -24,7 +29,11 @@ struct NoteActionsMenu: View {
                     exportMenu(menu)
                     Button(LibraryCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) }
                     Divider()
-                    Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+                    Button(role: .destructive) { perform(.moveToTrash) } label: {
+                        Label(TrashCopy.delete, systemImage: "trash")
+                        Text(TrashCopy.recoverableFor30Days)
+                    }
+                    .accessibilityIdentifier("Delete")
                 }
             }
         }

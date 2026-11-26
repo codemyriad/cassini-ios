@@ -68,15 +68,17 @@ final class AcceptanceWalkTests: XCTestCase {
 
         // Move to Recently Deleted: the Library says so; Restore brings the note back with its names.
         app.buttons["Share and more"].tap()
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.staticTexts["“\(Self.title)” moved to Recently Deleted"].waitForExistence(within: 10))
         XCTAssertFalse(row(app).exists)
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         let restore = app.buttons["Restore"]
         XCTAssertTrue(restore.waitForExistence(within: 5))
         shot("09-trash")
         restore.tap()
         XCTAssertTrue(app.staticTexts["Recently Deleted is empty"].waitForExistence(within: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(row(app).waitForExistence(within: 5), "the note is back in the Library")
         row(app).tap()

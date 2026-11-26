@@ -131,6 +131,11 @@ enum LibraryCopy {
 
     // MARK: Actions
 
+    static let select = String(localized: "Select", table: "Library", comment: "Library action: enter selection mode")
+    static let selectAll = String(localized: "Select All", table: "Library", comment: "Selection bar: select every meeting")
+    static func selectedCount(_ count: Int) -> String {
+        String(localized: "\(count) selected", table: "Library", comment: "Selection header: how many meetings are selected")
+    }
     static let star = String(localized: "Star", table: "Library", comment: "Note action (iOS extra)")
     static let removeStar = String(localized: "Remove star", table: "Library", comment: "Note action (iOS extra)")
     static let rename = String(localized: "Rename", table: "Library", comment: "Note action and its dialog title")

@@ -39,7 +39,7 @@ final class BackupFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["backupNoticeDismiss"].waitForExistence(within: 15))
         let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "Thoughts from the morning walk")).firstMatch
         row.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         let undo = app.buttons["Undo"]
         XCTAssertTrue(undo.waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)
@@ -81,7 +81,7 @@ final class BackupFlowTests: XCTestCase {
             let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
             XCTAssertTrue(row.waitForExistence(within: 15))
             row.press(forDuration: 1)
-            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            app.buttons["Delete"].tapWhenSettled()
         }
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
         XCTAssertFalse(app.buttons["backupNoticeDismiss"].exists)

@@ -247,8 +247,8 @@ extension XCUIApplication {
     @MainActor func scrolledLibraryElement(_ element: XCUIElement, description: String) -> XCUIElement {
         let bar = buttons["recordButton"]
         let viewport = scrollViews["libraryScroll"], navigation = navigationBars.firstMatch
-        guard viewport.waitForExistence(within: uiWaitFloor), bar.waitForExistence(within: uiWaitFloor) else {
-            XCTFail("The library's scroll region or capture bar is missing")
+        guard viewport.waitForExistence(within: uiWaitFloor) else {
+            XCTFail("The library's scroll region is missing")
             return element
         }
         func clearFrame() -> CGRect {
@@ -257,7 +257,7 @@ extension XCUIApplication {
             let top = max(frame.minY, navigation.exists ? navigation.frame.maxY : frame.minY,
                           search.exists ? search.frame.maxY : frame.minY) + 8
             let notice = descendants(matching: .any).matching(identifier: "backupNotice").firstMatch
-            let bottom = min(frame.maxY, bar.frame.minY, notice.exists ? notice.frame.minY : frame.maxY) - 8
+            let bottom = min(frame.maxY, bar.exists ? bar.frame.minY : frame.maxY, notice.exists ? notice.frame.minY : frame.maxY) - 8
             return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
         }
         for _ in 0..<12 {
@@ -298,5 +298,19 @@ extension XCUIApplication {
     @MainActor func waitForSettingsPage(_ page: String) -> Bool {
         staticTexts.matching(NSPredicate(format: "identifier == %@ AND value == %@",
             "uiTestState-settingsLoaded", page)).firstMatch.waitForValue(page, within: 15)
+    }
+
+    /// Opens Recently Deleted from Settings (where it now lives instead of the Library top bar).
+    @MainActor func openRecentlyDeleted(file: StaticString = #filePath, line: UInt = #line) {
+        let settings = buttons["settingsButton"]
+        let firstTopic = buttons["transcriptionRow"]
+        XCTAssertTrue(settings.waitForExistence(within: 15), "Settings button not found", file: file, line: line)
+        XCTAssertTrue(settings.tapWhenInteractive(in: self, until: { firstTopic.exists }),
+                      "Settings did not open", file: file, line: line)
+        XCTAssertTrue(waitForSettingsPage("map"), "Settings has not finished loading", file: file, line: line)
+        let row = buttons["recentlyDeletedRow"]
+        XCTAssertTrue(scroll(attempts: 8) { row.exists && row.isHittable },
+                      "Recently Deleted row not found in Settings", file: file, line: line)
+        row.tap()
     }
 }

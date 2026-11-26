@@ -14,6 +14,7 @@ struct NameSpeakerSheet: View {
     @Environment(SettingsStore.self) private var settings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var model: NameSpeakerModel
     @State private var pulse = false
     /// The field's own text: a name cut to its limit is put back into the field, which a computed binding cannot do.
@@ -58,7 +59,7 @@ struct NameSpeakerSheet: View {
                 }
             }
         }
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .tint(.accent)
         .task { await model.open(draft: draft, sheet: handle) }
         .onDisappear { playback.stopSample() }
@@ -314,7 +315,7 @@ struct NameSpeakerSheet: View {
         let subtitle = ui.rememberReason.map(SpeakersCopy.rememberReason)
             ?? SpeakersCopy.rememberBody(ui.name.trimmingCharacters(in: .whitespaces),
                                          automatic: settings.automaticallyNameVoices,
-                                         pad: UIDevice.current.userInterfaceIdiom == .pad,
+                                         pad: sizeClass == .regular,
                                          voicesBackedUp: settings.cloudBackup && settings.includeSavedVoicesInBackups)
         return Toggle(isOn: Binding(get: { ui.remember }, set: { send(.rememberToggled($0)) })) {
             VStack(alignment: .leading, spacing: 2) {

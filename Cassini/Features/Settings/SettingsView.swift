@@ -97,8 +97,9 @@ private struct SettingsForm: View {
     @Environment(Router.self) private var router
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var pad: Bool { sizeClass == .regular }
     private var privacy: String {
         (pad ? LibraryWave5Copy.firstRunPrivacyIpad : LibraryWave5Copy.firstRunPrivacyIphone)
             + " " + LibraryWave5Copy.firstRunPrivacyBackups
@@ -114,6 +115,8 @@ private struct SettingsForm: View {
             case .backup: BackupSection(archiveExport: backupExport)
             }
         }
+        .listRowBackground(Color.card)
+        .listRowSeparatorTint(Color.line)
         .readableListWidth()
         .shareSheet(item: $backupExport.shareItem)
         // Pushing a detail page also disappears this form. Only leaving the Backup route cancels its work.
@@ -128,13 +131,15 @@ private struct SettingsForm: View {
     private var map: some View {
         Group {
             Section {
-                topic(SettingsPhase2Copy.transcription, answer: speechAnswer, icon: "text.bubble", page: .transcription, id: "transcriptionRow")
+                topic(SettingsPhase2Copy.transcription, answer: "", icon: "text.bubble", page: .transcription, id: "transcriptionRow")
                 topic(SettingsPhase2Copy.speakers, answer: settings.identifySpeakers ? SettingsPhase2Copy.on : SettingsPhase2Copy.off,
                       icon: "person.2", page: .speakers, id: "speakersRow")
                 voicesRow
             } header: { Text(SettingsPhase2Copy.transcripts) } footer: {
                 Text(privacy).fixedSize(horizontal: false, vertical: true)
             }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 topic(SettingsPhase2Copy.backup, answer: settings.cloudBackup ? SettingsPhase2Copy.icloud : SettingsPhase2Copy.off,
                       icon: "icloud", page: .backup, id: "backupRow")
@@ -148,6 +153,8 @@ private struct SettingsForm: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("libraryStats")
             }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 Button(action: model.openAppLanguage) {
                     SettingsAnswerRow(title: SettingsPhase2Copy.language,
@@ -156,6 +163,8 @@ private struct SettingsForm: View {
                 .accessibilityHint(Text("Opens Cassini in the Settings app", tableName: "Settings"))
                 .accessibilityIdentifier("appLanguageRow")
             } header: { Text(SettingsPhase2Copy.app) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 Button { router.push(.settingsPage(.about)) } label: {
                     Group {
@@ -180,9 +189,12 @@ private struct SettingsForm: View {
                                                  subtitle: SettingsPhase2Copy.aboutSubtitle)
                             }
                         }
-                    }.padding(.vertical, 6)
+                    }
+                    .padding(.vertical, typeSize.isAccessibilitySize ? 6 : 0)
                 }.accessibilityIdentifier("aboutRow")
             }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             SettingsNoticesSection()
         }
     }
@@ -223,16 +235,24 @@ private struct SettingsForm: View {
                 }
                 if model.showsSpeechLanguage { SpeechLanguagePicker(model: model, language: $settings.speechLanguage) }
             } header: { Text(SettingsPhase2Copy.forNew) } footer: { Text(SettingsPhase2Copy.keepTranscript) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 Toggle(SettingsPhase2Copy.rightAway, isOn: $settings.autoTranscribe).accessibilityIdentifier("autoTranscribeToggle")
             } header: { Text(SettingsPhase2Copy.afterRecording).padding(.top, 24) } footer: { Text(SettingsPhase2Copy.rightAwaySubtitle) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 Button { router.push(.licenseText(.modelSources)) } label: {
                     SettingsAnswerRow(title: SettingsPhase2Copy.whereFrom, answer: "")
                 }
             } header: { Text(SettingsPhase2Copy.goingOnline).padding(.top, 24) } footer: { Text(SettingsPhase2Copy.online) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             if let store = ports.speechModels, store.promotionVisible {
                 Section { ParakeetSuggestionView(store: store, placement: .settings) }
+                    .listRowBackground(Color.card)
+                    .listRowSeparatorTint(Color.line)
             }
             SettingsNoticesSection()
         }
@@ -257,6 +277,8 @@ private struct SettingsForm: View {
             } header: { Text(SettingsPhase2Copy.whoIsSpeaking) } footer: {
                 Text(pad ? SettingsPhase2Copy.runsOnIpad : SettingsPhase2Copy.runsOnIphone)
             }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             Section {
                 Toggle(isOn: Binding(get: { settings.rememberPeopleIName }, set: settings.setRememberPeopleIName)) {
                     description(SettingsPhase2Copy.rememberDefault, SettingsPhase2Copy.rememberDefaultSubtitle)
@@ -270,12 +292,16 @@ private struct SettingsForm: View {
                 .accessibilityIdentifier("autoNameVoicesToggle")
                 voicesRow
             } header: { Text(SettingsPhase2Copy.savedVoices) } footer: { Text(Wave6Copy.savedVoicesPrivacyPhone) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             // Preserve installation status and size in the second layer, including retries and pending consent.
             Section {
                 ForEach(model.models.filter { $0.part != .speech }) { row in
                     ModelRowView(row: row) { model.openModel(row.part) }
                 }
             }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
             SettingsNoticesSection()
         }
     }
@@ -309,6 +335,8 @@ private struct SettingsForm: View {
                 }.accessibilityIdentifier("aboutSourceCode")
             } footer: { Text(SettingsPhase2Copy.licenceLine.replacingOccurrences(of: "{year}",
                 with: String(Calendar(identifier: .gregorian).component(.year, from: Date())))) }
+            .listRowBackground(Color.card)
+            .listRowSeparatorTint(Color.line)
         }
     }
 
@@ -348,16 +376,20 @@ private struct SettingsAnswerRow: View {
                     .accessibilityHidden(true)
             }
             if typeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 3) { Text(title).foregroundStyle(Color.ink); Text(answer).foregroundStyle(Color.muted) }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).foregroundStyle(Color.ink)
+                    if !answer.isEmpty { Text(answer).foregroundStyle(Color.muted) }
+                }
+                .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             } else {
                 Text(title).foregroundStyle(Color.ink)
                 Spacer(minLength: 8)
-                Text(answer).foregroundStyle(Color.muted).multilineTextAlignment(.trailing)
+                if !answer.isEmpty { Text(answer).foregroundStyle(Color.muted).multilineTextAlignment(.trailing) }
             }
             Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
-        .frame(minHeight: 40).contentShape(Rectangle()).accessibilityElement(children: .combine)
+        .contentShape(Rectangle()).accessibilityElement(children: .combine)
     }
 }
 

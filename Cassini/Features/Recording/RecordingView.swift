@@ -15,7 +15,7 @@ struct RecordingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RecordingHeader(phase: screen.phase, format: screen.format, minimise: screen.minimise)
+            RecordingHeader(phase: screen.phase, minimise: screen.minimise)
                 .padding(.horizontal, 16).padding(.top, 6)
             GeometryReader { geometry in
                 // Title, banner and meter scroll together, so the header and the controls stay reachable in short
@@ -54,8 +54,8 @@ struct RecordingView: View {
             RecordingControls(isPaused: screen.phase == .paused, capturing: capturing,
                               allMeetings: screen.minimise, pauseOrResume: screen.pauseOrResume, stop: screen.finish)
             .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 28)
+            .frame(maxWidth: ReadableWidth.content)
         }
-        .frame(maxWidth: ReadableWidth.content)
         .frame(maxWidth: .infinity)
         .background(Color.recordingBackground.ignoresSafeArea())
         .foregroundStyle(Color.recordingText)
@@ -72,41 +72,49 @@ struct RecordingView: View {
 private struct RecordingCaption: View {
     let screen: RecordingScreenModel
     var body: some View {
-        if let caption {
-            Text(caption).font(.subheadline).foregroundStyle(Color.recordingSecondary)
-                .multilineTextAlignment(.center).frame(maxWidth: 280)
+        let lines = captionLines
+        if !lines.isEmpty {
+            VStack(spacing: 2) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.recordingSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
-    private var caption: String? {
+    private var captionLines: [String] {
         switch screen.phase {
-        case .needsPermission: nil
-        case .starting: String(localized: "Starting the microphone…", table: "Recording")
-        case .stopping: String(localized: "Saving the recording…", table: "Recording")
-        case .recording, .paused: RecordingCopy.hint(screen.space)
+        case .needsPermission: []
+        case .starting: [String(localized: "Starting the microphone…", table: "Recording")]
+        case .stopping: [String(localized: "Saving the recording…", table: "Recording")]
+        case .recording, .paused: RecordingCopy.hintLines(screen.space)
         }
     }
 }
 
 private struct RecordingHeader: View {
     let phase: RecordingPhase
-    let format: CaptureFormat
     let minimise: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
         if dynamicType.isAccessibilitySize {
             VStack(spacing: 8) {
-                HStack { minimiseButton; Spacer(); formatLabel }
+                HStack { minimiseButton; Spacer() }
                 if phase == .recording || phase == .paused { RecordingStatus(isPaused: phase == .paused) }
             }
         } else {
-            HStack {
-                minimiseButton
-                Spacer()
+            ZStack {
+                HStack {
+                    minimiseButton
+                    Spacer()
+                }
                 if phase == .recording || phase == .paused { RecordingStatus(isPaused: phase == .paused) }
-                Spacer()
-                formatLabel
             }
             .frame(minHeight: 48)
         }
@@ -120,12 +128,6 @@ private struct RecordingHeader: View {
         }
         .accessibilityLabel(MeetingPhase1Copy.backToAllMeetings)
         .accessibilityHint(Text("The recording continues.", tableName: "Recording"))
-    }
-
-    private var formatLabel: some View {
-        Text(RecordingCopy.format(format)).font(.caption.weight(.semibold)).monospacedDigit()
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Color.recordingButtonWash, in: Capsule())
     }
 }
 

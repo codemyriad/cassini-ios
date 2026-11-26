@@ -43,7 +43,7 @@ struct VoicesQuestionSheet: View {
         .accessibilityIdentifier("voicesQuestionScroll")
         .scrollBounceBehavior(.basedOnSize)
         .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(contentHeight), .large])
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .presentationCornerRadius(34)
         .presentationBackground(Color.raised)
     }

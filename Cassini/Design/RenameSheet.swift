@@ -51,7 +51,7 @@ struct RenameSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button(saveLabel, action: confirm).disabled(!canSave) }
             }
         }
-        .presentationDetents([.medium]).presentationDragIndicator(.visible)
+        .presentationDetents([.medium]).compactDragIndicator()
         .onAppear {
             text = draft ?? original
             focused = true

@@ -78,7 +78,7 @@ final class LibraryUITests: XCTestCase {
             let count = app.buttons.matching(identifier: "noteRow").count
             let note = app.buttons.matching(identifier: "noteRow").firstMatch
             note.press(forDuration: 1)
-            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            app.buttons["Delete"].tapWhenSettled()
             XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
             XCTAssertTrue(poll(within: uiWaitFloor) { app.buttons.matching(identifier: "noteRow").count < count })
         }
@@ -154,14 +154,14 @@ final class LibraryUITests: XCTestCase {
         let second = row(app, "Second capture")
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         second.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
         app.buttons["Undo"].tap()
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         second.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: uiWaitFloor))
-        app.buttons["Recently Deleted"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.buttons["Restore"].firstMatch.waitForExistence(within: uiWaitFloor))
         // The fixed test clock gives all trash entries the same deletion date; locate this card by title.
         let deletedTitle = app.staticTexts["Second capture"]
@@ -172,6 +172,8 @@ final class LibraryUITests: XCTestCase {
             XCTFail("The recorded note's Restore button is missing"); return
         }
         restore.tapWhenSettled()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: uiWaitFloor))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(second.waitForExistence(within: uiWaitFloor))
         try assertRowPixels(second, contain: "2 speakers", excluding: "Recording")
@@ -280,7 +282,7 @@ final class LibraryUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"] + arguments
         app.launchAndWait()
-        XCTAssertTrue(app.textFields["librarySearch"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 15))
         return app
     }
 
@@ -306,7 +308,7 @@ final class LibraryUITests: XCTestCase {
         app.buttons["retryImport"].tapWhenSettled()
         XCTAssertTrue(app.buttons["dismissImport"].waitForExistence(within: 15))
         app.buttons["dismissImport"].tapWhenSettled()
-        XCTAssertTrue(app.textFields["librarySearch"].exists)
+        XCTAssertTrue(app.buttons["settingsButton"].exists)
         XCTAssertFalse(card.exists)
     }
 
@@ -563,18 +565,21 @@ final class LibraryUITests: XCTestCase {
             row(app, "A quieter kind of productivity").tap()
             XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: uiWaitFloor))
         }
-        if search {
-            app.textFields["librarySearch"].tap()
-            app.textFields["librarySearch"].typeText("Voice note\n")
-            XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: uiWaitFloor))
-        }
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["pauseResumeRecording"].waitForEnabled(within: uiWaitFloor))
         let meeting = row(app, "Voice note 8 Oct, 09:41")
-        if minimised {
+        if search || minimised {
             app.buttons["recordingAllMeetings"].tap()
-            XCTAssertTrue(waitFor(meeting, label: ", recording"), meeting.label)
-            try assertRowPixels(meeting, contain: "Recording")
+            if search {
+                app.textFields["librarySearch"].tap()
+                app.textFields["librarySearch"].typeText("Voice note\n")
+                XCTAssertTrue(app.staticTexts["librarySearchCount"].waitForExistence(within: uiWaitFloor))
+            }
+            if minimised {
+                XCTAssertTrue(waitFor(meeting, label: ", recording"), meeting.label)
+                try assertRowPixels(meeting, contain: "Recording")
+            }
+            XCTAssertTrue(meeting.waitForExistence(within: uiWaitFloor))
             meeting.tap()
             XCTAssertTrue(app.buttons["stopRecording"].waitForExistence(within: uiWaitFloor))
         }
@@ -589,6 +594,10 @@ final class LibraryUITests: XCTestCase {
         assertIPadSplitView(app)
         if UIDevice.current.userInterfaceIdiom == .pad { XCTAssertTrue(meeting.isSelected, "Finished note is selected beside its detail") }
         try assertRowPixels(meeting, contain: automatic ? "2 speakers" : "Audio only", excluding: "Recording")
+        if search {
+            XCTAssertFalse(app.buttons["recordButton"].exists, "CaptureBar hides while searching")
+            app.buttons["closeLibrarySearch"].tap()
+        }
         XCTAssertTrue(app.buttons["recordButton"].waitForEnabled(within: uiWaitFloor))
         XCTAssertEqual(app.buttons["recordButton"].label, "Record a new note")
         XCTAssertFalse(app.buttons["activeRecordingCard"].exists)
@@ -751,7 +760,7 @@ final class LibraryUITests: XCTestCase {
             guard date.exists, dateControl(app).isEnabled else { return false }
             let pane = app.scrollViews["libraryScroll"].frame.intersection(app.windows.firstMatch.frame)
             return pane.contains(date.frame) && date.frame.minY >= app.textFields["librarySearch"].frame.maxY
-                && date.frame.maxY <= app.buttons["recordButton"].frame.minY
+                && date.frame.maxY <= pane.maxY && !app.buttons["recordButton"].exists
         },
                       "opening Search brings the date filter into view without another swipe", file: file, line: line)
         XCTAssertTrue(count.wait(until: NSPredicate(format: "label == '1 meeting' AND hittable == true"), within: 15),
@@ -780,7 +789,8 @@ final class LibraryUITests: XCTestCase {
             if done() { return true }
             let pane = app.scrollViews["libraryScroll"].frame.intersection(app.windows.firstMatch.frame)
             let top = max(pane.minY, app.textFields["librarySearch"].frame.maxY) + 24
-            let bottom = min(pane.maxY, app.buttons["recordButton"].frame.minY) - 24
+            let recordButton = app.buttons["recordButton"]
+            let bottom = min(pane.maxY, recordButton.exists ? recordButton.frame.minY : pane.maxY) - 24
             guard !pane.isEmpty, bottom - top > 100 else { return false }
             let origin = app.coordinate(withNormalizedOffset: .zero)
             let start = origin.withOffset(CGVector(dx: pane.midX, dy: up ? bottom : top))
@@ -898,7 +908,7 @@ final class LibraryUITests: XCTestCase {
         close.tap()
         let settings = app.buttons["settingsButton"]
         XCTAssertTrue(settings.waitForExistence(within: 5))
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        XCTAssertFalse(app.buttons["recentlyDeletedButton"].exists)
         settings.tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(within: 15))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(search.frame), "Settings replaces only the detail column")
@@ -941,7 +951,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(date.wait(until: NSPredicate(format: "label CONTAINS 'Today'"), within: 5))
         close.tap()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(within: 5))
-        XCTAssertTrue(app.buttons["recentlyDeletedButton"].exists)
+        XCTAssertFalse(app.buttons["recentlyDeletedButton"].exists)
         XCTAssertFalse(close.exists)
         XCTAssertTrue(poll(within: uiWaitFloor) { (search.value as? String).map { $0.isEmpty || $0 == emptyQueryValue } ?? false },
                       "Close clears the query")
@@ -1026,7 +1036,7 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(garden.waitForExistence(within: 5))
         XCTAssertTrue(row(app, "Notes from the design review").waitForNonExistence(within: 5))
         garden.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        app.buttons["Delete"].tapWhenSettled()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 5))
         // Undo is available before the asynchronous search results have rendered the removal.
         XCTAssertTrue(app.staticTexts["Nothing matches “tomatoe”"].waitForExistence(within: 5))
@@ -1059,9 +1069,13 @@ final class LibraryUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Import audio"].exists, "Record and Import stay in the bottom capture bar")
         XCTAssertFalse(app.buttons["Import"].exists, "no duplicate Import banner button")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "never leaves")).firstMatch.exists)
-        // iOS 18's sidebar scroll surface extends beyond the window; the gutter starts at its visible edge.
+        // On iPhone the 14 pt gutter starts at the visible edge; on iPad first run is centred in one full-screen column.
         let viewport = app.scrollViews["libraryScroll"].frame.intersection(app.frame)
-        XCTAssertEqual(title.frame.minX, viewport.minX + 16, accuracy: 1)
+        if pad {
+            XCTAssertGreaterThan(title.frame.minX, viewport.minX + 14)
+        } else {
+            XCTAssertEqual(title.frame.minX, viewport.minX + 14, accuracy: 1)
+        }
         XCTAssertEqual(title.frame.minX, app.buttons["importButton"].frame.minX, accuracy: 1)
         XCTAssertGreaterThan(title.frame.minY, app.frame.midY)
         XCTAssertLessThan(privacy.frame.maxY, app.buttons["recordButton"].frame.minY)

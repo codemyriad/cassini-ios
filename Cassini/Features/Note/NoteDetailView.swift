@@ -32,6 +32,7 @@ struct NoteDetailView: View {
     @State private var transcribingDetailsOpen = false
     @State private var exportOpen = false
     @State private var exportPresented = false
+    @State private var findFieldFocused = false
 
     init(model: @autoclosure () -> NoteScreenModel) {
         let model = model()
@@ -151,7 +152,7 @@ struct NoteDetailView: View {
                 let headerSpeakers = mode == .processing ? [] : (model.shownDraft.map { cache.draft($0).headerSpeakers } ?? [])
                 ProcessingBody(note: note, isProcessing: mode == .processing, model: model, cache: cache) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerSpeakers,
-                               nameSpeaker: { model.speakerTapped($0) })
+                               nameSpeaker: { model.speakerTapped($0) }, openSpeakers: { model.perform(.speakers) })
                     ForEach(mode.sections, id: \.self) { section in
                         NoteSectionView(section: section, note: note, mode: mode, model: model,
                                         openDetails: openDetails)
@@ -187,16 +188,17 @@ struct NoteDetailView: View {
                 InNoteSearchBar(query: searchQuery, current: current, total: matches.count,
                                 previous: { model.screen.search?.previous(of: matches.count) },
                                 next: { model.screen.search?.next(of: matches.count) },
-                                close: { model.screen.closeSearch() })
-                    .padding(.horizontal, Spacing.gutter).padding(.vertical, 8)
-                    .readableWidth()
+                                close: { model.screen.closeSearch() },
+                                onFocusChange: { findFieldFocused = $0 })
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .meetingReadableWidth()
                     .background(Color.paper)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 FollowChipHost(noteID: noteID, follow: model.screen.follow) { model.resumeFollowing() }
-                if mode.hasPlayer, note.audio.isPlayable {
+                if mode.hasPlayer, note.audio.isPlayable, !(model.screen.search != nil && findFieldFocused) {
                     NotePlayerBar(note: note, markMoment: { model.markMoment(at: $0) })
                 }
             }
@@ -214,12 +216,16 @@ struct NoteDetailView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if mode == .reading, !transcript.isEmpty {
                     Button(NoteCopy.searchInTranscript, systemImage: "magnifyingglass") { model.screen.openSearch() }
+                        .foregroundStyle(Color.ink)
+                        .tint(Color.ink)
                         .accessibilityIdentifier("searchTranscript")
                 }
                 NoteMenu(note: note, transcribeRow: TranscribeRow.of(note, job: job), transcribeAction: model.transcribeAction,
                          exportingDocument: model.exportingDocument || model.exportingFile,
                          exportOpen: $exportOpen, exportPresented: $exportPresented,
                          perform: { model.perform($0) })
+                    .foregroundStyle(Color.ink)
+                    .tint(Color.ink)
             }
         }
     }
