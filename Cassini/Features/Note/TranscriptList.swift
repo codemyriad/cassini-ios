@@ -43,7 +43,7 @@ struct TranscriptList: View {
     @State private var expandedRuns: Set<String> = []
 
     var body: some View {
-        let items = style == .reading && transcript.turns.contains(where: \.isBackground)
+        let items = style == .reading && transcript.turns.contains(where: \.isFullyBackground)
             ? TranscriptFolding.items(of: transcript.turns)
             : transcript.turns.map(TranscriptDisplayItem.turn)
         LazyVStack(alignment: .leading, spacing: 14) {

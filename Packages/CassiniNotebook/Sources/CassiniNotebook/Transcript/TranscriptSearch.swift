@@ -15,7 +15,7 @@ public enum TranscriptSearch {
         let needle = fold(query.trimmingCharacters(in: .whitespacesAndNewlines)).text
         guard !needle.isEmpty else { return [] }
         var result: [TranscriptMatch] = []
-        for turn in turns where !turn.isBackground {
+        for turn in turns where !turn.isFullyBackground {
             let folded = spoken(turn)
             let haystack = folded.text
             guard haystack.count >= needle.count else { continue }
@@ -32,16 +32,16 @@ public enum TranscriptSearch {
         return result
     }
 
-    /// Search actual words, keeping the rendered offsets across inline speaker labels and parentheses.
-    /// A label rename must not create a match; a phrase crossing a chip still maps to its real first/last words.
+    /// Search actual foreground words, keeping the rendered offsets across inline speaker labels and parentheses.
+    /// A label rename must not create a match; a background host still exposes its foreground interjections.
     private static func spoken(_ turn: NoteTurn) -> Folded {
-        guard !turn.interjections.isEmpty else { return fold(turn.text) }
+        guard !turn.interjections.isEmpty || turn.isBackground else { return fold(turn.text) }
         var result = Folded(text: [], source: [])
         result.text.reserveCapacity(turn.text.count)
         result.source.reserveCapacity(turn.text.count)
         var previousEnd = 0
         for (index, word) in turn.words.enumerated() {
-            if turn.interjections.contains(where: { $0.isBackground && $0.wordRange.contains(index) }) { continue }
+            if turn.isWordBackground(index) { continue }
             let offset = turn.offsets[index]
             if !result.text.isEmpty && offset > previousEnd {
                 result.text.append(" ")

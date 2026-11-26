@@ -75,10 +75,16 @@ public struct SpeakerSheetSession: Hashable, Sendable {
     /// Builds the ordered roster for a note, matching the canonical word order under the meeting title.
     public static func roster(for note: Note, voices: [SavedVoice] = []) -> [RowSpeaker] {
         let transcript = NoteTranscripts.sealed(note, voices: voices)
-        let catalog = Dictionary((note.speakers ?? []).map { ($0.byteID, $0) }, uniquingKeysWith: { first, _ in first })
+        return roster(from: transcript.allHeaderSpeakers, speakers: note.speakers ?? [])
+    }
+
+    /// Builds the ordered roster from already-prepared `allHeaderSpeakers` without rebuilding the transcript.
+    public static func roster(from allHeaderSpeakers: [TranscriptSpeaker], speakers: [NoteSpeaker]) -> [RowSpeaker] {
+        let catalog = Dictionary(speakers.map { ($0.byteID, $0) }, uniquingKeysWith: { first, _ in first })
         var rows: [RowSpeaker] = []
+        rows.reserveCapacity(max(allHeaderSpeakers.count, speakers.count))
         var seen = Set<Data>()
-        for (ordinal, speaker) in transcript.allHeaderSpeakers.enumerated() {
+        for (ordinal, speaker) in allHeaderSpeakers.enumerated() {
             seen.insert(speaker.byteID)
             let stored = catalog[speaker.byteID]
             rows.append(RowSpeaker(
@@ -91,7 +97,7 @@ public struct SpeakerSheetSession: Hashable, Sendable {
             ))
         }
         // Include any catalog speaker without spoken words at the end, in catalog order.
-        for speaker in note.speakers ?? [] where seen.insert(speaker.byteID).inserted {
+        for speaker in speakers where seen.insert(speaker.byteID).inserted {
             let ordinal = rows.count
             let tint = speaker.colourIndex.map { SpeakerTint.named($0) } ?? .stone
             rows.append(RowSpeaker(
@@ -104,6 +110,24 @@ public struct SpeakerSheetSession: Hashable, Sendable {
             ))
         }
         return rows
+    }
+
+    /// Lightweight O(speakers) fallback roster from the note's speaker catalog while canonical order prepares off-main.
+    public static func catalogRoster(for speakers: [NoteSpeaker]) -> [RowSpeaker] {
+        speakers.enumerated().map { ordinal, speaker in
+            RowSpeaker(
+                speakerID: speaker.id,
+                label: speaker.name,
+                ordinal: ordinal,
+                tint: speaker.colourIndex.map { SpeakerTint.named($0) } ?? .stone,
+                isBackground: speaker.background,
+                provenance: speaker.provenance
+            )
+        }
+    }
+
+    public mutating func updateRoster(_ roster: [RowSpeaker]) {
+        self.roster = roster
     }
 
     public var currentState: NamingState? { drafts[Data(selectedSpeakerID.utf8)] }

@@ -438,10 +438,29 @@ public final class NoteScreenModel {
     }
 
     /// The model of Name a speaker for one of the note's speakers, or one of the draft's: its saves then go to the
-    /// draft's names, and are refused once the job closed naming.
-    public func naming(_ speakerID: String, displayLabel: @escaping (NamingInput) -> String = { $0.label }) -> NameSpeakerModel {
+    /// draft's names, and are refused once the job closed naming. Pass cached `allHeaderSpeakers` from `TranscriptCache`
+    /// when available; otherwise the canonical roster is prepared off-main during `open` without rebuilding the full
+    /// transcript on the main actor.
+    public func naming(_ speakerID: String, allHeaderSpeakers: [TranscriptSpeaker]? = nil,
+                       displayLabel: @escaping (NamingInput) -> String = { $0.label }) -> NameSpeakerModel {
         guard isDraftSpeaker(speakerID) else {
-            let roster = note.map { SpeakerSheetSession.roster(for: $0, voices: ports.savedVoices()) } ?? []
+            let currentNote = note
+            let roster: [SpeakerSheetSession.RowSpeaker]
+            let prepareRoster: (@MainActor () async -> [SpeakerSheetSession.RowSpeaker])?
+            if let allHeaderSpeakers {
+                roster = SpeakerSheetSession.roster(from: allHeaderSpeakers, speakers: currentNote?.speakers ?? [])
+                prepareRoster = nil
+            } else {
+                roster = SpeakerSheetSession.catalogRoster(for: currentNote?.speakers ?? [])
+                let voices = ports.savedVoices()
+                prepareRoster = currentNote.map { note in
+                    {
+                        await Task.detached(priority: .userInitiated) {
+                            SpeakerSheetSession.roster(for: note, voices: voices)
+                        }.value
+                    }
+                }
+            }
             return NameSpeakerModel(noteID: noteID, speakerID: speakerID, roster: roster, displayLabel: displayLabel, ports: .init(
                 input: ports.namingInput, perform: ports.performNaming,
                 readOnly: { [weak self] in self?.readOnly },
@@ -449,7 +468,8 @@ public final class NoteScreenModel {
                 onSaved: { [weak self] summary, snapshot in
                     guard let self, let snapshot, summary.toastKind != nil else { return }
                     self.speakerToast = SpeakerToast(summary: summary, snapshot: snapshot)
-                }))
+                },
+                prepareRoster: prepareRoster))
         }
         let change = ports.changeDraft, open = ports.draftNamingOpen
         return NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import CassiniEngine
+@testable import CassiniEngine
 import CassiniEngineTesting
 import CassiniNotebook
 
@@ -544,5 +544,319 @@ import CassiniNotebook
         guard case .failed = outcome else { Issue.record("forgot everyone in a folder that can't be written: \(outcome)"); return }
         #expect(h.voices.savedVoices.count == 1)
         #expect(h.library.note(note.id)?.speakers?.first?.match.voiceID != nil)
+    }
+
+    // MARK: - Batch Save, Rollback & Undo (D-1167)
+
+    /// Reassigning a confirmed speaker whose previous voice had only this sample deletes that voice and scrubs links
+    /// across other notes; Undo restores the deleted voice, its sample, the confirmed link, and the scrubbed link.
+    @Test func batchUndoRestoresReassignedSpeakerDeletedLastSampleVoiceAndScrubbedLinks() async throws {
+        defer { h.tearDown() }
+        let printA = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        let printB = SpeakerPrint(speakerID: "b", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10)
+        let printOther = SpeakerPrint(speakerID: "x", model: VoiceprintModel.sha256, vector: [0.5, 0.5], speechSeconds: 10)
+
+        var note = Note(title: "Primary")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 5, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Coffee", start: 6, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        var otherNote = Note(title: "Other")
+        otherNote.status = .ready
+        otherNote.speakers = [NoteSpeaker(id: "x", name: "Carol"), NoteSpeaker(id: "y", name: "Bob")]
+        otherNote.transcript = [
+            .init(text: "Hi", start: 0, end: 5, speaker: "Carol", speakerID: "x"),
+            .init(text: "Yo", start: 6, end: 10, speaker: "Bob", speakerID: "y"),
+        ]
+        let repo = try NoteRepository(root: h.root)
+        try repo.save(note)
+        try repo.save(otherNote)
+        await h.start()
+        try await h.voices.store?.savePrints([printA, printB], noteID: note.id)
+        try await h.voices.store?.savePrints([printOther], noteID: otherNote.id)
+
+        // Enrol Bob (only sample = note/a) and Carol (only sample = otherNote/x).
+        try await remember("Bob", speaker: "a", in: note.id, voices: h.voices)
+        try await remember("Carol", speaker: "x", in: otherNote.id, voices: h.voices)
+        let bob = try #require(h.voices.savedVoices.first { $0.name == "Bob" })
+        let carol = try #require(h.voices.savedVoices.first { $0.name == "Carol" })
+
+        // Give otherNote/y an automatic link to Bob so forgetting Bob scrubs it.
+        _ = await h.library.commit(otherNote.id) { n in
+            n.speakers?[1].match = .auto(voice: bob.id, score: 0.9)
+        }
+        await h.library.settle()
+
+        // Batch: reassign a from Bob -> Carol (unenrol deletes Bob's last sample) AND mark b as background.
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .unenrol(speakerID: "a"),
+                .relabel(speakerID: "a", name: "Carol"),
+                .rememberVoice(speakerID: "a", voiceID: carol.id, name: "Carol"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+
+        #expect(h.voices.voice(bob.id) == nil, "Bob had only a's sample and was forgotten")
+        #expect(h.voices.voice(carol.id)?.samples.count == 2)
+        #expect(h.library.note(otherNote.id)?.speaker("y")?.match == .unmatched, "scrubbed link on otherNote")
+        #expect(h.library.note(note.id)?.speaker("b")?.background == true)
+
+        // Undo must restore Bob, Bob's sample, a's confirmed link to Bob, Carol's original 1 sample,
+        // otherNote/y's scrubbed link to Bob, and b's foreground state.
+        await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        let restoredBob = try #require(h.voices.voice(bob.id))
+        #expect(restoredBob.name == "Bob")
+        #expect(restoredBob.samples.count == 1)
+        #expect(restoredBob.samples.first?.noteID == note.id)
+        #expect(restoredBob.samples.first?.print.speakerID == "a")
+        #expect(h.voices.voice(carol.id)?.samples.count == 1)
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: bob.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Bob")
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+        #expect(h.library.note(otherNote.id)?.speaker("y")?.match == .auto(voice: bob.id, score: 0.9))
+    }
+
+    /// Multi-speaker swap (A -> Bob, B -> Carol, C -> background) followed by Undo replays inverse ops in strict
+    /// reverse order so Bob is never temporarily deleted or overcounted.
+    @Test func batchUndoReplaysMultiSpeakerSwapInStrictReverseOrder() async throws {
+        defer { h.tearDown() }
+        let printA = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        let printB = SpeakerPrint(speakerID: "b", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10)
+        let printOther = SpeakerPrint(speakerID: "x", model: VoiceprintModel.sha256, vector: [0.5, 0.5], speechSeconds: 10)
+
+        var note = Note(title: "Swap")
+        note.status = .ready
+        note.speakers = [
+            NoteSpeaker(id: "a", name: "Speaker 1"),
+            NoteSpeaker(id: "b", name: "Speaker 2"),
+            NoteSpeaker(id: "c", name: "Speaker 3"),
+        ]
+        note.transcript = [
+            .init(text: "One", start: 0, end: 5, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Two", start: 6, end: 11, speaker: "Speaker 2", speakerID: "b"),
+            .init(text: "Three", start: 12, end: 15, speaker: "Speaker 3", speakerID: "c"),
+        ]
+        var otherNote = Note(title: "CarolNote")
+        otherNote.status = .ready
+        otherNote.speakers = [NoteSpeaker(id: "x", name: "Speaker 1")]
+        otherNote.transcript = [.init(text: "Hi", start: 0, end: 5, speaker: "Speaker 1", speakerID: "x")]
+        let repo = try NoteRepository(root: h.root)
+        try repo.save(note)
+        try repo.save(otherNote)
+        await h.start()
+        try await h.voices.store?.savePrints([printA, printB], noteID: note.id)
+        try await h.voices.store?.savePrints([printOther], noteID: otherNote.id)
+
+        try await remember("Bob", speaker: "b", in: note.id, voices: h.voices)
+        try await remember("Carol", speaker: "x", in: otherNote.id, voices: h.voices)
+        let bob = try #require(h.voices.savedVoices.first { $0.name == "Bob" })
+        let carol = try #require(h.voices.savedVoices.first { $0.name == "Carol" })
+
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Bob"),
+                .rememberVoice(speakerID: "a", voiceID: bob.id, name: "Bob"),
+            ]),
+            .init(speakerID: "b", effects: [
+                .unenrol(speakerID: "b"),
+                .relabel(speakerID: "b", name: "Carol"),
+                .rememberVoice(speakerID: "b", voiceID: carol.id, name: "Carol"),
+            ]),
+            .init(speakerID: "c", effects: [.setBackground(speakerID: "c", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+
+        #expect(h.voices.voice(bob.id)?.samples.map(\.print.speakerID) == ["a"])
+        #expect(h.voices.voice(carol.id)?.samples.count == 2)
+        #expect(h.library.note(note.id)?.speaker("c")?.background == true)
+
+        await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        let restoredBob = try #require(h.voices.voice(bob.id))
+        #expect(restoredBob.samples.count == 1)
+        #expect(restoredBob.samples.first?.print.speakerID == "b")
+        #expect(h.voices.voice(carol.id)?.samples.count == 1)
+        #expect(h.voices.voice(carol.id)?.samples.first?.noteID == otherNote.id)
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .unmatched)
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Speaker 1")
+        #expect(h.library.note(note.id)?.speaker("b")?.match == .confirmed(voice: bob.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("b")?.name == "Bob")
+        #expect(h.library.note(note.id)?.speaker("c")?.background == false)
+    }
+
+    /// Renaming a saved voice in a batch alongside marking another speaker background is reversed by Undo.
+    @Test func batchUndoReversesSavedVoiceRename() async throws {
+        defer { h.tearDown() }
+        var note = Note(title: "Rename")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 6, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Noise", start: 7, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        try NoteRepository(root: h.root).save(note)
+        await h.start()
+        try await h.voices.store?.savePrints([print], noteID: note.id)
+        try await remember("Alex", speaker: "a", in: note.id, voices: h.voices)
+        let alex = try #require(h.voices.savedVoices.first)
+
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Alexander"),
+                .renameVoice(voiceID: alex.id, name: "Alexander"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+
+        #expect(h.voices.voice(alex.id)?.name == "Alexander")
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Alexander")
+        #expect(h.library.note(note.id)?.speaker("b")?.background == true)
+
+        await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        #expect(h.voices.voice(alex.id)?.name == "Alex")
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Alex")
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+    }
+
+    /// Switching transcript versions while the Undo snackbar is visible never overwrites the newly shown version;
+    /// Undo restores only the original version's changed speakers.
+    @Test func batchUndoAfterSwitchingTranscriptVersionsDoesNotCorruptCurrentVersion() async throws {
+        defer { h.tearDown() }
+        let v1 = UUID(), v2 = UUID()
+        var note = Note(title: "Two versions")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "s1", name: "Silvio", provenance: .user),
+                         NoteSpeaker(id: "s2", name: "Ruurd", provenance: .user)]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 4, speaker: "Silvio", speakerID: "s1"),
+            .init(text: "Coffee", start: 5, end: 8, speaker: "Ruurd", speakerID: "s2"),
+        ]
+        note.saveCurrentVersion(.transcription, id: v1)
+
+        note.speakers = [NoteSpeaker(id: "s1", name: "Alice", provenance: .user),
+                         NoteSpeaker(id: "s3", name: "Bob", provenance: .user, background: true)]
+        note.transcript = [
+            .init(text: "Different", start: 0, end: 4, speaker: "Alice", speakerID: "s1"),
+            .init(text: "Chatter", start: 5, end: 8, speaker: "Bob", speakerID: "s3"),
+        ]
+        note.saveCurrentVersion(.speakerAnalysis, id: v2)
+        note.selectVersion(v1)
+        try NoteRepository(root: h.root).save(note)
+        await h.start()
+
+        // Mark s2 as background on v1.
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "s2", effects: [.setBackground(speakerID: "s2", background: true)]),
+        ], noteID: note.id)
+        #expect(snapshot.versionID == v1)
+        #expect(h.library.note(note.id)?.speaker("s2")?.background == true)
+
+        // Switch to v2 while the Undo snackbar is still available.
+        h.voices.selectTranscriptVersion(noteID: note.id, versionID: v2)
+        await h.library.settle()
+        #expect(h.library.note(note.id)?.selectedVersionID == v2)
+
+        // Tap Undo: v2 must remain untouched, while v1's s2 is restored to foreground.
+        await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        let currentV2 = try #require(h.library.note(note.id))
+        #expect(currentV2.selectedVersionID == v2)
+        #expect(currentV2.speakers?.map(\.name) == ["Alice", "Bob"])
+        #expect(currentV2.speaker("s3")?.background == true)
+
+        h.voices.selectTranscriptVersion(noteID: note.id, versionID: v1)
+        await h.library.settle()
+        let restoredV1 = try #require(h.library.note(note.id))
+        #expect(restoredV1.speaker("s1")?.name == "Silvio")
+        #expect(restoredV1.speaker("s2")?.name == "Ruurd")
+        #expect(restoredV1.speaker("s2")?.background == false)
+    }
+
+    /// A failure on the second speaker rolls back earlier speakers' note and voice writes cleanly so a subsequent retry
+    /// commits the complete batch and Undo restores the full original state.
+    @Test func batchFailureOnSecondSpeakerRollsBackForCleanRetryAndUndo() async throws {
+        defer { h.tearDown() }
+        var note = Note(title: "Batch failure")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 6, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Noise", start: 7, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        try NoteRepository(root: h.root).save(note)
+        await h.start()
+        try await h.voices.store?.savePrints([print], noteID: note.id)
+
+        // 1. Upfront validation refuses before writing speaker a if speaker b lacks a print.
+        do throws(VoicesStore.SaveFailure) {
+            _ = try await h.voices.performBatch([
+                .init(speakerID: "a", effects: [
+                    .relabel(speakerID: "a", name: "Alex"),
+                    .rememberVoice(speakerID: "a", voiceID: nil, name: "Alex"),
+                ]),
+                .init(speakerID: "b", effects: [
+                    .relabel(speakerID: "b", name: "Bea"),
+                    .rememberVoice(speakerID: "b", voiceID: nil, name: "Bea"),
+                ]),
+            ], noteID: note.id)
+            Issue.record("expected tooLittleSpeech refusal")
+        } catch {
+            guard case .tooLittleSpeech = error.reason else { Issue.record("\(error.reason)"); return }
+        }
+        #expect(h.voices.savedVoices.isEmpty)
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Speaker 1")
+
+        // 2. Inject a failure on the second speaker after speaker a has written to both NoteStore and VoiceStore.
+        let writes: [SpeakerSheetSession.BatchWrite] = [
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Alex"),
+                .rememberVoice(speakerID: "a", voiceID: nil, name: "Alex"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ]
+        h.voices.beforeBatchStep = { stepIndex, _ throws(VoicesStore.SaveFailure) in
+            if stepIndex == 1 { throw VoicesStore.SaveFailure(reason: .noteNotSaved) }
+        }
+        do throws(VoicesStore.SaveFailure) {
+            _ = try await h.voices.performBatch(writes, noteID: note.id)
+            Issue.record("expected injected noteNotSaved on step 1")
+        } catch {
+            guard case .noteNotSaved = error.reason else { Issue.record("\(error.reason)"); return }
+        }
+        await h.library.settle()
+
+        // Rollback must have removed Alex from VoiceStore and restored Speaker 1 on disk.
+        #expect(h.voices.savedVoices.isEmpty)
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Speaker 1")
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .unmatched)
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+        let storedAfterRollback = try #require(try h.stored(note.id))
+        #expect(storedAfterRollback.speaker("a")?.name == "Speaker 1")
+
+        // 3. Retry succeeds and produces a complete Undo snapshot that reverts both speakers cleanly.
+        h.voices.beforeBatchStep = nil
+        let snapshot = try await h.voices.performBatch(writes, noteID: note.id)
+        await h.library.settle()
+        #expect(h.voices.savedVoices.map(\.name) == ["Alex"])
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Alex")
+        #expect(h.library.note(note.id)?.speaker("b")?.background == true)
+
+        await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+        #expect(h.voices.savedVoices.isEmpty)
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Speaker 1")
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .unmatched)
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
     }
 }

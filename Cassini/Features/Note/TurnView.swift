@@ -131,7 +131,7 @@ struct TurnView: View, Equatable {
             }
         }
         Button(NoteCopy.markThisMoment, systemImage: "bookmark") { actions.markMoment(turn.start) }
-        if !turn.isBackground {
+        if !turn.isFullyBackground {
             Button(NoteCopy.copyText, systemImage: "doc.on.doc") { UIPasteboard.general.string = turn.text }
         }
     }
@@ -161,11 +161,15 @@ struct TurnView: View, Equatable {
         // The full chip tint includes its internal spaces; active-word colors are applied after every decoration.
         for chip in turn.interjections {
             if let span = range(chip.textRange) {
-                result[span].foregroundColor = Color.ink
-                result[span].backgroundColor = chip.crosstalk ? Color.warnTint : chip.tint.wash
+                result[span].foregroundColor = chip.isBackground ? Color.muted : Color.ink
+                if chip.crosstalk {
+                    result[span].backgroundColor = Color.warnTint
+                } else if !chip.isBackground {
+                    result[span].backgroundColor = chip.tint.wash
+                }
             }
             if let name = range(chip.nameRange) {
-                result[name].foregroundColor = chip.tint.color
+                result[name].foregroundColor = chip.isBackground ? Color.muted : chip.tint.color
                 result[name].font = .system(.body, weight: .semibold)
             }
         }

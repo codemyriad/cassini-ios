@@ -248,4 +248,66 @@ import CassiniCore
         #expect(note.speaker("s1")?.name == "Silvio")
         #expect(note.speaker("s1")?.background == false)
     }
+
+    // MARK: - Mixed-speaker turns (background host + foreground interjection)
+
+    private struct InterjectionFixture: Decodable {
+        struct Item: Decodable { let speaker: String; let startMs: Int64; let endMs: Int64; let text: String }
+        let items: [Item]
+    }
+
+    @Test func backgroundHostPreservesForegroundInterjectionInSearchLibraryAndFolding() throws {
+        let url = try #require(Bundle.module.url(forResource: "acknowledgment.words", withExtension: "json", subdirectory: "interjections"))
+        let fixture = try JSONDecoder().decode(InterjectionFixture.self, from: Data(contentsOf: url))
+        var note = Note(title: "Mixed host", createdAt: Date(timeIntervalSince1970: 1))
+        note.status = .ready
+        note.speakers = [
+            NoteSpeaker(id: "ada", name: "Ada", colourIndex: 0, provenance: .user, background: true),
+            NoteSpeaker(id: "ben", name: "Ben", colourIndex: 1, provenance: .user, background: false),
+        ]
+        note.transcript = fixture.items.map {
+            TranscriptSegment(text: $0.text, start: Double($0.startMs) / 1_000, end: Double($0.endMs) / 1_000,
+                              speaker: $0.speaker == "ben" ? "Ben" : "Ada", speakerID: $0.speaker)
+        }
+
+        let transcript = NoteTranscripts.sealed(note)
+        let mixed = try #require(transcript.turns.first { $0.isBackground && !$0.interjections.isEmpty })
+        #expect(!mixed.isFullyBackground)
+        #expect(mixed.interjections.contains { !$0.isBackground })
+
+        // Folding must NOT hide a mixed turn that contains a foreground interjection.
+        let items = TranscriptFolding.items(of: transcript.turns)
+        #expect(items.contains { item in
+            if case .turn(let turn) = item { return turn.id == mixed.id }
+            return false
+        })
+
+        // In-note search finds Ben's foreground interjection ("Sounds good") and excludes Ada's background host words.
+        let fgHits = TranscriptSearch.matches(transcript.turns, query: "Sounds good")
+        #expect(fgHits.count == 1)
+        #expect(fgHits[0].turnID == mixed.id)
+        let chars = Array(mixed.text)
+        #expect(String(chars[fgHits[0].range]).lowercased() == "sounds good")
+        #expect(TranscriptSearch.matches(transcript.turns, query: "release").isEmpty)
+        #expect(TranscriptSearch.matches(transcript.turns, query: "download").isEmpty)
+
+        // Library search (SearchFields) likewise preserves Ben's foreground interjection and excludes Ada's host speech.
+        let fields = SearchFields(note)
+        #expect(fields.matches(SearchQuery("Sounds good")))
+        #expect(!fields.matches(SearchQuery("release")))
+        #expect(!fields.matches(SearchQuery("download")))
+
+        // When BOTH host and inline speaker are background, the turn is fully background: folded and excluded from search.
+        note.setSpeakerBackground("ben", true)
+        let allBgTranscript = NoteTranscripts.sealed(note)
+        let folded = TranscriptFolding.items(of: allBgTranscript.turns)
+        let runs = folded.compactMap { item -> BackgroundTurnRun? in
+            if case .backgroundRun(let run) = item { return run }
+            return nil
+        }
+        #expect(runs.count == 1)
+        #expect(runs[0].voiceCount == 2)
+        #expect(TranscriptSearch.matches(allBgTranscript.turns, query: "Sounds good").isEmpty)
+        #expect(!SearchFields(note).matches(SearchQuery("Sounds good")))
+    }
 }

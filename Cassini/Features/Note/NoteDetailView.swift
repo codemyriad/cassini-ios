@@ -107,7 +107,7 @@ struct NoteDetailView: View {
         )) {
             TranscribingDetailsSheet(noteID: noteID, stop: model.stopJob, cancelDownload: model.cancelJobDownload)
         }
-        .noteSheetsAndDialogs(model: model)
+        .noteSheetsAndDialogs(model: model, cache: cache)
         .keepsNoteOverlay(noteID: noteID, note: note, readOnly: readOnly, sheet: $model.sheet, draft: $model.sheetDraft,
                           dialog: $model.screen.dialog, ready: $overlayReady)
         .shareSheet(item: $model.shareItem)

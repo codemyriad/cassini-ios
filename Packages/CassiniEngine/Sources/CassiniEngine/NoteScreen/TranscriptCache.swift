@@ -37,6 +37,13 @@ import CassiniNotebook
 
     public var shownSealed: NoteTranscript { sealedValue }
 
+    /// Cached `allHeaderSpeakers` when the prepared sealed transcript matches `note`, so Name a speaker can build its
+    /// speaker row without rebuilding the full transcript on the main actor.
+    public func allHeaderSpeakers(for note: Note) -> [TranscriptSpeaker]? {
+        guard let key = sealedKey, key.transcript == note.transcript, key.speakers == note.speakers else { return nil }
+        return sealedValue.allHeaderSpeakers
+    }
+
     /// Questions use only the matching prepared snapshot, never stale presentation content.
     public func speakerCount(sealed key: SealedKey) -> Int? {
         sealedKey == key ? sealedValue.headerSpeakers.count : nil

@@ -4,6 +4,19 @@ import Foundation
 /// speakers, worked out before anything is written. The app writes the note first and the voices after it, so a note
 /// that cannot be saved leaves no voice behind.
 public struct NamingCommit: Hashable, Sendable {
+    /// One inverse voice operation recorded in effect order during `plan`, to be replayed in strict reverse order
+    /// on Undo or batch rollback.
+    public enum VoiceUndoOp: Hashable, Sendable {
+        /// Reverses `.rememberVoice`: removes the enrolled sample (and the voice if left empty), restores any replaced
+        /// sample and previous voice name.
+        case undoEnrol(voiceID: UUID, noteID: UUID, speakerID: String, previousName: String?, replacedSample: VoiceSample?)
+        /// Reverses `.unenrol` / `.reject(unenrol: true)`: restores the removed sample to `voiceID`, recreating the
+        /// voice from `fallbackVoice` if it was forgotten.
+        case undoUnenrol(voiceID: UUID, sample: VoiceSample, fallbackVoice: SavedVoice, forgotten: Bool)
+        /// Reverses `.renameVoice`: restores `previousName` on `voiceID`.
+        case undoRename(voiceID: UUID, previousName: String)
+    }
+
     /// The saved voices after the effects.
     public var voices: [SavedVoice]
     /// The changes to the note's speakers.
@@ -11,6 +24,8 @@ public struct NamingCommit: Hashable, Sendable {
     /// Voices left without a sample: they are forgotten, so every note drops its links to them once the voices are
     /// written (`Note.unlinkVoice`). They are not in `changes`, so a voice write that fails leaves the links alone.
     public var forgotten: [UUID]
+    /// Inverse voice operations in effect order; replay in strict reverse order to undo or roll back.
+    public var voiceUndoOps: [VoiceUndoOp] = []
     /// The voice changes need a print the note no longer has, or voices that cannot be changed now.
     public var refused: Refusal?
 
@@ -42,14 +57,23 @@ public struct NamingCommit: Hashable, Sendable {
                     commit.refused = .noPrint
                     continue
                 }
-                let score = voiceID.flatMap { id in commit.voices.first { $0.id == id }?.score(print) } ?? 1
+                let existing = voiceID.flatMap { vid in commit.voices.first { $0.id == vid } }
+                let previousName = existing?.name
+                let replacedSample = existing?.samples.first { $0.noteID == noteID && $0.print.speakerID == print.speakerID }
+                let score = existing?.score(print) ?? 1
                 let enrolled = VoiceCodec.enrol(commit.voices, voiceID: voiceID, name: name, noteID: noteID, print: print,
                                                 newID: newVoiceID)
                 commit.voices = enrolled.voices
+                commit.voiceUndoOps.append(.undoEnrol(voiceID: enrolled.voice.id, noteID: noteID, speakerID: print.speakerID,
+                                                      previousName: previousName, replacedSample: replacedSample))
                 commit.changes.append(.match(speakerID: id, .confirmed(voice: enrolled.voice.id, score: score)))
             case .renameVoice(let voiceID, let name):
                 guard let index = commit.voices.firstIndex(where: { $0.id == voiceID }) else { continue }
+                let previousName = commit.voices[index].name
                 commit.voices[index].name = name
+                if previousName != name {
+                    commit.voiceUndoOps.append(.undoRename(voiceID: voiceID, previousName: previousName))
+                }
             case .clearMatch(let id):
                 commit.changes.append(.match(speakerID: id, .unmatched))
             case .unenrol(let id):
@@ -76,8 +100,38 @@ public struct NamingCommit: Hashable, Sendable {
     /// Takes back the speaker's confirmed sample; a voice left without samples is forgotten.
     private mutating func unenrol(_ speaker: NoteSpeaker, noteID: UUID) {
         guard case .confirmed(let voiceID, _) = speaker.match else { return }
+        let previousVoice = voices.first { $0.id == voiceID }
+        let removedSample = previousVoice?.samples.first { $0.noteID == noteID && $0.print.speakerID == speaker.id }
         let result = VoiceCodec.unenrol(voices, voiceID: voiceID, noteID: noteID, speakerID: speaker.id)
         voices = result.voices
+        if result.outcome != .nothingToUndo, let previousVoice, let removedSample {
+            voiceUndoOps.append(.undoUnenrol(voiceID: voiceID, sample: removedSample, fallbackVoice: previousVoice,
+                                             forgotten: result.outcome == .forgotten))
+        }
         if result.outcome == .forgotten { forgotten.append(voiceID) }
+    }
+
+    /// Applies one inverse voice operation to `voices`. Replay recorded ops in strict reverse order.
+    public static func applyInverse(_ op: VoiceUndoOp, to voices: inout [SavedVoice]) {
+        switch op {
+        case .undoEnrol(let voiceID, let noteID, let speakerID, let previousName, let replacedSample):
+            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return }
+            voices[index].samples.removeAll { $0.noteID == noteID && $0.print.speakerID == speakerID }
+            if let replacedSample { voices[index].samples.append(replacedSample) }
+            if let previousName { voices[index].name = previousName }
+            if voices[index].samples.isEmpty { voices.remove(at: index) }
+        case .undoUnenrol(let voiceID, let sample, let fallbackVoice, _):
+            if let index = voices.firstIndex(where: { $0.id == voiceID }) {
+                voices[index].samples.removeAll { $0.noteID == sample.noteID && $0.print.speakerID == sample.print.speakerID }
+                voices[index].samples.append(sample)
+            } else {
+                var restored = fallbackVoice
+                restored.samples = [sample]
+                voices.append(restored)
+            }
+        case .undoRename(let voiceID, let previousName):
+            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return }
+            voices[index].name = previousName
+        }
     }
 }

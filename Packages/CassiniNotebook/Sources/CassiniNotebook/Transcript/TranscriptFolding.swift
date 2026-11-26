@@ -13,6 +13,9 @@ public struct BackgroundTurnRun: Identifiable, Hashable, Sendable {
         var seen = Set<Data>()
         for turn in turns {
             if let id = turn.speakerID { seen.insert(Data(id.utf8)) }
+            for chip in turn.interjections {
+                if let id = chip.speakerID { seen.insert(Data(id.utf8)) }
+            }
         }
         self.voiceCount = max(1, seen.count)
     }
@@ -43,7 +46,7 @@ public enum TranscriptFolding {
             pending.removeAll(keepingCapacity: true)
         }
         for turn in turns {
-            if turn.isBackground {
+            if turn.isFullyBackground {
                 pending.append(turn)
             } else {
                 flush()

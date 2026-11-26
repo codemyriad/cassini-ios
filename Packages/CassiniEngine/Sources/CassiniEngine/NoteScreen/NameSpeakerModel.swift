@@ -18,6 +18,8 @@ public final class NameSpeakerModel {
         public var performBatch: (@MainActor ([SpeakerSheetSession.BatchWrite], UUID) async throws(VoicesStore.SaveFailure) -> VoicesStore.SpeakerUndoSnapshot?)?
         /// Called after a successful batch save with the toast summary and Undo snapshot.
         public var onSaved: (@MainActor (SpeakerSheetSession.SaveSummary, VoicesStore.SpeakerUndoSnapshot?) -> Void)?
+        /// Off-main canonical roster loader when the caller did not have a cached `allHeaderSpeakers` snapshot.
+        public var prepareRoster: (@MainActor () async -> [SpeakerSheetSession.RowSpeaker])?
         /// Why the note's transcript cannot be changed now.
         public var readOnly: @MainActor () -> ReadOnlyReason?
 
@@ -25,9 +27,10 @@ public final class NameSpeakerModel {
                     perform: @escaping @MainActor ([NamingEffect], UUID, String) async throws(VoicesStore.SaveFailure) -> Void,
                     readOnly: @escaping @MainActor () -> ReadOnlyReason?,
                     performBatch: (@MainActor ([SpeakerSheetSession.BatchWrite], UUID) async throws(VoicesStore.SaveFailure) -> VoicesStore.SpeakerUndoSnapshot?)? = nil,
-                    onSaved: (@MainActor (SpeakerSheetSession.SaveSummary, VoicesStore.SpeakerUndoSnapshot?) -> Void)? = nil) {
+                    onSaved: (@MainActor (SpeakerSheetSession.SaveSummary, VoicesStore.SpeakerUndoSnapshot?) -> Void)? = nil,
+                    prepareRoster: (@MainActor () async -> [SpeakerSheetSession.RowSpeaker])? = nil) {
             self.input = input; self.perform = perform; self.readOnly = readOnly
-            self.performBatch = performBatch; self.onSaved = onSaved
+            self.performBatch = performBatch; self.onSaved = onSaved; self.prepareRoster = prepareRoster
         }
     }
 
@@ -70,7 +73,11 @@ public final class NameSpeakerModel {
 
     /// Reads what the sheet needs; the name typed before Cassini was closed, `draft`, goes back into the field.
     public func open(draft: String?, sheet: @escaping @MainActor (SheetAction) -> Void) async {
-        if let input = await ports.input(noteID, speakerID) {
+        async let loadedInput = ports.input(noteID, speakerID)
+        if let roster = await ports.prepareRoster?(), !roster.isEmpty {
+            session.updateRoster(roster)
+        }
+        if let input = await loadedInput {
             session.setLoaded(input)
         }
         if let draft { send(.nameChanged(draft), sheet: sheet) }

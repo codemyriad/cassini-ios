@@ -111,6 +111,20 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
     /// (D59), so its header is only a label.
     public var nameableSpeakerID: String? { speakerID == NoteTranscripts.draftOneVoice ? nil : speakerID }
 
+    /// Whether word `index` belongs to a background voice (its inline interjection's speaker, or the turn's host).
+    public func isWordBackground(_ index: Int) -> Bool {
+        if let chip = interjections.first(where: { $0.wordRange.contains(index) }) {
+            return chip.isBackground
+        }
+        return isBackground
+    }
+
+    /// True when every word in this turn belongs to a background voice (a background host with no foreground
+    /// interjections). Mixed turns with a foreground interjection stay visible and searchable.
+    public var isFullyBackground: Bool {
+        isBackground && !interjections.contains { !$0.isBackground }
+    }
+
     /// The character range of word `index` in `text`.
     public func range(ofWord index: Int) -> Range<Int> {
         offsets[index]..<(offsets[index] + words[index].text.count)
