@@ -144,12 +144,13 @@ extension CassiniDocument {
                 guard let source, source.state != .staleAudio, let date = parseInstant(value), date != sourceCreated else { return nil }
                 return value
             }
+            let started = meeting["startedAt"]?.string.flatMap { isValidStartedAt($0) ? $0 : nil }
             let recorded = meeting["recordedAtUtc"]?.string.flatMap { value -> String? in
                 let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard trimmed.hasSuffix("Z"), parseInstant(trimmed) != nil else { return nil }
                 return value
             }
-            let date = recorded ?? legacy ?? meeting["createdAtUtc"]?.string
+            let date = started ?? recorded ?? legacy ?? meeting["createdAtUtc"]?.string
             guard let date else { return self }
             // DATE is ordinary metadata, so do not add it to the set of load-bearing derived tags.
             // Replace all spellings here, including opaque entries, just as TITLE does.

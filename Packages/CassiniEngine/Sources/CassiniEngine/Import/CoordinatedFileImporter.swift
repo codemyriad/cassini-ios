@@ -122,8 +122,9 @@ private struct Copy {
     /// Streams `source` to `destination`; the limits are enforced as it goes.
     func run(from source: URL, size: Int64?, to destination: URL, name: String) throws -> ImportedFile {
         do {
+            let modifiedAt = try? source.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             let (sha256, bytes) = try stream(from: source, size: size, to: destination, name: name)
-            return ImportedFile(displayName: name, byteCount: bytes, sha256: sha256)
+            return ImportedFile(displayName: name, byteCount: bytes, sha256: sha256, modifiedAt: modifiedAt)
         } catch {
             try? FileManager.default.removeItem(at: destination)
             throw error

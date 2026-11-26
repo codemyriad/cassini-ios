@@ -1,4 +1,4 @@
-// Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a; do not edit.
+// Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit.
 import Foundation
 import CassiniNotebook
 
@@ -45,6 +45,21 @@ enum Wave6Copy {
     }
     static var commonStop: String {
         String(localized: "common.stop", table: "Wave6")
+    }
+    static var meetingSetDateTime: String {
+        String(localized: "meeting.setDateTime", table: "Wave6")
+    }
+    static var meetingSetDateTimeDateLabel: String {
+        String(localized: "meeting.setDateTime.dateLabel", table: "Wave6")
+    }
+    static var meetingSetDateTimePrefillSavedHint: String {
+        String(localized: "meeting.setDateTime.prefillSavedHint", table: "Wave6")
+    }
+    static var meetingSetDateTimeTimeLabel: String {
+        String(localized: "meeting.setDateTime.timeLabel", table: "Wave6")
+    }
+    static var meetingSetDateTimeTitle: String {
+        String(localized: "meeting.setDateTime.title", table: "Wave6")
     }
     static var savedVoicesPrivacyPhone: String {
         String(localized: "savedVoices.privacy.phone", table: "Wave6")
@@ -156,6 +171,16 @@ enum Wave6Copy {
             return String(localized: "common.notNow", table: "Wave6", bundle: localized, locale: locale)
         case "common.stop":
             return String(localized: "common.stop", table: "Wave6", bundle: localized, locale: locale)
+        case "meeting.setDateTime":
+            return String(localized: "meeting.setDateTime", table: "Wave6", bundle: localized, locale: locale)
+        case "meeting.setDateTime.dateLabel":
+            return String(localized: "meeting.setDateTime.dateLabel", table: "Wave6", bundle: localized, locale: locale)
+        case "meeting.setDateTime.prefillSavedHint":
+            return String(localized: "meeting.setDateTime.prefillSavedHint", table: "Wave6", bundle: localized, locale: locale)
+        case "meeting.setDateTime.timeLabel":
+            return String(localized: "meeting.setDateTime.timeLabel", table: "Wave6", bundle: localized, locale: locale)
+        case "meeting.setDateTime.title":
+            return String(localized: "meeting.setDateTime.title", table: "Wave6", bundle: localized, locale: locale)
         case "savedVoices.privacy.phone":
             return String(localized: "savedVoices.privacy.phone", table: "Wave6", bundle: localized, locale: locale)
         case "savedVoices.row.forget":

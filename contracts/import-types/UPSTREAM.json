@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "d9bf213a30179c395657e8d8ecd34fe2b987af1a",
+  "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
   "path": "contract/import-types.json",
   "sha256": "a6934fd26f12697b35e7754ba3c15dab4f122a28d027a7ed17b9a25ef44aaf68",
   "validator_path": "contract/validate_import_types.py",

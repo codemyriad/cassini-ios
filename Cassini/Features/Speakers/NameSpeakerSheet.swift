@@ -378,6 +378,7 @@ struct NameSpeakerSheet: View {
             Text(SpeakersCopy.mergeInto)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.ink)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.vertical, 8)
                 .frame(minHeight: HitTarget.minimum)
                 .contentShape(Rectangle())
@@ -459,6 +460,7 @@ private struct SheetPillButtonStyle: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(primary ? Color.onAccent : Color.ink)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, compact ? 14 : 18)
             .padding(.vertical, compact ? 7 : 10)
             .background {

@@ -256,7 +256,7 @@ public final class NoteScreenModel {
         case .stop: ports.stop(noteID)
         case .removeFromQueue: ports.dequeue(noteID)
         case .moveToTrash: Task { await ports.trash(noteID) }
-        case .nameSpeaker, .openVersions, .openSpeakers, .editPassage, .rename, .documentInfo:
+        case .nameSpeaker, .openVersions, .openSpeakers, .editPassage, .rename, .setDateTime, .documentInfo:
             break // A sheet (above); a passage that is gone opens nothing.
         }
     }
@@ -377,6 +377,12 @@ public final class NoteScreenModel {
     public func selectVersion(_ versionID: UUID) {
         ports.selectVersion(noteID, versionID)
         sheet = nil
+    }
+
+    /// Set date and time's Save (D112 / L-87).
+    public func setDateTime(to date: Date, timeZone: TimeZone) {
+        if sheet == .setDateTime { sheet = nil }
+        ports.update(noteID) { SetMeetingDate.apply(date: date, timeZone: timeZone, to: &$0) }
     }
 
     /// Edit passage's Save. The change runs again on the stored note when someone else saved it meanwhile; it then

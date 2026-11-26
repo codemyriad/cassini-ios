@@ -5,6 +5,7 @@ import Foundation
 /// speaker or Rename is kept beside it.
 public enum NoteOverlay: Codable, Hashable, Sendable {
     case rename
+    case setDateTime
     case speakers
     case versions
     case documentInfo
@@ -14,7 +15,7 @@ public enum NoteOverlay: Codable, Hashable, Sendable {
     /// Whether the sheet changes the transcript, so it opens only while the transcript can be changed.
     var changesTranscript: Bool {
         switch self {
-        case .rename, .documentInfo: false
+        case .rename, .setDateTime, .documentInfo: false
         case .speakers, .versions, .naming, .editing: true
         }
     }
@@ -24,7 +25,7 @@ public enum NoteOverlay: Codable, Hashable, Sendable {
     public func restorable(over note: Note, readOnly: ReadOnlyReason?) -> NoteOverlay? {
         if changesTranscript, readOnly != nil { return nil }
         switch self {
-        case .rename, .documentInfo: return self
+        case .rename, .setDateTime, .documentInfo: return self
         case .speakers: return note.speakers?.isEmpty == false ? self : nil
         case .versions: return note.versions?.isEmpty == false ? self : nil
         case .naming(let speakerID): return note.speaker(speakerID) != nil ? self : nil
@@ -79,7 +80,7 @@ extension NoteOverlay {
     var keepsDraft: Bool {
         switch self {
         case .naming, .rename: true
-        case .speakers, .versions, .documentInfo, .editing: false
+        case .setDateTime, .speakers, .versions, .documentInfo, .editing: false
         }
     }
 }

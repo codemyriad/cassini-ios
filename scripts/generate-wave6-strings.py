@@ -52,6 +52,11 @@ PROPERTIES = {
     'savedVoices.row.forget': 'savedVoicesRowForget',
     'savedVoices.row.sampleCount.one': 'savedVoicesRowSampleCountOne',
     'savedVoices.row.sampleCount.other': 'savedVoicesRowSampleCountOther',
+    'meeting.setDateTime': 'meetingSetDateTime',
+    'meeting.setDateTime.title': 'meetingSetDateTimeTitle',
+    'meeting.setDateTime.dateLabel': 'meetingSetDateTimeDateLabel',
+    'meeting.setDateTime.timeLabel': 'meetingSetDateTimeTimeLabel',
+    'meeting.setDateTime.prefillSavedHint': 'meetingSetDateTimePrefillSavedHint',
 }
 IDS = set(PROPERTIES)
 

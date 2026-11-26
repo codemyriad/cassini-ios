@@ -10,6 +10,10 @@ public struct Note: Identifiable, Hashable, Sendable {
     /// Catalogue fallback only; never display this as an imported meeting start.
     public var createdAt: Date
     public var meetingTime: MeetingTime
+    /// D112 (L-87): RFC 3339 timestamp with explicit UTC offset when the person set the date and time.
+    public var userStartedAt: String?
+    /// Last-modified time of an imported source file, used only to prefill Set date and time; never displayed as the meeting date.
+    public var sourceModifiedAt: Date?
     public var sortDate: Date { meetingTime.instant ?? createdAt }
     public var audioFilename: String
     public var duration: Double = 0
@@ -64,7 +68,7 @@ public enum NoteDecodingError: Error, Equatable {
 
 extension Note: Codable {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, id, title, createdAt, meetingTime, audioFilename, duration, status, transcript, bookmarks, waveform
+        case schemaVersion, id, title, createdAt, meetingTime, userStartedAt, sourceModifiedAt, audioFilename, duration, status, transcript, bookmarks, waveform
         case isFavorite, trashedAt, playbackPosition, language, audio, origin, document, sourceSha256, trashedJob
         case previewText, failure, speakerAnalysisFailure, fallbackFailure, originalAudioFilename, speakers, versions, selectedVersionID
         // Schema 1 only.
@@ -79,6 +83,8 @@ extension Note: Codable {
         title = try c.decode(String.self, forKey: .title)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         meetingTime = try c.decodeIfPresent(MeetingTime.self, forKey: .meetingTime) ?? .unknown
+        userStartedAt = try c.decodeIfPresent(String.self, forKey: .userStartedAt)
+        sourceModifiedAt = try c.decodeIfPresent(Date.self, forKey: .sourceModifiedAt)
         audioFilename = try c.decode(String.self, forKey: .audioFilename)
         duration = try c.decodeIfPresent(Double.self, forKey: .duration) ?? 0
         status = (try? c.decodeIfPresent(NoteStatus.self, forKey: .status)) ?? .audioOnly
@@ -144,6 +150,8 @@ extension Note: Codable {
         try c.encode(title, forKey: .title)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(meetingTime, forKey: .meetingTime)
+        try c.encodeIfPresent(userStartedAt, forKey: .userStartedAt)
+        try c.encodeIfPresent(sourceModifiedAt, forKey: .sourceModifiedAt)
         try c.encode(audioFilename, forKey: .audioFilename)
         try c.encode(duration, forKey: .duration)
         try c.encode(status, forKey: .status)

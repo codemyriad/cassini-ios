@@ -161,6 +161,11 @@ struct LibraryView: View {
             }
         }
         .sheet(item: renaming) { RenameNoteDialog(noteID: $0.id, draft: renameDraft) { renameDraft = $0 } }
+        .sheet(item: settingDateTime) { target in
+            SetDateTimeSheet(noteID: target.id) { date, timeZone in
+                model.setDateTime(target.id, to: date, timeZone: timeZone)
+            }
+        }
         .alert(LibraryCopy.startOverTitle, isPresented: confirming(\.startOver), presenting: model.dialog) { dialog in
             Button(LibraryCopy.startOver, role: .destructive) { confirm(dialog) }
             Button(LibraryCopy.cancel, role: .cancel) {}
@@ -470,6 +475,11 @@ struct LibraryView: View {
     private var renaming: Binding<RenameTarget?> {
         Binding(get: { if case .rename(let id) = model.dialog { RenameTarget(id: id) } else { nil } },
                 set: { if $0 == nil, case .rename = model.dialog { model.dismissDialog() } })
+    }
+
+    private var settingDateTime: Binding<RenameTarget?> {
+        Binding(get: { if case .setDateTime(let id) = model.dialog { RenameTarget(id: id) } else { nil } },
+                set: { if $0 == nil, case .setDateTime = model.dialog { model.dismissDialog() } })
     }
 
     private func confirming(_ kind: KeyPath<LibraryDialog, Bool>) -> Binding<Bool> {

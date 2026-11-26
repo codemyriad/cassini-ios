@@ -28,6 +28,8 @@ struct NoteMenu: View {
                 perform(.toggleStar)
             }
             Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
+            Button(Wave6Copy.meetingSetDateTime, systemImage: "calendar") { perform(.setDateTime) }
+                .accessibilityIdentifier("setDateTimeButton")
             if note.hasDocument || note.speakers?.isEmpty == false {
                 Button(NoteCopy.speakers, systemImage: "person.2") { perform(.speakers) }
                     .accessibilityIdentifier("speakersButton")

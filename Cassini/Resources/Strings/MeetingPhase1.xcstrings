@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "common.cancel": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.cancel.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.cancel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "common.quote": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.quote; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.quote; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "common.savedVoices": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.savedVoices.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.savedVoices.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "common.stop": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, common.stop.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.stop.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "library.allMeetings": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, library.allMeetings.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, library.allMeetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -212,7 +212,7 @@
       }
     },
     "library.backToAllMeetings": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, library.backToAllMeetings.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, library.backToAllMeetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "meeting.find.placeholder": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, meeting.find.placeholder.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.find.placeholder.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -296,7 +296,7 @@
       }
     },
     "phone.row.resume": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, phone.row.resume.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, phone.row.resume.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -338,7 +338,7 @@
       }
     },
     "player.pause": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, player.pause.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, player.pause.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -380,7 +380,7 @@
       }
     },
     "speakers.dialog.a11y": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.dialog.a11y.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.dialog.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -422,7 +422,7 @@
       }
     },
     "speakers.duplicate.notice": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.duplicate.notice; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.notice; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
       }
     },
     "speakers.duplicate.samePerson": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.duplicate.samePerson.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.samePerson.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -506,7 +506,7 @@
       }
     },
     "speakers.duplicate.someoneElse": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.duplicate.someoneElse.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.someoneElse.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -548,7 +548,7 @@
       }
     },
     "speakers.mergeInto": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.mergeInto.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.mergeInto.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -590,7 +590,7 @@
       }
     },
     "speakers.nameLabel": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.nameLabel.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.nameLabel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -632,7 +632,7 @@
       }
     },
     "speakers.playSample": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.playSample.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.playSample.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -674,7 +674,7 @@
       }
     },
     "speakers.rememberVoice.cardBody.iphone": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.rememberVoice.cardBody.iphone; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.cardBody.iphone; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -716,7 +716,7 @@
       }
     },
     "speakers.rememberVoice.cardBody.iphone.unnamed": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.rememberVoice.cardBody.iphone.unnamed.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.cardBody.iphone.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -758,7 +758,7 @@
       }
     },
     "speakers.rememberVoice.modelsNeeded": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.rememberVoice.modelsNeeded.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.modelsNeeded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -800,7 +800,7 @@
       }
     },
     "speakers.rememberVoice.title": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.rememberVoice.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -842,7 +842,7 @@
       }
     },
     "speakers.rememberVoice.tooShort": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.rememberVoice.tooShort.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.tooShort.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -884,49 +884,49 @@
       }
     },
     "speakers.saveName": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.saveName.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.saveName.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Save name"
+            "value": "Save"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Salva il nome"
+            "value": "Salva"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enregistrer le nom"
+            "value": "Enregistrer"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guardar nombre"
+            "value": "Guardar"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Salvar nome"
+            "value": "Salvar"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guardar nome"
+            "value": "Guardar"
           }
         }
       }
     },
     "speakers.savedVoices.heading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.savedVoices.heading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.savedVoices.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -968,7 +968,7 @@
       }
     },
     "speakers.savedVoices.likely": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.savedVoices.likely.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.savedVoices.likely.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1010,7 +1010,7 @@
       }
     },
     "speakers.talkTime": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, speakers.talkTime; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.talkTime; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1052,7 +1052,7 @@
       }
     },
     "transcribing.details.a11y": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.details.a11y.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.details.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1094,7 +1094,7 @@
       }
     },
     "transcribing.heading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.heading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1136,7 +1136,7 @@
       }
     },
     "transcribing.speakerSuggestion.no": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.speakerSuggestion.no.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion.no.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1178,7 +1178,7 @@
       }
     },
     "transcribing.speakerSuggestion.yes": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.speakerSuggestion.yes.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion.yes.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1220,7 +1220,7 @@
       }
     },
     "transcribing.stat.audioDone": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stat.audioDone.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.audioDone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1262,7 +1262,7 @@
       }
     },
     "transcribing.stat.batteryAtFinish": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stat.batteryAtFinish.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.batteryAtFinish.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1304,7 +1304,7 @@
       }
     },
     "transcribing.stat.timeLeft": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stat.timeLeft.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.timeLeft.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1346,7 +1346,7 @@
       }
     },
     "transcribing.stat.wordsSoFar": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stat.wordsSoFar.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.wordsSoFar.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1388,7 +1388,7 @@
       }
     },
     "transcribing.step.preparing": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.step.preparing.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.preparing.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1430,7 +1430,7 @@
       }
     },
     "transcribing.step.reading": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.step.reading.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.reading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1472,7 +1472,7 @@
       }
     },
     "transcribing.step.saving": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.step.saving.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.saving.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1514,7 +1514,7 @@
       }
     },
     "transcribing.step.speakers": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.step.speakers.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.speakers.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1556,7 +1556,7 @@
       }
     },
     "transcribing.step.words": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.step.words.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.words.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1598,7 +1598,7 @@
       }
     },
     "transcribing.stopAndKeepProgress": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stopAndKeepProgress.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stopAndKeepProgress.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1640,7 +1640,7 @@
       }
     },
     "transcribing.transcriptSoFar": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.transcriptSoFar.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.transcriptSoFar.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1682,7 +1682,7 @@
       }
     },
     "transcribing.speakerSuggestion": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.speakerSuggestion; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1724,7 +1724,7 @@
       }
     },
     "transcribing.stat.audioDoneValue": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.stat.audioDoneValue; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.audioDoneValue; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1766,7 +1766,7 @@
       }
     },
     "transcribing.eta.minutes.one": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.eta.minutes (one); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.eta.minutes (one); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1808,7 +1808,7 @@
       }
     },
     "transcribing.eta.minutes.other": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, transcribing.eta.minutes (other); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.eta.minutes (other); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
