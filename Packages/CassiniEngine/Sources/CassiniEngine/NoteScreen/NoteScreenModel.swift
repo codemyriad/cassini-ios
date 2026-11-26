@@ -458,13 +458,15 @@ public final class NoteScreenModel {
                 prepareRoster = nil
             } else {
                 roster = SpeakerSheetSession.catalogRoster(for: currentNote?.speakers ?? [])
-                let voices = ports.savedVoices()
-                prepareRoster = currentNote.map { note in
-                    {
+                if let currentNote {
+                    let voices = ports.savedVoices()
+                    prepareRoster = { @MainActor in
                         await Task.detached(priority: .userInitiated) {
-                            SpeakerSheetSession.roster(for: note, voices: voices)
+                            SpeakerSheetSession.roster(for: currentNote, voices: voices)
                         }.value
                     }
+                } else {
+                    prepareRoster = nil
                 }
             }
             return NameSpeakerModel(noteID: noteID, speakerID: speakerID, roster: roster, displayLabel: displayLabel, ports: .init(

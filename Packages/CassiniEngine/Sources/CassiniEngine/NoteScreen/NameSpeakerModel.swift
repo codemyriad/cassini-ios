@@ -9,7 +9,7 @@ import CassiniNotebook
 /// the sheet can do (play a sample, focus the question, close) goes back to it as a `SheetAction`.
 @MainActor @Observable
 public final class NameSpeakerModel {
-    public struct Ports {
+    public struct Ports: Sendable {
         /// What the sheet needs about the speaker; nil when the note or the speaker is gone.
         public var input: @MainActor (UUID, String) async -> NamingInput?
         /// Carries out the sheet's writes for one speaker: the note first, then the saved voices.

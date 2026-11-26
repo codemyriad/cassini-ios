@@ -250,8 +250,10 @@ extension Note {
                 return true
             }
             if var history = versions, let index = history.firstIndex(where: { $0.id == targetVersionID }) {
-                guard matches(history[index].speakers) else { return false }
-                patch(&history[index].speakers, segments: &history[index].segments)
+                var version = history[index]
+                guard matches(version.speakers) else { return false }
+                patch(&version.speakers, segments: &version.segments)
+                history[index] = version
                 versions = history
                 return true
             }
@@ -265,8 +267,10 @@ extension Note {
         }
         if let expected = expectedAfterSpeakers, var history = versions,
            let index = history.lastIndex(where: { $0.id != selectedVersionID && $0.speakers == expected }) {
-            guard matches(history[index].speakers) else { return false }
-            patch(&history[index].speakers, segments: &history[index].segments)
+            var version = history[index]
+            guard matches(version.speakers) else { return false }
+            patch(&version.speakers, segments: &version.segments)
+            history[index] = version
             versions = history
             return true
         }
@@ -296,7 +300,9 @@ extension Note {
                 versions?[shown].segments = transcript
                 versions?[shown].speakers = list
             } else if var history = versions, let index = history.firstIndex(where: { $0.id == targetVersionID }) {
-                patch(&history[index].speakers, segments: &history[index].segments)
+                var version = history[index]
+                patch(&version.speakers, segments: &version.segments)
+                history[index] = version
                 versions = history
             }
         } else if shownVersionID == nil, var list = speakers {

@@ -710,7 +710,7 @@ import CassiniNotebook
         let snapshot = try await h.voices.performBatch([
             .init(speakerID: "a", effects: [
                 .relabel(speakerID: "a", name: "Alexander"),
-                .renameVoice(voiceID: alex.id, name: "Alexander"),
+                .renameVoice(alex.id, name: "Alexander"),
             ]),
             .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
         ], noteID: note.id)

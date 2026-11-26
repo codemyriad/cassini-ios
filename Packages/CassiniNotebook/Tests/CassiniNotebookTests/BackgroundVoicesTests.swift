@@ -293,9 +293,10 @@ import CassiniCore
 
         // Library search (SearchFields) likewise preserves Ben's foreground interjection and excludes Ada's host speech.
         let fields = SearchFields(note)
-        #expect(fields.matches(SearchQuery("Sounds good")))
-        #expect(!fields.matches(SearchQuery("release")))
-        #expect(!fields.matches(SearchQuery("download")))
+        let soundsGoodQuery = try #require(SearchQuery("Sounds good"))
+        #expect(fields.matches(soundsGoodQuery))
+        #expect(!fields.matches(try #require(SearchQuery("release"))))
+        #expect(!fields.matches(try #require(SearchQuery("download"))))
 
         // When BOTH host and inline speaker are background, the turn is fully background: folded and excluded from search.
         note.setSpeakerBackground("ben", true)
@@ -308,6 +309,6 @@ import CassiniCore
         #expect(runs.count == 1)
         #expect(runs[0].voiceCount == 2)
         #expect(TranscriptSearch.matches(allBgTranscript.turns, query: "Sounds good").isEmpty)
-        #expect(!SearchFields(note).matches(SearchQuery("Sounds good")))
+        #expect(!SearchFields(note).matches(soundsGoodQuery))
     }
 }
