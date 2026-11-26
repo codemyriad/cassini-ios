@@ -312,8 +312,11 @@ extension Note {
     }
 
     /// Restores a voice link that `unlinkVoice` scrubbed when a voice's last sample was temporarily removed.
+    /// Bound to the originating `versionID` (or the unversioned shown transcript matching `expectedUnversionedSpeakers`
+    /// when `versionID` is nil), so switching versions never corrupts another version's speakers.
     /// Only restores links that are currently `.unmatched`, never overwriting a newer match or rejection.
-    public mutating func restoreVoiceLink(speakerID: String, versionID: UUID?, match: VoiceMatchState) {
+    public mutating func restoreVoiceLink(speakerID: String, versionID: UUID?, match: VoiceMatchState,
+                                          expectedUnversionedSpeakers: [NoteSpeaker]? = nil) {
         let key = Data(speakerID.utf8)
         if let versionID {
             if var history = versions, let vIndex = history.firstIndex(where: { $0.id == versionID }),
@@ -321,7 +324,7 @@ extension Note {
                history[vIndex].speakers[sIndex].match == .unmatched {
                 history[vIndex].speakers[sIndex].match = match
                 versions = history
-                if selectedVersionID == versionID,
+                if shownVersionID == versionID,
                    var shownList = speakers,
                    let shownIndex = shownList.firstIndex(where: { $0.byteID == key }),
                    shownList[shownIndex].match == .unmatched {
@@ -329,12 +332,20 @@ extension Note {
                     speakers = shownList
                 }
             }
-        } else if var list = speakers,
-                  let index = list.firstIndex(where: { $0.byteID == key }),
-                  list[index].match == .unmatched {
-            changeShownSpeakers { note in
-                note.speakers?[index].match = match
+        } else if shownVersionID == nil {
+            if var list = speakers,
+               let index = list.firstIndex(where: { $0.byteID == key }),
+               list[index].match == .unmatched {
+                list[index].match = match
+                speakers = list
             }
+        } else if let expected = expectedUnversionedSpeakers,
+                  var history = versions,
+                  let vIndex = history.lastIndex(where: { $0.id != selectedVersionID && $0.speakers == expected }),
+                  let sIndex = history[vIndex].speakers.firstIndex(where: { $0.byteID == key }),
+                  history[vIndex].speakers[sIndex].match == .unmatched {
+            history[vIndex].speakers[sIndex].match = match
+            versions = history
         }
     }
 

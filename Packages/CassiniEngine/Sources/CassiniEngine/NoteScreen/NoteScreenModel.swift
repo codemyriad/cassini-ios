@@ -44,7 +44,7 @@ public final class NoteScreenModel {
         public var namingInput: @MainActor (UUID, String) async -> NamingInput?
         public var performNaming: @MainActor ([NamingEffect], UUID, String) async throws(VoicesStore.SaveFailure) -> Void
         public var performNamingBatch: (@MainActor ([SpeakerSheetSession.BatchWrite], UUID) async throws(VoicesStore.SaveFailure) -> VoicesStore.SpeakerUndoSnapshot?)? = nil
-        public var undoSpeakerChanges: @MainActor (UUID, VoicesStore.SpeakerUndoSnapshot) async -> Void = { _, _ in }
+        public var undoSpeakerChanges: @MainActor (UUID, VoicesStore.SpeakerUndoSnapshot) async throws(VoicesStore.SaveFailure) -> Void = { _, _ in }
 
         // The queue
         public var transcribe: @MainActor (UUID, JobKind) async -> TranscribeOutcome
@@ -430,13 +430,22 @@ public final class NoteScreenModel {
     }
 
     public var speakerToast: SpeakerToast?
+    @ObservationIgnored private var undoingToastID: UUID?
 
     public func undoSpeakerToast() {
-        guard let toast = speakerToast else { return }
-        speakerToast = nil
+        guard let toast = speakerToast, undoingToastID != toast.id else { return }
+        undoingToastID = toast.id
         let undo = ports.undoSpeakerChanges
         let id = noteID
-        Task { await undo(id, toast.snapshot) }
+        Task {
+            defer { if self.undoingToastID == toast.id { self.undoingToastID = nil } }
+            do throws(VoicesStore.SaveFailure) {
+                try await undo(id, toast.snapshot)
+                if self.speakerToast?.id == toast.id { self.speakerToast = nil }
+            } catch {
+                self.ports.present(.speakerNotSaved(error))
+            }
+        }
     }
 
     public func dismissSpeakerToast(_ id: UUID) {

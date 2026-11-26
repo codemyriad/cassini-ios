@@ -83,8 +83,8 @@ extension AppGraph {
         ports.performNamingBatch = { writes, noteID throws(VoicesStore.SaveFailure) in
             try await voices.performBatch(writes, noteID: noteID)
         }
-        ports.undoSpeakerChanges = { noteID, snapshot in
-            await voices.undoSpeakerChanges(snapshot, noteID: noteID)
+        ports.undoSpeakerChanges = { noteID, snapshot throws(VoicesStore.SaveFailure) in
+            try await voices.undoSpeakerChanges(snapshot, noteID: noteID)
         }
         return NoteScreens(ports: ports)
     }
