@@ -39,7 +39,9 @@ private struct NoteSheetsAndDialogs: ViewModifier {
         case .versions: TranscriptVersionsView(model: model)
         case .documentInfo: DocumentInfoSheet(noteID: noteID)
         case .naming(let speakerID, let draft):
-            NameSpeakerSheet(model: model.naming(speakerID), draft: draft) { model.sheetDraft = $0 }
+            NameSpeakerSheet(model: model.naming(speakerID, displayLabel: {
+                NoteCopy.speakerLabel($0.label, id: $0.speakerID, ordinal: $0.ordinal)
+            }), draft: draft) { model.sheetDraft = $0 }
         case .editing(let segment): SegmentEditor(model: model, segment: segment)
         }
     }

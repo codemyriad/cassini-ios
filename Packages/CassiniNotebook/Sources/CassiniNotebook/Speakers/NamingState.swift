@@ -26,9 +26,11 @@ public struct NamingState: Hashable, Sendable {
     public var name: String
     public var boundVoiceID: UUID?
     public var remember: Bool
+    public var isBackground: Bool = false
     public var initialName: String
     public var initialBound: UUID?
     public var initialRemember: Bool
+    public var initialBackground: Bool = false
     public var showAll = false
     /// The normalised name the user answered "Someone else" to: the question stays closed for it.
     public var declinedSamePerson: String?
@@ -59,6 +61,7 @@ public enum NamingEvent: Hashable, Sendable {
     /// "Not <name>?".
     case notThisPerson
     case rememberToggled(Bool)
+    case backgroundToggled(Bool)
     case playSample
     /// "Merge into…": the list of the other speakers.
     case mergeInto
@@ -77,6 +80,8 @@ public enum NamingEvent: Hashable, Sendable {
 public enum NamingEffect: Hashable, Sendable {
     /// Write `name` as the speaker's label.
     case relabel(speakerID: String, name: String)
+    /// Mark or unmark the speaker as a background voice (D112 / L-86).
+    case setBackground(speakerID: String, background: Bool)
     /// Enrol the speaker's print into `voiceID` (a new person when nil) called `name`; the speaker is then confirmed.
     case rememberVoice(speakerID: String, voiceID: UUID?, name: String)
     /// Rename the saved voice (the rename-saved question answered yes). Names already in notes stay.
@@ -126,7 +131,7 @@ extension NamingEffect {
     public var isWrite: Bool {
         switch self {
         case .playRange, .focusQuestion, .close: false
-        case .relabel, .rememberVoice, .renameVoice, .clearMatch, .unenrol, .reject, .merge, .mergeDraft, .draftName: true
+        case .relabel, .setBackground, .rememberVoice, .renameVoice, .clearMatch, .unenrol, .reject, .merge, .mergeDraft, .draftName: true
         }
     }
 }
@@ -168,6 +173,7 @@ public struct NameSheetUI: Hashable, Sendable {
     public var remember: Bool
     public var rememberEnabled: Bool
     public var rememberReason: RememberReason?
+    public var isBackground: Bool = false
     public var canMerge: Bool
     public var save: SaveState
     /// The sheet names a speaker of a running job's draft.

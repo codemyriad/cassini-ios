@@ -15,7 +15,7 @@ public enum TranscriptSearch {
         let needle = fold(query.trimmingCharacters(in: .whitespacesAndNewlines)).text
         guard !needle.isEmpty else { return [] }
         var result: [TranscriptMatch] = []
-        for turn in turns {
+        for turn in turns where !turn.isBackground {
             let folded = spoken(turn)
             let haystack = folded.text
             guard haystack.count >= needle.count else { continue }
@@ -41,8 +41,9 @@ public enum TranscriptSearch {
         result.source.reserveCapacity(turn.text.count)
         var previousEnd = 0
         for (index, word) in turn.words.enumerated() {
+            if turn.interjections.contains(where: { $0.isBackground && $0.wordRange.contains(index) }) { continue }
             let offset = turn.offsets[index]
-            if index > 0 && offset > previousEnd {
+            if !result.text.isEmpty && offset > previousEnd {
                 result.text.append(" ")
                 result.source.append(offset - 1)
             }

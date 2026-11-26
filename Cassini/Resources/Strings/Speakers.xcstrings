@@ -656,7 +656,7 @@
       }
     },
     "Cassini stops recognising all %lld saved voices and deletes the voiceprints from every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, android.savedVoices.forgetEveryone.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, android.savedVoices.forgetEveryone.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -841,7 +841,7 @@
       }
     },
     "Deletes the voiceprints of every meeting. Names already in your meetings stay.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, ios.savedVoices.forgetAllData.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, ios.savedVoices.forgetAllData.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2115,7 +2115,7 @@
       }
     },
     "People in this meeting": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, ios.speakers.peopleInMeeting.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, ios.speakers.peopleInMeeting.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2662,7 +2662,7 @@
       }
     },
     "The meeting could not be saved. Nothing was changed.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, ios.speakers.meetingSaveFailed.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, ios.speakers.meetingSaveFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {

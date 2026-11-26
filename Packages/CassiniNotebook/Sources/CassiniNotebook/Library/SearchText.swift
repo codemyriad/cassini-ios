@@ -164,22 +164,23 @@ public struct SearchFields: Sendable {
     }
 
     public init(_ note: Note) {
-        // Synthetic inline-speaker labels are presentation, not speech. A single line also keeps paragraph
-        // breaks from consuming the result preview's two lines before the highlighted word appears.
+        // Synthetic inline-speaker labels are presentation, not speech. Background voices are excluded from search
+        // (D112 / L-86). A single line keeps paragraph breaks from consuming the result preview's two lines.
         self.init(title: note.title,
-                  body: NoteTranscripts.sealed(note).turns.lazy.map(Self.spokenText).filter { !$0.isEmpty }.joined(separator: " "),
+                  body: NoteTranscripts.sealed(note).turns.lazy.filter { !$0.isBackground }.map(Self.spokenText).filter { !$0.isEmpty }.joined(separator: " "),
                   bookmarks: note.bookmarks.compactMap(\.label))
     }
 
-    /// Keep the viewer's punctuation spacing while omitting synthetic inline-speaker labels.
+    /// Keep the viewer's punctuation spacing while omitting synthetic inline-speaker labels and background chips.
     private static func spokenText(_ turn: NoteTurn) -> String {
         guard !turn.interjections.isEmpty else { return turn.text }
         var text = ""
         text.reserveCapacity(turn.text.utf8.count)
         var previousEnd = 0
         for (index, word) in turn.words.enumerated() {
+            if turn.interjections.contains(where: { $0.isBackground && $0.wordRange.contains(index) }) { continue }
             let offset = turn.offsets[index]
-            if index > 0 && offset > previousEnd { text.append(" ") }
+            if !text.isEmpty && offset > previousEnd { text.append(" ") }
             text.append(word.text)
             previousEnd = max(previousEnd, offset + word.text.count)
         }

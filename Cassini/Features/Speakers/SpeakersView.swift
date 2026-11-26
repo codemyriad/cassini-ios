@@ -61,7 +61,11 @@ struct SpeakersView: View {
             .paperListBackground()
             .navigationTitle(SpeakersCopy.speakersTitle).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(SpeakersCopy.done) { dismiss() } } }
-            .sheet(item: $naming) { NameSpeakerSheet(model: model.naming($0.speakerID)) }
+            .sheet(item: $naming) {
+                NameSpeakerSheet(model: model.naming($0.speakerID, displayLabel: {
+                    NoteCopy.speakerLabel($0.label, id: $0.speakerID, ordinal: $0.ordinal)
+                }))
+            }
             .alert(SpeakersCopy.addSpeaker, isPresented: $adding) {
                 TextField(SpeakersCopy.nameField, text: $newName)
                 Button(SpeakersCopy.cancel, role: .cancel) {}

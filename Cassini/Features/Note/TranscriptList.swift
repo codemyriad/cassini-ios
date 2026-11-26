@@ -40,19 +40,67 @@ struct TranscriptList: View {
     var actions = TranscriptActions()
     var geometry: FollowGeometry?
     var suggestion: (NoteTurn) -> AnyView? = { _ in nil }
+    @State private var expandedRuns: Set<String> = []
 
     var body: some View {
+        let items = style == .reading && transcript.turns.contains(where: \.isBackground)
+            ? TranscriptFolding.items(of: transcript.turns)
+            : transcript.turns.map(TranscriptDisplayItem.turn)
         LazyVStack(alignment: .leading, spacing: 14) {
-            ForEach(transcript.turns) { turn in
-                if let card = suggestion(turn) { card }
-                TurnView(input: TurnRenderInput(turn: turn, activeWord: activeWord,
-                                               matches: hits.ranges[turn.id] ?? [],
-                                               currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
-                                               style: style, renamable: renamable),
-                         actions: actions, geometry: geometry)
-                    .id(turn.id)
+            ForEach(items) { item in
+                switch item {
+                case .turn(let turn):
+                    if let card = suggestion(turn) { card }
+                    turnRow(turn)
+                case .backgroundRun(let run):
+                    let expanded = expandedRuns.contains(run.id)
+                    BackgroundRunRow(run: run, expanded: expanded) {
+                        if expanded { expandedRuns.remove(run.id) } else { expandedRuns.insert(run.id) }
+                    }
+                    if expanded {
+                        ForEach(run.turns) { turn in
+                            turnRow(turn)
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func turnRow(_ turn: NoteTurn) -> some View {
+        TurnView(input: TurnRenderInput(turn: turn, activeWord: activeWord,
+                                       matches: hits.ranges[turn.id] ?? [],
+                                       currentMatch: hits.current?.turnID == turn.id ? hits.current?.range : nil,
+                                       style: style, renamable: renamable),
+                 actions: actions, geometry: geometry)
+            .id(turn.id)
+    }
+}
+
+/// Folded row for consecutive background-voice turns (D112 / L-86): text-only, tertiary text colour,
+/// aligned with paragraph text, with a trailing chevron pointing down (up when open).
+private struct BackgroundRunRow: View {
+    let run: BackgroundTurnRun
+    let expanded: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Text(SpeakersCopy.backgroundHidden(run.voiceCount))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.faint)
+                Spacer(minLength: 8)
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.faint)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: HitTarget.minimum, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("backgroundRun-\(run.id)")
     }
 }
 

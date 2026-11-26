@@ -20,7 +20,7 @@ extension SpeakerNaming {
             showAll: !state.showAll && ranked.count > visibleVoices, ranked: input.print != nil,
             samePerson: samePerson(state)?.name, renameSaved: renameQuestion(state)?.name, notName: notName(input)?.name,
             remember: state.remember && reason == nil, rememberEnabled: reason == nil,
-            rememberReason: reason, canMerge: canMerge(state), save: saveState(state), draft: input.draft)
+            rememberReason: reason, isBackground: state.isBackground, canMerge: canMerge(state), save: saveState(state), draft: input.draft)
     }
 
     /// The Merge sheet, or nil while the Name sheet shows.
@@ -33,10 +33,18 @@ extension SpeakerNaming {
                        draft: state.input.draft)
     }
 
-    /// Disabled only for an empty name, or when nothing changed and the speaker is already confirmed: an automatic,
-    /// suggested or unmatched speaker can still Save its name, which confirms it.
+    /// Disabled only for an empty name (when not toggling background voice), or when nothing changed and the speaker
+    /// is already confirmed: an automatic, suggested or unmatched speaker can still Save its name, which confirms it.
     public static func saveState(_ state: NamingState) -> SaveState {
+        let backgroundChanged = state.isBackground != state.initialBackground
+        if state.isBackground {
+            return backgroundChanged ? .enabled : .disabled
+        }
         let trimmed = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if backgroundChanged {
+            if samePerson(state) != nil || renameQuestion(state) != nil { return .blockedByQuestion }
+            return .enabled
+        }
         var confirmed = false
         if case .confirmed = state.input.match { confirmed = true }
         let unchanged = trimmed == state.initialName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -53,6 +61,7 @@ extension SpeakerNaming {
     /// The same-person question: Remember is on, no voice is bound, a print exists, the name was not answered
     /// "Someone else", and the typed name is a saved voice's full name or first word. The best scored one.
     public static func samePerson(_ state: NamingState) -> SavedVoice? {
+        guard !state.isBackground else { return nil }
         let typed = NameMatch.normalise(state.name)
         guard effectiveRemember(state), state.boundVoiceID == nil, state.input.hasPrint,
               !typed.isEmpty, typed != state.declinedSamePerson else { return nil }
@@ -62,6 +71,7 @@ extension SpeakerNaming {
     /// The rename-saved question: the speaker is confirmed as voice V, the user edited the name and it differs from
     /// V's name, with no voice bound and no same-person question open.
     public static func renameQuestion(_ state: NamingState) -> SavedVoice? {
+        guard !state.isBackground else { return nil }
         guard let confirmed = confirmedVoice(state.input) else { return nil }
         let edited = !NameMatch.same(state.name, state.initialName)
         let open = state.renameAnswer == nil && state.boundVoiceID == nil

@@ -19,6 +19,8 @@ struct NameSpeakerSheet: View {
     @State private var pulse = false
     /// The field's own text: a name cut to its limit is put back into the field, which a computed binding cannot do.
     @State private var nameField = ""
+    /// Prevents `onChange(of: nameField)` from sending `.nameChanged` when switching speakers in the top row.
+    @State private var syncingField = false
     @FocusState private var nameFocused: Bool
     @AccessibilityFocusState private var questionFocused: Bool
 
@@ -71,7 +73,12 @@ struct NameSpeakerSheet: View {
     /// This speaker's label as stored (D47), or "Speaker N" in the app's language when it has none
     /// (`NoteCopy.speakerLabel`).
     private func shown(_ label: String) -> String {
-        NoteCopy.speakerLabel(label, id: speakerID, ordinal: state?.input.ordinal ?? 0)
+        NoteCopy.speakerLabel(label, id: model.activeSpeakerID, ordinal: state?.input.ordinal ?? 0)
+    }
+
+    private func rowLabel(_ item: SpeakerSheetSession.RowSpeaker) -> String {
+        if let provenance = item.provenance, provenance != .unnamed { return item.label }
+        return NoteCopy.speakerLabel(item.label, id: item.speakerID, ordinal: item.ordinal)
     }
 
     /// A sample of this note is playing; it ends by itself at its end, on a pause, an interruption or a lost output.
@@ -84,16 +91,24 @@ struct NameSpeakerSheet: View {
     private func sheetContent(_ ui: NameSheetUI) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if !model.displayedRoster.isEmpty {
+                    speakerRow
+                }
                 header(ui)
                 if !ui.quote.isEmpty {
                     quoteBlock(ui.quote)
                 }
                 nameSection(ui)
+                if !ui.draft {
+                    backgroundVoiceCard(ui)
+                }
                 question(ui)
                 if !ui.voices.isEmpty {
                     voiceRows(ui)
+                        .disabled(ui.isBackground)
+                        .opacity(ui.isBackground ? 0.45 : 1)
                 }
-                if let name = ui.notName {
+                if let name = ui.notName, !ui.isBackground {
                     Button { send(.notThisPerson) } label: {
                         Text(SpeakersCopy.notName(name))
                             .font(.subheadline.weight(.semibold))
@@ -104,7 +119,9 @@ struct NameSpeakerSheet: View {
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("notThisPerson")
                 }
-                rememberCard(ui)
+                if !ui.isBackground {
+                    rememberCard(ui)
+                }
             }
             .readableWidth()
             .padding(.horizontal, 20)
@@ -113,6 +130,103 @@ struct NameSpeakerSheet: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .disabled(saving)
+        .onChange(of: model.activeSpeakerID) { _, _ in
+            syncFieldFromModel()
+        }
+        .onChange(of: model.state?.input.speakerID) { _, _ in
+            syncFieldFromModel()
+        }
+    }
+
+    private func syncFieldFromModel() {
+        let target = model.state?.name ?? ""
+        if nameField != target {
+            syncingField = true
+            nameField = target
+            DispatchQueue.main.async { syncingField = false }
+        }
+    }
+
+    private var speakerRow: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(model.displayedRoster) { item in
+                        let selected = Data(item.speakerID.utf8) == Data(model.activeSpeakerID.utf8)
+                        Button {
+                            nameFocused = false
+                            Task { await model.selectSpeaker(item.speakerID, sheet: handle) }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if item.isBackground {
+                                    Circle()
+                                        .strokeBorder(Color.muted, lineWidth: 1.5)
+                                        .frame(width: 8, height: 8)
+                                        .accessibilityHidden(true)
+                                } else {
+                                    Circle()
+                                        .fill(item.tint.color)
+                                        .frame(width: 8, height: 8)
+                                        .accessibilityHidden(true)
+                                }
+                                Text(rowLabel(item))
+                                    .font(.subheadline.weight(selected ? .semibold : .regular))
+                                    .foregroundStyle(item.isBackground ? Color.muted : Color.ink)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: HitTarget.minimum)
+                            .background(
+                                Capsule().fill(selected ? Color.card : Color.sunken.opacity(0.6))
+                            )
+                            .overlay(
+                                Capsule().strokeBorder(selected ? Color.accent : Color.lineSoft, lineWidth: selected ? 1.5 : 1)
+                            )
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .id(item.id)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityIdentifier("speakerRow-\(item.speakerID)")
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .accessibilityIdentifier("speakerRowScroll")
+            .onChange(of: model.activeSpeakerID) { _, id in
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(Data(id.utf8), anchor: .center)
+                }
+            }
+        }
+    }
+
+    private func backgroundVoiceCard(_ ui: NameSheetUI) -> some View {
+        let cardShape = RoundedRectangle(cornerRadius: Radius.field)
+        return Toggle(isOn: Binding(get: { ui.isBackground }, set: { on in
+            if on { nameFocused = false }
+            send(.backgroundToggled(on))
+        })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SpeakersCopy.backgroundVoice)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(SpeakersCopy.backgroundVoiceDescription)
+                    .font(.footnote)
+                    .foregroundStyle(Color.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .toggleStyle(.switch)
+        .tint(.accent)
+        .accessibilityIdentifier("backgroundVoiceToggle")
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+        .background(cardShape.fill(Color.card))
+        .overlay(cardShape.strokeBorder(Color.lineSoft, lineWidth: 1))
     }
 
     private func header(_ ui: NameSheetUI) -> some View {
@@ -170,34 +284,46 @@ struct NameSpeakerSheet: View {
                 .foregroundStyle(Color.ink)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 0) {
-                TextField(SpeakersCopy.nameField, text: $nameField.handingEdits { text in
-                    nameTyped(text)
-                    // A name cut to its limit goes back once the field's own edit is done, as in the Rename sheet.
-                    if let name = state?.name, name != text {
-                        DispatchQueue.main.async { if nameField == text { nameField = name } }
-                    }
-                }, prompt: Text(verbatim: ""))
-                    .font(.body)
-                    .foregroundStyle(Color.ink)
-                    .focused($nameFocused)
-                    .onAppear { nameField = ui.name }
-                    .onChange(of: nameField) { _, text in
+                if ui.isBackground {
+                    Text(SpeakersCopy.backgroundVoiceNamePlaceholder)
+                        .font(.body)
+                        .foregroundStyle(Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("speakerNameField")
+                } else {
+                    TextField(SpeakersCopy.nameField, text: $nameField.handingEdits { text in
+                        guard !syncingField else { return }
                         nameTyped(text)
-                        if let name = state?.name, name != text { nameField = name }
-                    }
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .onSubmit { send(.save) }
-                    .accessibilityLabel(SpeakersCopy.nameField)
-                    .accessibilityIdentifier("speakerNameField")
+                        // A name cut to its limit goes back once the field's own edit is done, as in the Rename sheet.
+                        if let name = state?.name, name != text {
+                            DispatchQueue.main.async { if nameField == text { nameField = name } }
+                        }
+                    }, prompt: Text(verbatim: ""))
+                        .font(.body)
+                        .foregroundStyle(Color.ink)
+                        .focused($nameFocused)
+                        .onAppear { nameField = ui.name }
+                        .onChange(of: nameField) { _, text in
+                            guard !syncingField else { return }
+                            nameTyped(text)
+                            if let name = state?.name, name != text { nameField = name }
+                        }
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .onSubmit { send(.save) }
+                        .accessibilityLabel(SpeakersCopy.nameField)
+                        .accessibilityIdentifier("speakerNameField")
+                }
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-            .background(fieldShape.fill(Color.card))
-            .overlay(fieldShape.strokeBorder(nameFocused ? Color.accent : Color.line, lineWidth: nameFocused ? 2 : 1))
+            .background(fieldShape.fill(ui.isBackground ? Color.sunken : Color.card))
+            .overlay(fieldShape.strokeBorder(!ui.isBackground && nameFocused ? Color.accent : Color.line,
+                                             lineWidth: !ui.isBackground && nameFocused ? 2 : 1))
+            .opacity(ui.isBackground ? 0.7 : 1)
             .contentShape(Rectangle())
-            .onTapGesture { nameFocused = true }
+            .onTapGesture { if !ui.isBackground { nameFocused = true } }
         }
     }
 
@@ -341,11 +467,12 @@ struct NameSpeakerSheet: View {
     }
 
     private func footer(_ ui: NameSheetUI) -> some View {
-        VStack(spacing: 0) {
+        let hasMergeTargets = !(state?.input.mergeTargets.isEmpty ?? true)
+        return VStack(spacing: 0) {
             Rectangle().fill(Color.lineSoft).frame(height: 1).accessibilityHidden(true)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
-                    if ui.canMerge { mergeButton }
+                    if hasMergeTargets { mergeButton(disabled: !ui.canMerge) }
                     Spacer(minLength: 8)
                     HStack(spacing: 8) {
                         cancelButton
@@ -357,9 +484,9 @@ struct NameSpeakerSheet: View {
                         cancelButton
                         saveButton(ui)
                     }
-                    if ui.canMerge {
+                    if hasMergeTargets {
                         HStack {
-                            mergeButton
+                            mergeButton(disabled: !ui.canMerge)
                             Spacer(minLength: 0)
                         }
                     }
@@ -373,16 +500,19 @@ struct NameSpeakerSheet: View {
         .disabled(saving)
     }
 
-    private var mergeButton: some View {
+    private func mergeButton(disabled: Bool) -> some View {
         Button { send(.mergeInto) } label: {
             Text(SpeakersCopy.mergeInto)
                 .font(.subheadline.weight(.semibold))
+                .fixedSize(horizontal: true, vertical: true)
                 .foregroundStyle(Color.ink)
                 .padding(.vertical, 8)
                 .frame(minHeight: HitTarget.minimum)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
         .accessibilityIdentifier("mergeInto")
     }
 
@@ -392,7 +522,7 @@ struct NameSpeakerSheet: View {
     }
 
     private func saveButton(_ ui: NameSheetUI) -> some View {
-        let disabled = saving || ui.save == .disabled
+        let disabled = saving || model.combinedSaveState == .disabled
         return Button(SpeakersCopy.saveName) { send(.save) }
             .buttonStyle(SheetPillButtonStyle(primary: true, compact: false))
             .disabled(disabled)
@@ -423,6 +553,7 @@ struct NameSpeakerSheet: View {
     private func handle(_ action: NameSpeakerModel.SheetAction) {
         switch action {
         case .toggleSample(let window): toggleSample(window)
+        case .stopSample: playback.stopSample()
         case .focusQuestion: focusQuestion()
         case .close: close()
         }
@@ -458,6 +589,7 @@ private struct SheetPillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
+            .fixedSize(horizontal: true, vertical: true)
             .foregroundStyle(primary ? Color.onAccent : Color.ink)
             .padding(.horizontal, compact ? 14 : 18)
             .padding(.vertical, compact ? 7 : 10)

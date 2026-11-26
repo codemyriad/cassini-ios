@@ -1,4 +1,4 @@
-// Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a; do not edit.
+// Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit.
 import Foundation
 
 /// Literal call sites keep Xcode extraction and the compiled catalog in agreement.

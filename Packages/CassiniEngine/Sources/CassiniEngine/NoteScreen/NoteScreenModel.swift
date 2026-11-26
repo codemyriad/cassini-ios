@@ -43,6 +43,8 @@ public final class NoteScreenModel {
         /// What Name a speaker needs about a speaker, and the writes it asks for.
         public var namingInput: @MainActor (UUID, String) async -> NamingInput?
         public var performNaming: @MainActor ([NamingEffect], UUID, String) async throws(VoicesStore.SaveFailure) -> Void
+        public var performNamingBatch: (@MainActor ([SpeakerSheetSession.BatchWrite], UUID) async throws(VoicesStore.SaveFailure) -> VoicesStore.SpeakerUndoSnapshot?)? = nil
+        public var undoSpeakerChanges: @MainActor (UUID, VoicesStore.SpeakerUndoSnapshot) async -> Void = { _, _ in }
 
         // The queue
         public var transcribe: @MainActor (UUID, JobKind) async -> TranscribeOutcome
@@ -411,13 +413,43 @@ public final class NoteScreenModel {
         }
     }
 
+    /// Toast shown after saving speaker changes (e.g., background voices), with Undo (D112 / L-86).
+    public struct SpeakerToast: Equatable, Sendable {
+        public let id: UUID
+        public let summary: SpeakerSheetSession.SaveSummary
+        public let snapshot: VoicesStore.SpeakerUndoSnapshot
+        public init(id: UUID = UUID(), summary: SpeakerSheetSession.SaveSummary, snapshot: VoicesStore.SpeakerUndoSnapshot) {
+            self.id = id; self.summary = summary; self.snapshot = snapshot
+        }
+    }
+
+    public var speakerToast: SpeakerToast?
+
+    public func undoSpeakerToast() {
+        guard let toast = speakerToast else { return }
+        speakerToast = nil
+        let undo = ports.undoSpeakerChanges
+        let id = noteID
+        Task { await undo(id, toast.snapshot) }
+    }
+
+    public func dismissSpeakerToast(_ id: UUID) {
+        if speakerToast?.id == id { speakerToast = nil }
+    }
+
     /// The model of Name a speaker for one of the note's speakers, or one of the draft's: its saves then go to the
     /// draft's names, and are refused once the job closed naming.
-    public func naming(_ speakerID: String) -> NameSpeakerModel {
+    public func naming(_ speakerID: String, displayLabel: @escaping (NamingInput) -> String = { $0.label }) -> NameSpeakerModel {
         guard isDraftSpeaker(speakerID) else {
-            return NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(
+            let roster = note.map { SpeakerSheetSession.roster(for: $0, voices: ports.savedVoices()) } ?? []
+            return NameSpeakerModel(noteID: noteID, speakerID: speakerID, roster: roster, displayLabel: displayLabel, ports: .init(
                 input: ports.namingInput, perform: ports.performNaming,
-                readOnly: { [weak self] in self?.readOnly }))
+                readOnly: { [weak self] in self?.readOnly },
+                performBatch: ports.performNamingBatch,
+                onSaved: { [weak self] summary, snapshot in
+                    guard let self, let snapshot, summary.toastKind != nil else { return }
+                    self.speakerToast = SpeakerToast(summary: summary, snapshot: snapshot)
+                }))
         }
         let change = ports.changeDraft, open = ports.draftNamingOpen
         return NameSpeakerModel(noteID: noteID, speakerID: speakerID, ports: .init(

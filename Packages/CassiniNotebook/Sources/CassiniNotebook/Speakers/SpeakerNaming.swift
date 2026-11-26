@@ -24,8 +24,9 @@ public enum SpeakerNaming {
             return NameMatch.same(voice.name, name) ? voice.id : nil
         }
         let remember = (input.remembered ?? (input.rememberDefault || bound != nil)) && rememberReason(input) == nil
-        return NamingState(input: input, name: name, boundVoiceID: bound, remember: remember, initialName: name,
-                           initialBound: bound, initialRemember: remember)
+        return NamingState(input: input, name: name, boundVoiceID: bound, remember: remember,
+                           isBackground: input.isBackground, initialName: name,
+                           initialBound: bound, initialRemember: remember, initialBackground: input.isBackground)
     }
 
     public static func reduce(_ state: NamingState, _ event: NamingEvent) -> NamingResult {
@@ -40,6 +41,9 @@ public enum SpeakerNaming {
         case .keepSaved: next.renameAnswer = false
         case .notThisPerson: return notThisPerson(state)
         case .rememberToggled(let on): next.remember = on && rememberable(state)
+        case .backgroundToggled(let on):
+            next.isBackground = on
+            if on { next.merge = nil }
         case .playSample: return NamingResult(state, playSample(state))
         case .mergeInto: if canMerge(state) { next.merge = MergeStep() }
         case .mergeTarget(let id):
@@ -108,12 +112,20 @@ public enum SpeakerNaming {
         }
     }
 
-    /// Relabel, then the voice part: unenrol from a confirmed voice that is no longer this speaker, then enrol, rename
-    /// only, or clear a stale automatic match.
+    /// Relabel, background toggle, then the voice part: unenrol from a confirmed voice that is no longer this speaker,
+    /// then enrol, rename only, or clear a stale automatic match. When Background voice is on, the name and provenance
+    /// are kept intact and no voiceprint is enrolled (D112 / L-86).
     private static func sealedSave(_ state: NamingState) -> [NamingEffect] {
         let input = state.input
-        let name = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
         var effects: [NamingEffect] = []
+        if state.isBackground != state.initialBackground {
+            effects.append(.setBackground(speakerID: input.speakerID, background: state.isBackground))
+        }
+        if state.isBackground {
+            return effects
+        }
+        let name = state.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return effects }
         if name != input.namedLabel { effects.append(.relabel(speakerID: input.speakerID, name: name)) }
         let previous = confirmedID(input)
         let target = target(state, previous: previous, name: name)
@@ -169,11 +181,11 @@ public enum SpeakerNaming {
 
     // MARK: - Helpers
 
-    static func canMerge(_ state: NamingState) -> Bool { !state.input.mergeTargets.isEmpty }
+    static func canMerge(_ state: NamingState) -> Bool { !state.isBackground && !state.input.mergeTargets.isEmpty }
 
     static func rememberable(_ state: NamingState) -> Bool { rememberReason(state.input) == nil }
 
-    static func effectiveRemember(_ state: NamingState) -> Bool { state.remember && rememberable(state) }
+    static func effectiveRemember(_ state: NamingState) -> Bool { !state.isBackground && state.remember && rememberable(state) }
 
     static func confirmedID(_ input: NamingInput) -> UUID? {
         if case .confirmed(let voice, _) = input.match { return voice }

@@ -19,7 +19,9 @@ public struct LibraryIndex: Sendable {
             preview = note.transcriptPreview.map {
                 Highlighted($0.text, leadingEllipsis: $0.leadingEllipsis, trailingEllipsis: $0.trailingEllipsis)
             } ?? LibraryMapping.storedPreview(note.previewText)
-            speakerCount = Set(note.transcript.compactMap { $0.speakerID ?? $0.speaker }.map { Data($0.utf8) }).count
+            let backgroundIDs = Set((note.speakers ?? []).filter(\.background).map(\.byteID))
+            speakerCount = Set(note.transcript.compactMap { $0.speakerID ?? $0.speaker }.map { Data($0.utf8) })
+                .subtracting(backgroundIDs).count
             hasWords = note.transcript.contains { $0.text.contains { !$0.isWhitespace } }
         }
     }
@@ -139,10 +141,10 @@ public struct LibraryIndex: Sendable {
         }
         return hits
     }
-    /// Names offered by the filter, excluding imported placeholder labels as well as unnamed slots.
+    /// Names offered by the filter, excluding imported placeholder labels, unnamed slots, and background voices.
     public static func namedSpeakers(_ note: Note) -> [NoteSpeaker] {
         (note.speakers ?? []).filter {
-            $0.provenance != .unnamed && !DefaultLabels.isDefault(id: $0.id, label: $0.name)
+            !$0.background && $0.provenance != .unnamed && !DefaultLabels.isDefault(id: $0.id, label: $0.name)
         }
     }
 

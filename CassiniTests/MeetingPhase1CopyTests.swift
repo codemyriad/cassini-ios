@@ -10,11 +10,22 @@ import Testing
         "common.quote",
         "common.savedVoices",
         "common.stop",
+        "common.undo",
         "library.allMeetings",
         "library.backToAllMeetings",
         "meeting.find.placeholder",
         "phone.row.resume",
         "player.pause",
+        "speakers.backgroundVoice",
+        "speakers.backgroundVoice.description",
+        "speakers.backgroundVoice.hidden.one",
+        "speakers.backgroundVoice.hidden.other",
+        "speakers.backgroundVoice.namePlaceholder",
+        "speakers.backgroundVoice.toast.count.one",
+        "speakers.backgroundVoice.toast.count.other",
+        "speakers.backgroundVoice.toast.namedAndBackground.one",
+        "speakers.backgroundVoice.toast.namedAndBackground.other",
+        "speakers.backgroundVoice.toast.single",
         "speakers.dialog.a11y",
         "speakers.duplicate.notice",
         "speakers.duplicate.samePerson",
@@ -122,6 +133,9 @@ import Testing
             #expect(MeetingPhase1Copy.template("speakers.rememberVoice.cardBody.iphone.unnamed", language: locale).contains("\n"))
         }
         #expect(MeetingPhase1Copy.template("speakers.duplicate.notice", language: "en") == "{name} is already a saved voice.")
+        #expect(MeetingPhase1Copy.template("speakers.saveName", language: "en") == "Save")
+        #expect(MeetingPhase1Copy.template("speakers.backgroundVoice", language: "en") == "Background voice")
+        #expect(MeetingPhase1Copy.template("common.undo", language: "en") == "Undo")
     }
 
     @Test func duplicateNoticeStylesOnlyThePlaceholderSpanEvenWhenNameMatchesTemplateWords() {

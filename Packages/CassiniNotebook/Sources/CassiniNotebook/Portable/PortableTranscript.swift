@@ -84,13 +84,14 @@ public struct PortableTranscript: Hashable, Sendable {
             }
             for item in roster { _ = allocator.reserve(item.id) }
             let entries = Dictionary(roster.map { (Data($0.id.utf8), $0.entry) }, uniquingKeysWith: { first, _ in first })
+            let backgroundIDs = Self.backgroundSpeakerIDs(document)
             for variant in document.variants {
                 guard let transcript = variant.transcript else {
                     unavailable[variant.id] = variant.error ?? "unavailable"
                     continue
                 }
                 var version = TranscriptVersion(kind: .imported, segments: Self.segments(transcript, document),
-                                                speakers: Self.speakers(transcript, roster: entries, indices: allocator.byteAssignments), language: transcript.language)
+                                                speakers: Self.speakers(transcript, roster: entries, indices: allocator.byteAssignments, backgroundIDs: backgroundIDs), language: transcript.language)
                 version.portableID = variant.id
                 versions.append(version)
                 // The default when it decodes, else the first variant that does.
@@ -126,8 +127,27 @@ public struct PortableTranscript: Hashable, Sendable {
         }
     }
 
+    /// Background speaker ids from either manifest `speakers[]` or desktop `x["codemyriad.io"].meeting.speakers[]` (D112 / L-86).
+    private static func backgroundSpeakerIDs(_ document: CassiniDocument) -> Set<Data> {
+        var ids = Set<Data>()
+        for entry in document.manifest?["speakers"]?.array ?? [] {
+            if let obj = entry.object, let id = obj["id"]?.string, obj["background"]?.bool == true {
+                ids.insert(Data(id.utf8))
+            }
+        }
+        if let desktopSpeakers = document.manifest?["x"]?.object?["codemyriad.io"]?.object?["meeting"]?.object?["speakers"]?.array {
+            for entry in desktopSpeakers {
+                if let obj = entry.object, let id = obj["id"]?.string, obj["background"]?.bool == true {
+                    ids.insert(Data(id.utf8))
+                }
+            }
+        }
+        return ids
+    }
+
     /// Speakers retain canonical word order and the document-wide, byte-exact palette.
-    private static func speakers(_ transcript: Transcript, roster: [Data: JSONObject], indices: [Data: Int]) -> [NoteSpeaker] {
+    private static func speakers(_ transcript: Transcript, roster: [Data: JSONObject], indices: [Data: Int],
+                                 backgroundIDs: Set<Data> = []) -> [NoteSpeaker] {
         var seen = Set<Data>()
         return transcript.words.compactMap { word in
             let id = Data(word.speaker.utf8)
@@ -136,7 +156,8 @@ public struct PortableTranscript: Hashable, Sendable {
             let label = entry?["label"]?.string ?? word.speaker
             let provenance = (entry?["provenance"]?.string).flatMap { NoteSpeaker.Provenance(rawValue: $0) }
                 ?? (DefaultLabels.isDefault(id: word.speaker, label: label) ? .unnamed : .source)
-            return NoteSpeaker(id: word.speaker, name: label, colourIndex: indices[id], provenance: provenance)
+            return NoteSpeaker(id: word.speaker, name: label, colourIndex: indices[id], provenance: provenance,
+                               background: backgroundIDs.contains(id))
         }
     }
 
@@ -190,8 +211,10 @@ extension PortableTranscript {
         let hintEntries = palette.map { speaker -> (Data, JSONObject) in
             var hint = JSONObject([("provenance", .string(speaker.provenance.rawValue))])
             if let index = speaker.colourIndex { hint["colourIndex"] = .int(index) }
+            if speaker.background { hint["background"] = .bool(true) }
             return (speaker.byteID, hint)
         }
+        let backgroundByID = Dictionary(palette.map { ($0.byteID, $0.background) }, uniquingKeysWith: { first, _ in first })
         let hints = Dictionary(hintEntries, uniquingKeysWith: { first, _ in first })
         var existing: CassiniDocument?
         var carried: CassiniDocument?
@@ -207,8 +230,32 @@ extension PortableTranscript {
                     if let hint = hints[Data(id.utf8)] {
                         for (key, value) in hint.pairs { speaker[key] = value }
                     }
+                    if backgroundByID[Data(id.utf8)] != true {
+                        speaker["background"] = nil
+                    }
                     return .object(speaker)
                 })
+            }
+            if var x = manifest["x"]?.object,
+               var cm = x["codemyriad.io"]?.object,
+               var xMeeting = cm["meeting"]?.object,
+               let xSpeakers = xMeeting["speakers"]?.array {
+                var changed = false
+                let updatedXSpeakers = xSpeakers.map { entry -> JSON in
+                    guard var speaker = entry.object, let id = speaker["id"]?.string,
+                          let isBg = backgroundByID[Data(id.utf8)] else { return entry }
+                    let wasBg = speaker["background"]?.bool == true
+                    guard wasBg != isBg else { return entry }
+                    changed = true
+                    speaker["background"] = isBg ? .bool(true) : nil
+                    return .object(speaker)
+                }
+                if changed {
+                    xMeeting["speakers"] = .array(updatedXSpeakers)
+                    cm["meeting"] = .object(xMeeting)
+                    x["codemyriad.io"] = .object(cm)
+                    manifest["x"] = .object(x)
+                }
             }
             var updated = source
             updated.manifest = manifest

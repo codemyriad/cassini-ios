@@ -137,4 +137,48 @@ final class SpeakerNamingFlowTests: XCTestCase {
         }
         XCTAssertTrue(issues.isEmpty, issues.joined(separator: "\n"))
     }
+
+    @MainActor func testBackgroundVoiceAndSpeakerRowWithUndo() {
+        let app = launchSpeakersSeed()
+        let header = app.buttons["speakerHeader-w1"]
+        XCTAssertTrue(header.waitForExistence(within: 15))
+        header.tap()
+
+        // Speaker row is shown across the top; tap another speaker without closing.
+        let speakerRowScroll = app.scrollViews["speakerRowScroll"]
+        XCTAssertTrue(speakerRowScroll.waitForExistence(within: 10))
+        let rowButtons = speakerRowScroll.buttons
+        XCTAssertGreaterThanOrEqual(rowButtons.count, 2)
+
+        // Toggle Background voice on the second speaker in the row.
+        rowButtons.element(boundBy: 1).tap()
+        let bgToggle = app.switches["backgroundVoiceToggle"]
+        XCTAssertTrue(bgToggle.waitForExistence(within: 10))
+        bgToggle.tap()
+
+        // Name placeholder changes, Remember is hidden, Merge is disabled.
+        XCTAssertTrue(element(app, containing: "Not needed for a background voice").waitForExistence(within: 10))
+        XCTAssertFalse(app.switches["rememberVoice"].exists)
+        XCTAssertFalse(app.buttons["mergeInto"].isEnabled)
+
+        // Save applies changes and shows Undo snackbar.
+        let saveButton = app.buttons["saveSpeakerName"]
+        XCTAssertEqual(saveButton.label, "Save")
+        saveButton.tap()
+        XCTAssertTrue(app.otherElements["nameSpeakerSheet"].waitForNonExistence(within: 15))
+
+        let snackbar = app.otherElements["speakerUndoSnackbar"]
+        XCTAssertTrue(snackbar.waitForExistence(within: 10))
+
+        // Background turn folds into a single collapsible row.
+        let foldedRow = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "backgroundRun-")).firstMatch
+        XCTAssertTrue(foldedRow.waitForExistence(within: 10))
+        XCTAssertTrue(foldedRow.label.contains("background voice"))
+
+        // Tap Undo on the snackbar to restore everything.
+        let undoButton = snackbar.buttons["Undo"]
+        XCTAssertTrue(undoButton.waitForExistence(within: 5))
+        undoButton.tap()
+        XCTAssertTrue(foldedRow.waitForNonExistence(within: 10))
+    }
 }

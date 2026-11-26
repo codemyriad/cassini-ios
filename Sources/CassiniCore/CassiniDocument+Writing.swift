@@ -245,7 +245,7 @@ extension CassiniDocument {
         // The portable speaker object is open: these optional display hints never alter identity or labels.
         manifest["speakers"] = .array(speakers.map { entry in
             guard var speaker = entry.object, let id = speaker["id"]?.string, let hints = hintsByID[Data(id.utf8)] else { return entry }
-            for key in ["colourIndex", "provenance"] {
+            for key in ["colourIndex", "provenance", "background"] {
                 if let value = hints[key] { speaker[key] = value }
             }
             return .object(speaker)

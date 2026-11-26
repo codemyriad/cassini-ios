@@ -17,11 +17,16 @@ ENTRIES = {
     'common.quote': ('quote', 'quote'),
     'common.savedVoices': ('savedVoices', None),
     'common.stop': ('stop', None),
+    'common.undo': ('undo', None),
     'library.allMeetings': ('allMeetings', None),
     'library.backToAllMeetings': ('backToAllMeetings', None),
     'meeting.find.placeholder': ('findPlaceholder', None),
     'phone.row.resume': ('resume', None),
     'player.pause': ('pause', None),
+    'speakers.backgroundVoice': ('speakerBackgroundVoice', None),
+    'speakers.backgroundVoice.description': ('speakerBackgroundVoiceDescription', None),
+    'speakers.backgroundVoice.namePlaceholder': ('speakerBackgroundVoiceNamePlaceholder', None),
+    'speakers.backgroundVoice.toast.single': ('speakerBackgroundToastSingle', 'name'),
     'speakers.dialog.a11y': ('speakerDialogLabel', None),
     'speakers.duplicate.notice': ('speakerDuplicateNotice', 'name'),
     'speakers.duplicate.samePerson': ('speakerSamePerson', None),
@@ -59,16 +64,22 @@ TEMPLATES = {
     'transcribing.stat.audioDoneValue': ('audioDoneValue', ('done', 'total')),
 }
 PLURALS = {
+    'speakers.backgroundVoice.hidden': ('speakerBackgroundHidden', 'n'),
+    'speakers.backgroundVoice.toast.count': ('speakerBackgroundToastCount', 'n'),
     'transcribing.eta.minutes': ('etaMinutes', 'n'),
+}
+PLURAL_TEMPLATES = {
+    'speakers.backgroundVoice.toast.namedAndBackground': ('speakerBackgroundToastNamedAndBackground', 'n', ('name',)),
 }
 
 
-def normalize_count_template(text, argument, *, literal):
+def normalize_count_template(text, argument, *, literal, extra=()):
     if literal and '{' + argument + '}' not in text:
         text, count = re.subn(r'(?<!\w)1(?!\w)', '{' + argument + '}', text)
         if count != 1:
             raise ValueError('Shared singular count form must carry a single 1 or placeholder')
-    if set(re.findall(r'\{\w+\}', text)) != {'{' + argument + '}'}:
+    expected = {'{' + argument + '}'} | {'{' + p + '}' for p in extra}
+    if set(re.findall(r'\{\w+\}', text)) != expected:
         raise ValueError(f'Count plural placeholder drift: {text}')
     return text
 
@@ -88,7 +99,7 @@ def outputs(root=ROOT):
             or shared.get('sha256') != digest
             or shared.get('vendored_path') != (SOURCE / 'strings/strings.json').as_posix()):
         raise ValueError('Meeting-string pin/hash mismatch')
-    wanted = set(ENTRIES) | set(TEMPLATES) | set(PLURALS)
+    wanted = set(ENTRIES) | set(TEMPLATES) | set(PLURALS) | set(PLURAL_TEMPLATES)
     selected = [entry for entry in json.loads(source.read_text())['entries'] if entry['id'] in wanted]
     if len(selected) != len(wanted) or {entry['id'] for entry in selected} != wanted:
         raise ValueError('Missing or duplicate Phase 1 string IDs')
@@ -157,6 +168,28 @@ def outputs(root=ROOT):
                 'extractionState': 'manual', 'localizations': locales,
             }
 
+    for key, (_, argument, extra) in sorted(PLURAL_TEMPLATES.items()):
+        entry = by_id[key]
+        if set(entry.get('placeholders', {})) != ({argument} | set(extra)) or 'plural' not in entry:
+            raise ValueError(f'Plural template declaration changed: {key}')
+        one_locales, other_locales = {}, {}
+        for language in LANGUAGES:
+            forms = entry['plural'] if language == 'en' else entry['l10n'][language]['plural']
+            extra_forms = set(forms) - {'one', 'other', 'many'}
+            if extra_forms or 'one' not in forms or 'other' not in forms:
+                raise ValueError(f'Unsupported plural forms in {key} {language}: {sorted(forms)}')
+            if 'many' in forms and forms['many'] != forms['other']:
+                raise ValueError(f'Distinct many form requires CLDR plural routing: {key} {language}')
+            one = normalize_count_template(forms['one'], argument, literal=True, extra=extra)
+            other = normalize_count_template(forms['other'], argument, literal=False, extra=extra)
+            one_locales[language] = {'stringUnit': {'state': 'translated', 'value': one}}
+            other_locales[language] = {'stringUnit': {'state': 'translated', 'value': other}}
+        for suffix, locales in (('one', one_locales), ('other', other_locales)):
+            strings[f'{key}.{suffix}'] = {
+                'comment': f'Generated from cassini-ux {pin["commit"]}, {key} ({suffix}); named placeholders stay verbatim.',
+                'extractionState': 'manual', 'localizations': locales,
+            }
+
     catalog = (json.dumps({'sourceLanguage': 'en', 'strings': strings, 'version': '1.0'},
                           ensure_ascii=False, indent=2) + '\n').encode()
     lines = [f'// Generated from cassini-ux {pin["commit"]}; do not edit.', 'import Foundation', '',
@@ -185,6 +218,16 @@ def outputs(root=ROOT):
                   f'            ? String(localized: "{key}.one", table: "MeetingPhase1")',
                   f'            : String(localized: "{key}.other", table: "MeetingPhase1")',
                   f'        return template.replacingOccurrences(of: "{{{argument}}}", with: {argument})',
+                  '    }']
+    for key, (name, argument, extra) in sorted(PLURAL_TEMPLATES.items()):
+        signature = ', '.join([f'singular: Bool'] + [f'{p}: String' for p in extra] + [f'{argument}: String'])
+        lines += [f'    static func {name}({signature}) -> String {{',
+                  '        var text = singular',
+                  f'            ? String(localized: "{key}.one", table: "MeetingPhase1")',
+                  f'            : String(localized: "{key}.other", table: "MeetingPhase1")']
+        for p in extra:
+            lines.append(f'        text = text.replacingOccurrences(of: "{{{p}}}", with: {p})')
+        lines += [f'        return text.replacingOccurrences(of: "{{{argument}}}", with: {argument})',
                   '    }']
     lines += ['', '    static func template(_ key: String, language: String, bundle: Bundle = .main) -> String {',
               '        let locale = Locale(identifier: language)',

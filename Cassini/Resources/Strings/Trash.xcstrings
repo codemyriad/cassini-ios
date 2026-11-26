@@ -145,7 +145,7 @@
       }
     },
     "%lld meetings could not be deleted. They stay in Recently Deleted.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, ios.trash.deleteManyFailed.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, ios.trash.deleteManyFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -371,7 +371,7 @@
       }
     },
     "Delete %lld meetings for good?": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, android.trash.deleteAll.title.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, android.trash.deleteAll.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -761,7 +761,7 @@
       }
     },
     "Its audio, transcripts and voiceprints from this meeting are deleted. This can’t be undone.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, android.trash.delete.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, android.trash.delete.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -844,7 +844,7 @@
       }
     },
     "Meetings here are deleted for good after 30 days, with their audio, transcripts and voiceprints from those meetings.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, android.trash.retentionNote.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, android.trash.retentionNote.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -886,7 +886,7 @@
       }
     },
     "Meetings you delete stay here for 30 days.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, android.trash.empty.body.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, android.trash.empty.body.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1256,7 +1256,7 @@
       }
     },
     "“%@” could not be deleted. It stays in Recently Deleted.": {
-      "comment": "Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a, ios.trash.deleteFailed.",
+      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, ios.trash.deleteFailed.",
       "extractionState": "manual",
       "localizations": {
         "en": {

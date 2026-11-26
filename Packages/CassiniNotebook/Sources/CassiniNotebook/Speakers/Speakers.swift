@@ -158,6 +158,23 @@ extension Note {
         }
     }
 
+    /// Marks or unmarks a speaker as a background voice, keeping its name and provenance intact (D112 / L-86).
+    public mutating func setSpeakerBackground(_ id: String, _ background: Bool) {
+        backfillSpeakerColours()
+        guard let index = speakers?.firstIndex(where: { $0.byteID == Data(id.utf8) }) else { return }
+        changeShownSpeakers { note in
+            note.speakers?[index].background = background
+        }
+    }
+
+    /// Restores the shown speakers (and refreshes passage labels) from an Undo snapshot without adding a version.
+    public mutating func restoreShownSpeakers(_ previous: [NoteSpeaker]?) {
+        changeShownSpeakers { note in
+            note.speakers = previous
+            note.refreshSpeakerLabels()
+        }
+    }
+
     /// Shows everything `source` said as `target`, keeping the transcript before the merge as a version. The merged
     /// version links `target` to its voice only as an automatic match: a confirmed sample belongs to the version it
     /// was confirmed in, so taking it back later never takes it back twice. The merged version records the alias and

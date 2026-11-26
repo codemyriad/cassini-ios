@@ -35,6 +35,8 @@ public struct NamingCommit: Hashable, Sendable {
             switch effect {
             case .relabel(let id, let name):
                 commit.changes.append(.rename(speakerID: id, name: name))
+            case .setBackground(let id, let background):
+                commit.changes.append(.setBackground(speakerID: id, background: background))
             case .rememberVoice(let id, let voiceID, let name):
                 guard let print, print.speechSeconds >= VoiceLibrary.minimumRememberSeconds else {
                     commit.refused = .noPrint

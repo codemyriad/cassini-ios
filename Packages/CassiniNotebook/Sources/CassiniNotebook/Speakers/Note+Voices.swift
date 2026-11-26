@@ -4,6 +4,7 @@ import Foundation
 /// again on a newer note (see `NoteEdit`) and give the same result.
 public enum SpeakerChange: Hashable, Sendable {
     case rename(speakerID: String, name: String)
+    case setBackground(speakerID: String, background: Bool)
     case match(speakerID: String, VoiceMatchState)
     /// "Not <name>": the voice is never offered for the speaker again; a label that is the voice's name goes back to
     /// the placeholder when `restorePlaceholder`.
@@ -18,6 +19,7 @@ extension Note {
         for change in changes {
             switch change {
             case .rename(let id, let name): renameSpeaker(id, name: name)
+            case .setBackground(let id, let background): setSpeakerBackground(id, background)
             case .match(let id, let match):
                 if let index = speakers?.firstIndex(where: { $0.byteID == Data(id.utf8) }) {
                     changeShownSpeakers { $0.speakers?[index].match = match }

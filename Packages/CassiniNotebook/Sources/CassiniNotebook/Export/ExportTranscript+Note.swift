@@ -13,8 +13,14 @@ extension ExportTranscript {
     /// without word timing (one edited by hand) gives one word per part too, its span shared out among them
     /// (`untimedWords`), so the cue rules cut it like a timed passage.
     public init(note: Note, version: TranscriptVersion? = nil, unassignedLabel: String) {
-        let segments = version?.segments ?? note.transcript
-        let speakers = version?.speakers ?? note.speakers ?? []
+        let allSegments = version?.segments ?? note.transcript
+        let allSpeakers = version?.speakers ?? note.speakers ?? []
+        let backgroundIDs = Set(allSpeakers.filter(\.background).map(\.byteID))
+        let segments = backgroundIDs.isEmpty ? allSegments : allSegments.filter { segment in
+            guard let id = segment.speakerID else { return true }
+            return !backgroundIDs.contains(Data(id.utf8))
+        }
+        let speakers = allSpeakers.filter { !$0.background }
         var labels = Dictionary(speakers.map { ($0.byteID, $0.name) }, uniquingKeysWith: { first, _ in first })
         if labels[Data(Self.unassignedSpeaker.utf8)] == nil { labels[Data(Self.unassignedSpeaker.utf8)] = unassignedLabel }
         var legacyLabels = Dictionary(speakers.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })

@@ -1,4 +1,4 @@
-// Generated from cassini-ux d9bf213a30179c395657e8d8ecd34fe2b987af1a; do not edit.
+// Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3; do not edit.
 import Foundation
 
 /// Shared Phase 1 meeting and speaker copy, resolved using the current app language.
@@ -18,6 +18,9 @@ enum MeetingPhase1Copy {
     static var stop: String {
         String(localized: "common.stop", table: "MeetingPhase1")
     }
+    static var undo: String {
+        String(localized: "common.undo", table: "MeetingPhase1")
+    }
     static var allMeetings: String {
         String(localized: "library.allMeetings", table: "MeetingPhase1")
     }
@@ -32,6 +35,21 @@ enum MeetingPhase1Copy {
     }
     static var pause: String {
         String(localized: "player.pause", table: "MeetingPhase1")
+    }
+    static var speakerBackgroundVoice: String {
+        String(localized: "speakers.backgroundVoice", table: "MeetingPhase1")
+    }
+    static var speakerBackgroundVoiceDescription: String {
+        String(localized: "speakers.backgroundVoice.description", table: "MeetingPhase1")
+    }
+    static var speakerBackgroundVoiceNamePlaceholder: String {
+        String(localized: "speakers.backgroundVoice.namePlaceholder", table: "MeetingPhase1")
+    }
+    static var speakerBackgroundToastSingleTemplate: String {
+        String(localized: "speakers.backgroundVoice.toast.single", table: "MeetingPhase1")
+    }
+    static func speakerBackgroundToastSingle(_ name: String) -> String {
+        speakerBackgroundToastSingleTemplate.replacingOccurrences(of: "{name}", with: name)
     }
     static var speakerDialogLabel: String {
         String(localized: "speakers.dialog.a11y", table: "MeetingPhase1")
@@ -146,11 +164,30 @@ enum MeetingPhase1Copy {
         text = text.replacingOccurrences(of: "{total}", with: total)
         return text
     }
+    static func speakerBackgroundHidden(singular: Bool, n: String) -> String {
+        let template = singular
+            ? String(localized: "speakers.backgroundVoice.hidden.one", table: "MeetingPhase1")
+            : String(localized: "speakers.backgroundVoice.hidden.other", table: "MeetingPhase1")
+        return template.replacingOccurrences(of: "{n}", with: n)
+    }
+    static func speakerBackgroundToastCount(singular: Bool, n: String) -> String {
+        let template = singular
+            ? String(localized: "speakers.backgroundVoice.toast.count.one", table: "MeetingPhase1")
+            : String(localized: "speakers.backgroundVoice.toast.count.other", table: "MeetingPhase1")
+        return template.replacingOccurrences(of: "{n}", with: n)
+    }
     static func etaMinutes(singular: Bool, n: String) -> String {
         let template = singular
             ? String(localized: "transcribing.eta.minutes.one", table: "MeetingPhase1")
             : String(localized: "transcribing.eta.minutes.other", table: "MeetingPhase1")
         return template.replacingOccurrences(of: "{n}", with: n)
+    }
+    static func speakerBackgroundToastNamedAndBackground(singular: Bool, name: String, n: String) -> String {
+        var text = singular
+            ? String(localized: "speakers.backgroundVoice.toast.namedAndBackground.one", table: "MeetingPhase1")
+            : String(localized: "speakers.backgroundVoice.toast.namedAndBackground.other", table: "MeetingPhase1")
+        text = text.replacingOccurrences(of: "{name}", with: name)
+        return text.replacingOccurrences(of: "{n}", with: n)
     }
 
     static func template(_ key: String, language: String, bundle: Bundle = .main) -> String {
@@ -167,6 +204,8 @@ enum MeetingPhase1Copy {
             return String(localized: "common.savedVoices", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "common.stop":
             return String(localized: "common.stop", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "common.undo":
+            return String(localized: "common.undo", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "library.allMeetings":
             return String(localized: "library.allMeetings", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "library.backToAllMeetings":
@@ -177,6 +216,26 @@ enum MeetingPhase1Copy {
             return String(localized: "phone.row.resume", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "player.pause":
             return String(localized: "player.pause", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice":
+            return String(localized: "speakers.backgroundVoice", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.description":
+            return String(localized: "speakers.backgroundVoice.description", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.hidden.one":
+            return String(localized: "speakers.backgroundVoice.hidden.one", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.hidden.other":
+            return String(localized: "speakers.backgroundVoice.hidden.other", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.namePlaceholder":
+            return String(localized: "speakers.backgroundVoice.namePlaceholder", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.toast.count.one":
+            return String(localized: "speakers.backgroundVoice.toast.count.one", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.toast.count.other":
+            return String(localized: "speakers.backgroundVoice.toast.count.other", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.toast.namedAndBackground.one":
+            return String(localized: "speakers.backgroundVoice.toast.namedAndBackground.one", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.toast.namedAndBackground.other":
+            return String(localized: "speakers.backgroundVoice.toast.namedAndBackground.other", table: "MeetingPhase1", bundle: localized, locale: locale)
+        case "speakers.backgroundVoice.toast.single":
+            return String(localized: "speakers.backgroundVoice.toast.single", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "speakers.dialog.a11y":
             return String(localized: "speakers.dialog.a11y", table: "MeetingPhase1", bundle: localized, locale: locale)
         case "speakers.duplicate.notice":

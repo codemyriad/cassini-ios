@@ -210,6 +210,53 @@ import CassiniNotebook
         }
     }
 
+    /// Snapshot of a note's speakers before a Name a speaker batch Save, for Undo (D112 / L-86).
+    public struct SpeakerUndoSnapshot: Equatable, Sendable {
+        public let beforeSpeakers: [NoteSpeaker]?
+        public let enrolledSpeakerIDs: [String]
+        public init(beforeSpeakers: [NoteSpeaker]?, enrolledSpeakerIDs: [String] = []) {
+            self.beforeSpeakers = beforeSpeakers
+            self.enrolledSpeakerIDs = enrolledSpeakerIDs
+        }
+    }
+
+    /// Carries out a batch of speaker saves in order and returns an Undo snapshot.
+    public func performBatch(_ writes: [SpeakerSheetSession.BatchWrite], noteID: UUID) async throws(SaveFailure) -> SpeakerUndoSnapshot {
+        let before = library.note(noteID)?.speakers
+        var enrolled: [String] = []
+        for write in writes {
+            if write.effects.contains(where: { if case .rememberVoice = $0 { return true }; return false }) {
+                enrolled.append(write.speakerID)
+            }
+            try await perform(write.effects, noteID: noteID, speakerID: write.speakerID)
+        }
+        return SpeakerUndoSnapshot(beforeSpeakers: before, enrolledSpeakerIDs: enrolled)
+    }
+
+    /// Reverts a Name a speaker batch Save: unenrols any samples added by that save and restores the previous speakers.
+    public func undoSpeakerChanges(_ snapshot: SpeakerUndoSnapshot, noteID: UUID) async {
+        if let note = library.note(noteID), let store {
+            for speakerID in snapshot.enrolledSpeakerIDs {
+                if let current = note.speaker(speakerID), case .confirmed(let voiceID, _) = current.match {
+                    let wasSame: Bool = {
+                        guard let prev = snapshot.beforeSpeakers?.first(where: { $0.byteID == Data(speakerID.utf8) }),
+                              case .confirmed(let prevID, _) = prev.match else { return false }
+                        return prevID == voiceID
+                    }()
+                    if !wasSame {
+                        _ = try? await store.commit { voices, readOnly in
+                            NamingCommit.plan([.unenrol(speakerID: speakerID)], noteID: noteID, speaker: current,
+                                              print: nil, voices: voices, voicesReadOnly: readOnly)
+                        }
+                    }
+                }
+            }
+            await refresh()
+        }
+        let previous = snapshot.beforeSpeakers
+        _ = await library.commit(noteID) { $0.restoreShownSpeakers(previous) }
+    }
+
     /// "Yes, Luca": names the speaker after the voice and confirms it, remembering the speaker's print in it.
     public func accept(_ suggestion: SpeakerSuggestion, noteID: UUID) async throws(SaveFailure) {
         try await perform([.relabel(speakerID: suggestion.speakerID, name: suggestion.voiceName),
