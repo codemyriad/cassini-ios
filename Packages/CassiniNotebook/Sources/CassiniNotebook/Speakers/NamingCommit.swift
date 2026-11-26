@@ -111,27 +111,58 @@ public struct NamingCommit: Hashable, Sendable {
         if result.outcome == .forgotten { forgotten.append(voiceID) }
     }
 
-    /// Applies one inverse voice operation to `voices`. Replay recorded ops in strict reverse order.
-    public static func applyInverse(_ op: VoiceUndoOp, to voices: inout [SavedVoice]) {
+    /// Applies one inverse voice operation to `voices` and returns the inverse ops (in effect order; replay in reverse
+    /// order) needed to compensate only this operation against a later voice state without overwriting concurrent edits.
+    @discardableResult
+    public static func applyInverse(_ op: VoiceUndoOp, to voices: inout [SavedVoice]) -> [VoiceUndoOp] {
         switch op {
         case .undoEnrol(let voiceID, let noteID, let speakerID, let previousName, let replacedSample):
-            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return }
+            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return [] }
+            let currentVoice = voices[index]
+            let currentName = currentVoice.name
+            let removedSample = currentVoice.samples.first { $0.noteID == noteID && $0.print.speakerID == speakerID }
             voices[index].samples.removeAll { $0.noteID == noteID && $0.print.speakerID == speakerID }
             if let replacedSample { voices[index].samples.append(replacedSample) }
             if let previousName { voices[index].name = previousName }
-            if voices[index].samples.isEmpty { voices.remove(at: index) }
+            let removedVoice = voices[index].samples.isEmpty
+            if removedVoice { voices.remove(at: index) }
+            var inverse: [VoiceUndoOp] = []
+            if let previousName, previousName != currentName {
+                inverse.append(.undoRename(voiceID: voiceID, previousName: currentName))
+            }
+            if let replacedSample {
+                inverse.append(.undoEnrol(voiceID: voiceID, noteID: replacedSample.noteID,
+                                          speakerID: replacedSample.print.speakerID,
+                                          previousName: nil, replacedSample: nil))
+            }
+            if let removedSample {
+                inverse.append(.undoUnenrol(voiceID: voiceID, sample: removedSample,
+                                            fallbackVoice: currentVoice, forgotten: removedVoice))
+            }
+            return inverse
         case .undoUnenrol(let voiceID, let sample, let fallbackVoice, _):
+            let replacedSample: VoiceSample?
             if let index = voices.firstIndex(where: { $0.id == voiceID }) {
-                voices[index].samples.removeAll { $0.noteID == sample.noteID && $0.print.speakerID == sample.print.speakerID }
+                replacedSample = voices[index].samples.first {
+                    $0.noteID == sample.noteID && $0.print.speakerID == sample.print.speakerID
+                }
+                voices[index].samples.removeAll {
+                    $0.noteID == sample.noteID && $0.print.speakerID == sample.print.speakerID
+                }
                 voices[index].samples.append(sample)
             } else {
+                replacedSample = nil
                 var restored = fallbackVoice
                 restored.samples = [sample]
                 voices.append(restored)
             }
+            return [.undoEnrol(voiceID: voiceID, noteID: sample.noteID, speakerID: sample.print.speakerID,
+                               previousName: nil, replacedSample: replacedSample)]
         case .undoRename(let voiceID, let previousName):
-            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return }
+            guard let index = voices.firstIndex(where: { $0.id == voiceID }) else { return [] }
+            let currentName = voices[index].name
             voices[index].name = previousName
+            return currentName == previousName ? [] : [.undoRename(voiceID: voiceID, previousName: currentName)]
         }
     }
 }

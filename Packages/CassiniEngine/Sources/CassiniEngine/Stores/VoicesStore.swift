@@ -43,6 +43,8 @@ import CassiniNotebook
     @ObservationIgnored public var drafts: DraftNamesStore?
     /// Test-only hook invoked right before each batch step executes (after staging/validation).
     @ObservationIgnored var beforeBatchStep: (@MainActor (_ stepIndex: Int, _ speakerID: String) async throws(SaveFailure) -> Void)?
+    /// Test-only hook invoked during Undo after inverse voice ops persist and before note restoration commits.
+    @ObservationIgnored var beforeUndoNoteCommit: (@MainActor () async -> Void)?
     /// The saved voices for a running job's live matching, readable from any thread.
     public nonisolated let liveVoices = LiveVoices()
 
@@ -366,7 +368,7 @@ import CassiniNotebook
                     guard await library.commit(noteID, {
                         $0.rollbackSpeakers(toRollback, versionID: targetVersionID)
                     }) != nil else {
-                        await compensateVoices(replay?.previous)
+                        await compensateVoices(replay?.compensationOps ?? [])
                         throw SaveFailure(reason: .noteNotSaved)
                     }
                 }
@@ -424,38 +426,45 @@ import CassiniNotebook
                                       expectedAfterSpeakers: snapshot.afterSpeakers)
         else { return }
         let replay = try await replayInverseVoiceOps(snapshot.voiceOps)
+        if let hook = beforeUndoNoteCommit { await hook() }
         let entries = snapshot.speakerEntries
         let versionID = snapshot.versionID
         let expected = snapshot.afterSpeakers
         guard await library.commit(noteID, { note in
             _ = note.restoreSpeakers(entries, versionID: versionID, expectedAfterSpeakers: expected)
         }) != nil else {
-            await compensateVoices(replay?.previous)
+            await compensateVoices(replay?.compensationOps ?? [])
             throw SaveFailure(reason: .noteNotSaved)
         }
         unlinkDeletedVoices(replay?.deletedVoiceIDs ?? [])
         await restoreScrubbedLinks(snapshot.voiceOps)
     }
 
-    /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`, returning the previous
-    /// voices (for compensation if a dependent note write fails) and any voice IDs deleted by the replay.
-    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> (previous: [SavedVoice], deletedVoiceIDs: [UUID])? {
+    /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`, returning the
+    /// per-operation compensation ops (to reverse only this replay against current voices if note persistence fails)
+    /// and any voice IDs deleted by the replay.
+    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> (compensationOps: [NamingCommit.VoiceUndoOp], deletedVoiceIDs: [UUID])? {
         guard !recorded.isEmpty else { return nil }
         guard let store else { throw SaveFailure(reason: .voicesReadOnly) }
         let ops = recorded.reversed().map(\.op)
-        let previous: [SavedVoice]
+        let result: (compensation: [NamingCommit.VoiceUndoOp], deleted: [UUID])
         do {
-            previous = try await store.mutateReturningPrevious { voices in
-                for op in ops { NamingCommit.applyInverse(op, to: &voices) }
+            result = try await store.mutateReturning { voices in
+                let beforeIDs = voices.map(\.id)
+                var compensation: [NamingCommit.VoiceUndoOp] = []
+                for op in ops {
+                    compensation.append(contentsOf: NamingCommit.applyInverse(op, to: &voices))
+                }
+                let remaining = Set(voices.map(\.id))
+                let deleted = beforeIDs.filter { !remaining.contains($0) }
+                return (compensation, deleted)
             }
         } catch {
             await refresh()
             throw SaveFailure(reason: .voiceNotSaved(error))
         }
         await refresh()
-        let remaining = Set(savedVoices.map(\.id))
-        let deleted = previous.map(\.id).filter { !remaining.contains($0) }
-        return (previous, deleted)
+        return (result.compensation, result.deleted)
     }
 
     /// Scrubs links to voices deleted by inverse operations across every note, version, and running draft.
@@ -466,10 +475,14 @@ import CassiniNotebook
         }
     }
 
-    /// Restores `VoiceStore` to `previousVoices` when a dependent note write fails after inverse voice ops landed.
-    private func compensateVoices(_ previousVoices: [SavedVoice]?) async {
-        guard let previousVoices, let store else { return }
-        _ = try? await store.save(previousVoices)
+    /// Reverses only this operation's inverse voice ops against the current `VoiceStore` state when a dependent note
+    /// write fails, preserving any concurrent voice enrollments or edits that landed in the meantime.
+    private func compensateVoices(_ compensationOps: [NamingCommit.VoiceUndoOp]) async {
+        guard !compensationOps.isEmpty, let store else { return }
+        let ops = Array(compensationOps.reversed())
+        _ = try? await store.mutate { voices in
+            for op in ops { _ = NamingCommit.applyInverse(op, to: &voices) }
+        }
         await refresh()
     }
 

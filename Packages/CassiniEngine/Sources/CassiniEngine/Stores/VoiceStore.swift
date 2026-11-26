@@ -83,15 +83,14 @@ public actor VoiceStore {
         return voices
     }
 
-    /// Applies `change` to the saved voices and writes them, returning the previous voices so a caller can
-    /// compensate if a dependent note write subsequently fails.
-    public func mutateReturningPrevious(_ change: @Sendable (inout [SavedVoice]) -> Void) throws -> [SavedVoice] {
+    /// Applies `change` to the saved voices, persists them when changed, and returns the closure's result.
+    public func mutateReturning<T: Sendable>(_ change: @Sendable (inout [SavedVoice]) -> T) throws -> T {
         library.refreshed()
         let previous = library.voices
         var voices = previous
-        change(&voices)
+        let result = change(&voices)
         if voices != previous { try library.save(voices) }
-        return previous
+        return result
     }
 
     /// Works out the voice side of a naming commit against the saved voices as they are now, and writes it, in one step:

@@ -1479,4 +1479,84 @@ import CassiniNotebook
         #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: bob.id, score: 1))
         #expect(h.library.note(note.id)?.speaker("b")?.match == .auto(voice: bob.id, score: 0.85))
     }
+
+    /// When another enrollment saves concurrently between Undo's inverse voice write and its note-write failure,
+    /// voice compensation reverses only Undo's own changes against the current voice library, preserving both the
+    /// concurrent enrollment's saved voice and its confirmed link.
+    @Test func undoCompensationPreservesConcurrentEnrollmentOnNoteWriteFailure() async throws {
+        defer { h.tearDown() }
+        let printA = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        let printD = SpeakerPrint(speakerID: "d", model: VoiceprintModel.sha256, vector: [0, 1], speechSeconds: 10)
+
+        var note1 = Note(title: "Undo Target")
+        note1.status = .ready
+        note1.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note1.transcript = [
+            .init(text: "Hello", start: 0, end: 6, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Coffee", start: 7, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        var note2 = Note(title: "Concurrent Enrollment")
+        note2.status = .ready
+        note2.speakers = [NoteSpeaker(id: "d", name: "Speaker 1")]
+        note2.transcript = [.init(text: "World", start: 0, end: 6, speaker: "Speaker 1", speakerID: "d")]
+
+        let repo = try NoteRepository(root: h.root)
+        try repo.save(note1)
+        try repo.save(note2)
+        await h.start()
+        try await h.voices.store?.savePrints([printA], noteID: note1.id)
+        try await h.voices.store?.savePrints([printD], noteID: note2.id)
+
+        let note1Dir = try #require(h.library.directory(for: note1.id))
+        let note1DirPath = note1Dir.path
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: note1DirPath) }
+
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Alex"),
+                .rememberVoice(speakerID: "a", voiceID: nil, name: "Alex"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note1.id)
+        await h.library.settle()
+        let alex = try #require(h.voices.savedVoices.first { $0.name == "Alex" })
+
+        // Event gate: after Undo removes Alex from VoiceStore and before it commits note1,
+        // enroll Dana on note2 and make note1's directory read-only so note1's commit fails.
+        let note2ID = note2.id
+        let voicesStore = h.voices
+        h.voices.beforeUndoNoteCommit = {
+            try? await voicesStore.perform([
+                .relabel(speakerID: "d", name: "Dana"),
+                .rememberVoice(speakerID: "d", voiceID: nil, name: "Dana"),
+            ], noteID: note2ID, speakerID: "d")
+            try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: note1DirPath)
+        }
+
+        do throws(VoicesStore.SaveFailure) {
+            try await h.voices.undoSpeakerChanges(snapshot, noteID: note1.id)
+            Issue.record("expected noteNotSaved when note1 directory is read-only")
+        } catch {
+            guard case .noteNotSaved = error.reason else { Issue.record("\(error.reason)"); return }
+        }
+        h.voices.beforeUndoNoteCommit = nil
+        await h.library.settle()
+
+        // Compensation restored Alex for note1's persisted link AND preserved concurrent enrollment Dana and its link.
+        let dana = try #require(h.voices.savedVoices.first { $0.name == "Dana" })
+        #expect(h.voices.voice(alex.id)?.samples.count == 1)
+        #expect(dana.samples.count == 1)
+        #expect(h.library.note(note1.id)?.speaker("a")?.match == .confirmed(voice: alex.id, score: 1))
+        #expect(h.library.note(note2.id)?.speaker("d")?.match == .confirmed(voice: dana.id, score: 1))
+
+        // Retrying Undo once note1 is writable removes Alex while keeping Dana intact.
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: note1DirPath)
+        try await h.voices.undoSpeakerChanges(snapshot, noteID: note1.id)
+        await h.library.settle()
+        #expect(h.voices.voice(alex.id) == nil)
+        #expect(h.voices.voice(dana.id)?.samples.count == 1)
+        #expect(h.library.note(note1.id)?.speaker("a")?.match == .unmatched)
+        #expect(h.library.note(note1.id)?.speaker("b")?.background == false)
+        #expect(h.library.note(note2.id)?.speaker("d")?.match == .confirmed(voice: dana.id, score: 1))
+    }
 }
