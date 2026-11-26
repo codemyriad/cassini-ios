@@ -131,8 +131,9 @@ struct TurnView: View, Equatable {
             }
         }
         Button(NoteCopy.markThisMoment, systemImage: "bookmark") { actions.markMoment(turn.start) }
-        if !turn.isFullyBackground {
-            Button(NoteCopy.copyText, systemImage: "doc.on.doc") { UIPasteboard.general.string = turn.text }
+        let copied = turn.copyableText
+        if !turn.isFullyBackground, !copied.isEmpty {
+            Button(NoteCopy.copyText, systemImage: "doc.on.doc") { UIPasteboard.general.string = copied }
         }
     }
 

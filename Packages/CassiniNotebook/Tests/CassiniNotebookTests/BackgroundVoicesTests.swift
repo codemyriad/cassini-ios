@@ -298,6 +298,26 @@ import CassiniCore
         #expect(!fields.matches(try #require(SearchQuery("release"))))
         #expect(!fields.matches(try #require(SearchQuery("download"))))
 
+        // Copy on a mixed turn copies only foreground words (Ben's reply), never the background host's words.
+        #expect(mixed.copyableText == "Sounds good.")
+        #expect(!mixed.copyableText.contains("release"))
+        #expect(!mixed.copyableText.contains("download"))
+
+        // Conversely, a foreground host with a background interjection copies only the host's words.
+        var bgReplyNote = note
+        bgReplyNote.setSpeakerBackground("ada", false)
+        bgReplyNote.setSpeakerBackground("ben", true)
+        let bgReplyMixed = try #require(NoteTranscripts.sealed(bgReplyNote).turns.first { !$0.interjections.isEmpty })
+        #expect(bgReplyMixed.copyableText.contains("release"))
+        #expect(bgReplyMixed.copyableText.contains("download"))
+        #expect(!bgReplyMixed.copyableText.contains("Sounds"))
+
+        // Without any background speakers, copyableText matches turn.text unchanged.
+        var allFgNote = note
+        allFgNote.setSpeakerBackground("ada", false)
+        let allFgTurn = try #require(NoteTranscripts.sealed(allFgNote).turns.first { !$0.interjections.isEmpty })
+        #expect(allFgTurn.copyableText == allFgTurn.text)
+
         // When BOTH host and inline speaker are background, the turn is fully background: folded and excluded from search.
         note.setSpeakerBackground("ben", true)
         let allBgTranscript = NoteTranscripts.sealed(note)
@@ -310,5 +330,6 @@ import CassiniCore
         #expect(runs[0].voiceCount == 2)
         #expect(TranscriptSearch.matches(allBgTranscript.turns, query: "Sounds good").isEmpty)
         #expect(!SearchFields(note).matches(soundsGoodQuery))
+        #expect(allBgTranscript.turns.allSatisfy { $0.copyableText.isEmpty })
     }
 }

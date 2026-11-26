@@ -125,6 +125,24 @@ public struct NoteTurn: Identifiable, Hashable, Sendable {
         isBackground && !interjections.contains { !$0.isBackground }
     }
 
+    /// Text copied by the paragraph's Copy action: foreground speech only, preserving punctuation spacing.
+    /// Returns `text` unchanged when no words belong to a background voice, and `""` when every word is background.
+    public var copyableText: String {
+        guard isBackground || interjections.contains(where: \.isBackground) else { return text }
+        guard !isFullyBackground else { return "" }
+        var result = ""
+        result.reserveCapacity(text.utf8.count)
+        var previousEnd = 0
+        for (index, word) in words.enumerated() {
+            if isWordBackground(index) { continue }
+            let offset = offsets[index]
+            if !result.isEmpty && offset > previousEnd { result.append(" ") }
+            result.append(word.text)
+            previousEnd = max(previousEnd, offset + word.text.count)
+        }
+        return result
+    }
+
     /// The character range of word `index` in `text`.
     public func range(ofWord index: Int) -> Range<Int> {
         offsets[index]..<(offsets[index] + words[index].text.count)
