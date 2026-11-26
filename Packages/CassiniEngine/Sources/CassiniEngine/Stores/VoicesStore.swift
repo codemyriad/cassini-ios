@@ -336,7 +336,7 @@ import CassiniNotebook
                 case .noPrint?: throw SaveFailure(reason: .tooLittleSpeech)
                 case nil:
                     let key = Data(item.write.speakerID.utf8)
-                    failedStepSpeaker = committedKeys.contains(key) ? nil : beforeByID[key]
+                    failedStepSpeaker = committedKeys.contains(key) ? nil : currentSpeaker
                     let ops = try await writeWithUndo(commit, plan: plan, noteID: noteID, before: currentNote)
                     failedStepSpeaker = nil
                     recordedVoiceOps.append(contentsOf: ops)
@@ -360,19 +360,20 @@ import CassiniNotebook
             // If note persistence fails, compensate VoiceStore back to its pre-rollback voices so no confirmed link
             // ever points to a deleted voice, and retain pendingRollback[noteID] until both stores agree.
             do throws(SaveFailure) {
-                let previousVoices = try await replayInverseVoiceOps(recordedVoiceOps)
+                let replay = try await replayInverseVoiceOps(recordedVoiceOps)
                 if !committedSpeakers.isEmpty {
                     let toRollback = committedSpeakers
                     guard await library.commit(noteID, {
                         $0.rollbackSpeakers(toRollback, versionID: targetVersionID)
                     }) != nil else {
-                        await compensateVoices(previousVoices)
+                        await compensateVoices(replay?.previous)
                         throw SaveFailure(reason: .noteNotSaved)
                     }
                 }
                 if unrolledFailedStepID != nil {
                     throw SaveFailure(reason: .noteNotSaved)
                 }
+                unlinkDeletedVoices(replay?.deletedVoiceIDs ?? [])
                 await restoreScrubbedLinks(recordedVoiceOps)
                 pendingRollback[noteID] = nil
             } catch {
@@ -422,22 +423,23 @@ import CassiniNotebook
               note.canRestoreSpeakers(snapshot.speakerEntries, versionID: snapshot.versionID,
                                       expectedAfterSpeakers: snapshot.afterSpeakers)
         else { return }
-        let previousVoices = try await replayInverseVoiceOps(snapshot.voiceOps)
+        let replay = try await replayInverseVoiceOps(snapshot.voiceOps)
         let entries = snapshot.speakerEntries
         let versionID = snapshot.versionID
         let expected = snapshot.afterSpeakers
         guard await library.commit(noteID, { note in
             _ = note.restoreSpeakers(entries, versionID: versionID, expectedAfterSpeakers: expected)
         }) != nil else {
-            await compensateVoices(previousVoices)
+            await compensateVoices(replay?.previous)
             throw SaveFailure(reason: .noteNotSaved)
         }
+        unlinkDeletedVoices(replay?.deletedVoiceIDs ?? [])
         await restoreScrubbedLinks(snapshot.voiceOps)
     }
 
     /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`, returning the previous
-    /// voices (if any voice op ran) so callers can compensate if a dependent note write fails.
-    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> [SavedVoice]? {
+    /// voices (for compensation if a dependent note write fails) and any voice IDs deleted by the replay.
+    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> (previous: [SavedVoice], deletedVoiceIDs: [UUID])? {
         guard !recorded.isEmpty else { return nil }
         guard let store else { throw SaveFailure(reason: .voicesReadOnly) }
         let ops = recorded.reversed().map(\.op)
@@ -451,7 +453,17 @@ import CassiniNotebook
             throw SaveFailure(reason: .voiceNotSaved(error))
         }
         await refresh()
-        return previous
+        let remaining = Set(savedVoices.map(\.id))
+        let deleted = previous.map(\.id).filter { !remaining.contains($0) }
+        return (previous, deleted)
+    }
+
+    /// Scrubs links to voices deleted by inverse operations across every note, version, and running draft.
+    private func unlinkDeletedVoices(_ voiceIDs: [UUID]) {
+        for voice in voiceIDs {
+            library.updateAll { $0.unlinkVoice(voice) }
+            drafts?.mutateAll { $0.forgetting(voice) }
+        }
     }
 
     /// Restores `VoiceStore` to `previousVoices` when a dependent note write fails after inverse voice ops landed.
