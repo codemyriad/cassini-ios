@@ -256,9 +256,13 @@ import CassiniNotebook
     }
 
     /// Carries out a batch of speaker saves with upfront staging/validation, transaction-level rollback on failure,
-    /// and a version-bound Undo snapshot recording inverse voice operations in effect order.
+    /// and a version-bound Undo snapshot recording inverse voice operations in effect order. Any pending rollback
+    /// retained from an earlier failed batch on `noteID` is resolved before staging the new batch.
     public func performBatch(_ writes: [SpeakerSheetSession.BatchWrite], noteID: UUID) async throws(SaveFailure) -> SpeakerUndoSnapshot {
         await retryUnreadable()
+        if pendingRollback[noteID] != nil {
+            try await retryPendingRollback(noteID: noteID)
+        }
         guard let beforeNote = library.note(noteID) else { return SpeakerUndoSnapshot() }
         let targetVersionID = beforeNote.shownVersionID
         let allPrints = (try? await store?.prints(noteID: noteID)) ?? []
@@ -343,25 +347,42 @@ import CassiniNotebook
                 }
             }
         } catch {
-            // If the failing step itself already wrote non-link fields before its voice write failed, restore it
+            // If the failing step itself already wrote non-link fields before its voice write failed, try to restore it
             // immediately (its voice write did not land, so its pre-step links remain valid in VoiceStore).
+            var unrolledFailedStepID: String?
             if let failedStepSpeaker {
-                _ = await library.commit(noteID) { $0.rollbackSpeakers([failedStepSpeaker], versionID: targetVersionID) }
+                let rolledBack = await library.commit(noteID) {
+                    $0.rollbackSpeakers([failedStepSpeaker], versionID: targetVersionID)
+                } != nil
+                if !rolledBack { unrolledFailedStepID = failedStepSpeaker.id }
             }
-            // Transaction-level rollback: persist inverse voice ops in strict reverse order FIRST.
-            // Only restore committed note speakers and scrubbed links once voice persistence succeeds;
-            // otherwise retain a retryable rollback snapshot so confirmed links never point to deleted voices.
+            // Transaction-level rollback: persist inverse voice ops in strict reverse order, then restore the note.
+            // If note persistence fails, compensate VoiceStore back to its pre-rollback voices so no confirmed link
+            // ever points to a deleted voice, and retain pendingRollback[noteID] until both stores agree.
             do throws(SaveFailure) {
-                try await replayInverseVoiceOps(recordedVoiceOps)
+                let previousVoices = try await replayInverseVoiceOps(recordedVoiceOps)
                 if !committedSpeakers.isEmpty {
                     let toRollback = committedSpeakers
-                    _ = await library.commit(noteID) { $0.rollbackSpeakers(toRollback, versionID: targetVersionID) }
+                    guard await library.commit(noteID, {
+                        $0.rollbackSpeakers(toRollback, versionID: targetVersionID)
+                    }) != nil else {
+                        await compensateVoices(previousVoices)
+                        throw SaveFailure(reason: .noteNotSaved)
+                    }
+                }
+                if unrolledFailedStepID != nil {
+                    throw SaveFailure(reason: .noteNotSaved)
                 }
                 await restoreScrubbedLinks(recordedVoiceOps)
                 pendingRollback[noteID] = nil
             } catch {
                 let partialNote = library.note(noteID)
-                let entries: [Note.SpeakerUndoEntry] = committedOrder.compactMap { id in
+                var restoreIDs = committedOrder
+                if let failedID = unrolledFailedStepID,
+                   !restoreIDs.contains(where: { Data($0.utf8) == Data(failedID.utf8) }) {
+                    restoreIDs.append(failedID)
+                }
+                let entries: [Note.SpeakerUndoEntry] = restoreIDs.compactMap { id in
                     guard let before = beforeByID[Data(id.utf8)], let after = partialNote?.speaker(id) else { return nil }
                     return Note.SpeakerUndoEntry(speakerID: id, before: before, after: after)
                 }
@@ -375,7 +396,6 @@ import CassiniNotebook
             throw error
         }
 
-        pendingRollback[noteID] = nil
         let afterNote = library.note(noteID)
         let entries: [Note.SpeakerUndoEntry] = touchedOrder.compactMap { id in
             guard let before = beforeByID[Data(id.utf8)], let after = afterNote?.speaker(id) else { return nil }
@@ -385,7 +405,7 @@ import CassiniNotebook
                                    speakerEntries: entries, voiceOps: recordedVoiceOps)
     }
 
-    /// Retries a retained mid-batch rollback once voice storage is writable again. Clears `pendingRollback[noteID]`
+    /// Retries a retained mid-batch rollback once storage is writable again. Clears `pendingRollback[noteID]`
     /// only after voice and note restoration both succeed.
     public func retryPendingRollback(noteID: UUID) async throws(SaveFailure) {
         guard let snapshot = pendingRollback[noteID] else { return }
@@ -394,37 +414,50 @@ import CassiniNotebook
     }
 
     /// Reverts a Name a speaker batch Save on its original version, replaying inverse voice operations in strict
-    /// reverse order and restoring note speakers and scrubbed links only after voice persistence succeeds.
+    /// reverse order and restoring note speakers and scrubbed links only when both voice and note persistence succeed.
+    /// If note persistence fails after voice restoration, `VoiceStore` is compensated back to its pre-undo state so no
+    /// confirmed note link ever points to a deleted voice.
     public func undoSpeakerChanges(_ snapshot: SpeakerUndoSnapshot, noteID: UUID) async throws(SaveFailure) {
         guard let note = library.note(noteID),
               note.canRestoreSpeakers(snapshot.speakerEntries, versionID: snapshot.versionID,
                                       expectedAfterSpeakers: snapshot.afterSpeakers)
         else { return }
-        try await replayInverseVoiceOps(snapshot.voiceOps)
+        let previousVoices = try await replayInverseVoiceOps(snapshot.voiceOps)
         let entries = snapshot.speakerEntries
         let versionID = snapshot.versionID
         let expected = snapshot.afterSpeakers
         guard await library.commit(noteID, { note in
             _ = note.restoreSpeakers(entries, versionID: versionID, expectedAfterSpeakers: expected)
         }) != nil else {
+            await compensateVoices(previousVoices)
             throw SaveFailure(reason: .noteNotSaved)
         }
         await restoreScrubbedLinks(snapshot.voiceOps)
     }
 
-    /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`.
-    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) {
-        guard !recorded.isEmpty else { return }
+    /// Replays recorded inverse voice operations in strict reverse order against `VoiceStore`, returning the previous
+    /// voices (if any voice op ran) so callers can compensate if a dependent note write fails.
+    private func replayInverseVoiceOps(_ recorded: [RecordedVoiceUndoOp]) async throws(SaveFailure) -> [SavedVoice]? {
+        guard !recorded.isEmpty else { return nil }
         guard let store else { throw SaveFailure(reason: .voicesReadOnly) }
         let ops = recorded.reversed().map(\.op)
+        let previous: [SavedVoice]
         do {
-            _ = try await store.mutate { voices in
+            previous = try await store.mutateReturningPrevious { voices in
                 for op in ops { NamingCommit.applyInverse(op, to: &voices) }
             }
         } catch {
             await refresh()
             throw SaveFailure(reason: .voiceNotSaved(error))
         }
+        await refresh()
+        return previous
+    }
+
+    /// Restores `VoiceStore` to `previousVoices` when a dependent note write fails after inverse voice ops landed.
+    private func compensateVoices(_ previousVoices: [SavedVoice]?) async {
+        guard let previousVoices, let store else { return }
+        _ = try? await store.save(previousVoices)
         await refresh()
     }
 

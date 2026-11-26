@@ -319,12 +319,13 @@ extension Note {
                                           expectedUnversionedSpeakers: [NoteSpeaker]? = nil) {
         let key = Data(speakerID.utf8)
         if let versionID {
+            let isShown = shownVersionID == versionID
             if var history = versions, let vIndex = history.firstIndex(where: { $0.id == versionID }),
                let sIndex = history[vIndex].speakers.firstIndex(where: { $0.byteID == key }),
                history[vIndex].speakers[sIndex].match == .unmatched {
                 history[vIndex].speakers[sIndex].match = match
                 versions = history
-                if shownVersionID == versionID,
+                if isShown,
                    var shownList = speakers,
                    let shownIndex = shownList.firstIndex(where: { $0.byteID == key }),
                    shownList[shownIndex].match == .unmatched {
