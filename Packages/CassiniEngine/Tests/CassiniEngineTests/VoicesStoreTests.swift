@@ -1366,8 +1366,9 @@ import CassiniNotebook
 
         // Edit a passage to create a new transcript version that inherits a's confirmed link to Alex.
         let original = try #require(h.library.note(note.id)?.transcript.first)
-        var revised = original
-        revised.text = "Hello edited"
+        var mutableRevised = original
+        mutableRevised.text = "Hello edited"
+        let revised = mutableRevised
         let editStamp = VersionStamp(date: h.clock.now)
         _ = await h.library.commit(note.id) { n in
             _ = n.revisePassage(original, to: revised, stamp: editStamp)
