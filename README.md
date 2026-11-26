@@ -465,7 +465,7 @@ Before diffing it checks each screen has both appearances and probes the canvas 
 (recording intentionally uses a dark canvas in both). CI runs those regressions and the canonical self-test.
 This wrapper never accesses GitHub or publishes; the coordinator alone uploads images and replaces PR blocks.
 
-`scripts/render-icon.swift` draws the app icon (`swift scripts/render-icon.swift` from the repository root).
+`Cassini/Resources/AppIcon.icon` is the Icon Composer app icon (Saturn from `CassiniShared/Brand/mark/saturn-nav.svg` on `#0D1015`).
 
 UI absence assertions wait for a completed screen or app decision, then inspect the same accessibility state immediately.
 Debug UI-test launches expose suggestion-completion, Settings-loaded and completed-scroll markers for this purpose.
