@@ -1630,4 +1630,134 @@ import CassiniNotebook
         #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: alex.id, score: 1))
         #expect(h.library.note(note.id)?.speaker("b")?.background == false)
     }
+
+    /// If a touched speaker is edited concurrently after Undo's inverse voice write lands and before Undo's note
+    /// commit runs, `restoreSpeakers` returns false and Undo compensates `VoiceStore` rather than leaving voice
+    /// samples reversed while speaker metadata keeps the concurrent edit.
+    @Test func undoCompensatesVoicesWhenConcurrentSpeakerEditSupersedesRevision() async throws {
+        defer { h.tearDown() }
+        let printA = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        var note = Note(title: "Concurrent Edit")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 6, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Coffee", start: 7, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        try NoteRepository(root: h.root).save(note)
+        await h.start()
+        try await h.voices.store?.savePrints([printA], noteID: note.id)
+
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Alex"),
+                .rememberVoice(speakerID: "a", voiceID: nil, name: "Alex"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+        let alex = try #require(h.voices.savedVoices.first { $0.name == "Alex" })
+
+        // Event gate: after Undo removes Alex from VoiceStore and before Undo commits the note,
+        // a concurrent edit renames speaker "a" to "Alexander".
+        let noteID = note.id
+        let library = h.library
+        h.voices.beforeUndoNoteCommit = {
+            _ = await library.commit(noteID) { n in
+                n.renameSpeaker("a", name: "Alexander")
+            }
+        }
+
+        try await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        h.voices.beforeUndoNoteCommit = nil
+        await h.library.settle()
+
+        // Concurrent edit won on the note, and VoiceStore was compensated so Alex still exists for a's confirmed link.
+        #expect(h.library.note(note.id)?.speaker("a")?.name == "Alexander")
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: alex.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("b")?.background == true)
+        #expect(h.voices.voice(alex.id)?.samples.count == 1)
+    }
+
+    /// If a secondary note cannot be written while restoring scrubbed cross-note links during Undo, Undo surfaces
+    /// `.noteNotSaved` rather than silently succeeding, and retrying the same snapshot once writable restores the
+    /// remaining cross-note links without re-reversing voices or the primary note.
+    @Test func failedCrossNoteLinkRestorationSurfacesFailureAndRetryFinishesRemainingLinksWithoutDuplicatingUndo() async throws {
+        defer { h.tearDown() }
+        let printA = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        let printOther = SpeakerPrint(speakerID: "x", model: VoiceprintModel.sha256, vector: [0.5, 0.5], speechSeconds: 10)
+
+        var note = Note(title: "Primary")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 5, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Coffee", start: 6, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        var otherNote = Note(title: "Secondary")
+        otherNote.status = .ready
+        otherNote.speakers = [NoteSpeaker(id: "x", name: "Speaker 1"), NoteSpeaker(id: "y", name: "Bob")]
+        otherNote.transcript = [
+            .init(text: "Hi", start: 0, end: 5, speaker: "Speaker 1", speakerID: "x"),
+            .init(text: "Yo", start: 6, end: 10, speaker: "Bob", speakerID: "y"),
+        ]
+        let repo = try NoteRepository(root: h.root)
+        try repo.save(note)
+        try repo.save(otherNote)
+        await h.start()
+        try await h.voices.store?.savePrints([printA], noteID: note.id)
+        try await h.voices.store?.savePrints([printOther], noteID: otherNote.id)
+
+        try await remember("Bob", speaker: "a", in: note.id, voices: h.voices)
+        try await remember("Carol", speaker: "x", in: otherNote.id, voices: h.voices)
+        let bob = try #require(h.voices.savedVoices.first { $0.name == "Bob" })
+        let carol = try #require(h.voices.savedVoices.first { $0.name == "Carol" })
+        _ = await h.library.commit(otherNote.id) { n in
+            n.speakers?[1].match = .auto(voice: bob.id, score: 0.9)
+        }
+        await h.library.settle()
+
+        // Batch reassigns a from Bob -> Carol (forgetting Bob and scrubbing otherNote/y) and marks b background.
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .unenrol(speakerID: "a"),
+                .relabel(speakerID: "a", name: "Carol"),
+                .rememberVoice(speakerID: "a", voiceID: carol.id, name: "Carol"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+        #expect(h.library.note(otherNote.id)?.speaker("y")?.match == .unmatched)
+
+        // Make only the secondary note directory read-only so cross-note link restoration fails during Undo.
+        let otherDir = try #require(h.library.directory(for: otherNote.id))
+        let otherDirPath = otherDir.path
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: otherDirPath) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: otherDirPath)
+
+        do throws(VoicesStore.SaveFailure) {
+            try await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+            Issue.record("expected noteNotSaved when secondary note directory is read-only")
+        } catch {
+            guard case .noteNotSaved = error.reason else { Issue.record("\(error.reason)"); return }
+        }
+        await h.library.settle()
+
+        // Primary note and Bob are restored, while otherNote/y is still unmatched pending retry.
+        #expect(h.voices.voice(bob.id)?.samples.count == 1)
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: bob.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+        #expect(h.library.note(otherNote.id)?.speaker("y")?.match == .unmatched)
+
+        // Once writable, retrying the same snapshot restores otherNote/y without duplicating voice or primary changes.
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: otherDirPath)
+        try await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        #expect(h.voices.voice(bob.id)?.samples.count == 1)
+        #expect(h.voices.voice(carol.id)?.samples.count == 1)
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: bob.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+        #expect(h.library.note(otherNote.id)?.speaker("y")?.match == .auto(voice: bob.id, score: 0.9))
+    }
 }
