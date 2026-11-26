@@ -8,6 +8,7 @@ struct InNoteSearchBar: View {
     let previous: () -> Void
     let next: () -> Void
     let close: () -> Void
+    var onFocusChange: (Bool) -> Void = { _ in }
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicType
 
@@ -43,7 +44,10 @@ struct InNoteSearchBar: View {
                 .frame(width: HitTarget.minimum, height: HitTarget.minimum)
                 .meetingGlass(cornerRadius: 22)
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge).accessibilityShowsLargeContentViewer()
         .onAppear { if query.isEmpty { focused = true } }
+        .onChange(of: focused, initial: true) { _, isFocused in onFocusChange(isFocused) }
+        .onDisappear { onFocusChange(false) }
         .onChange(of: total == 0 ? -1 : current) { _, _ in
             guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
             AccessibilityNotification.Announcement(NoteCopy.searchCounter(current: current + 1, total: total)).post()

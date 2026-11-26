@@ -70,7 +70,7 @@ final class VoicesQuestionFlowTests: XCTestCase {
             app.buttons["exportOpen"].tapWhenSettled()
             XCTAssertTrue(app.buttons["exportConfirm"].waitForExistence(within: 15))
         } else {
-            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            app.buttons["Delete"].tapWhenSettled()
             XCTAssertTrue(app.alerts["Stop transcription and move to Recently Deleted?"].waitForExistence(within: 15))
         }
         app.appendDraft(sentences: 1)

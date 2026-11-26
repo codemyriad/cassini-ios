@@ -57,7 +57,6 @@ struct ExportFormatSheet: View {
                 }
             }
             .accessibilityIdentifier("exportFormats")
-            .navigationTitle(ExportPhase2Copy.heading)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -75,7 +74,7 @@ struct ExportFormatSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .compactDragIndicator()
         .task(id: note.id) {
             let note = self.note
             let audioURL = library.audioURL(note)

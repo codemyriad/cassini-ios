@@ -251,7 +251,7 @@ final class ScreenshotTests: XCTestCase {
 
     @MainActor func test08RecentlyDeleted() throws {
         let app = try launchPhone(["--seed", "trash"])
-        app.buttons["recentlyDeletedButton"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         capture("08-recently-deleted")
     }
@@ -292,7 +292,7 @@ final class ScreenshotTests: XCTestCase {
     /// Opens the real destructive confirmation without accepting it or deleting anything.
     @MainActor func test12DeleteDialog() throws {
         let app = try launchPhone(["--seed", "trash"])
-        app.buttons["recentlyDeletedButton"].tap()
+        app.openRecentlyDeleted()
         XCTAssertTrue(app.staticTexts["Old interview draft"].waitForExistence(within: 5))
         app.buttons["Empty"].tapWhenSettled()
         let alert = app.alerts.firstMatch

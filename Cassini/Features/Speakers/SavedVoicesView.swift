@@ -114,17 +114,23 @@ struct SavedVoicesView: View {
                         .font(.footnote)
                         .foregroundStyle(Color.muted)
                 }
+                .listRowBackground(Color.card)
+                .listRowSeparatorTint(Color.line)
                 Section {
                     Button(SettingsPhase2Copy.forgetEveryone, role: .destructive) { send(.forgetEveryone) }
                         .foregroundStyle(Color.toneError)
                         .disabled(readOnly)
                         .accessibilityIdentifier("forgetEveryone")
                 }
+                .listRowBackground(Color.card)
+                .listRowSeparatorTint(Color.line)
             } else if voices.offersForgetAllData {
                 Section {
                     Button(SpeakersCopy.forgetAllData, role: .destructive) { forgettingAllData = true }
                         .foregroundStyle(Color.toneError)
                 } footer: { Text(SpeakersCopy.forgetAllDataBody).foregroundStyle(Color.muted) }
+                .listRowBackground(Color.card)
+                .listRowSeparatorTint(Color.line)
             }
             Section {
                 privacyFootnote

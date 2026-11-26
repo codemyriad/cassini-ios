@@ -36,9 +36,10 @@ struct NoteReadingScroll: View {
         let headerTranscript = mode.showsDraft ? model.shownDraft.map { cache.draft($0) } ?? transcript : transcript
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 26) {
                     NoteHeader(note: note, subtitle: subtitle, speakers: headerTranscript.headerSpeakers,
-                               nameSpeaker: { model.speakerTapped($0) }, headerTitleVisible: headerTitleVisible,
+                               nameSpeaker: { model.speakerTapped($0) }, openSpeakers: { model.perform(.speakers) },
+                               headerTitleVisible: headerTitleVisible,
                                titleContentBottomChanged: { bottom in
                                    geometry.titleContentBottom = bottom
                                    if let visible = geometry.titleVisibility.measured(bottom: Double(bottom)) {
@@ -49,7 +50,7 @@ struct NoteReadingScroll: View {
                         NoteSectionView(section: $0, note: note, mode: mode, model: model)
                     }
                     if mode.hasPlayer, !note.bookmarks.isEmpty {
-                        BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
+                        BookmarksSection(note: note, transcript: headerTranscript, isExpanded: $model.showBookmarks, model: model)
                     }
                     if mode.showsDraft, let draft = model.shownDraft, !draft.words.isEmpty {
                         DraftSection(draft: draft, transcript: cache.draft(draft), model: model)
@@ -65,7 +66,7 @@ struct NoteReadingScroll: View {
                     }
                 }
                 .padding(.horizontal, Spacing.gutter).padding(.top, 8).padding(.bottom, Spacing.gutter)
-                .coordinateSpace(name: NoteHeader.readingContentSpace).readableWidth()
+                .coordinateSpace(name: NoteHeader.readingContentSpace).meetingReadableWidth()
             }
             .accessibilityIdentifier("noteReadingScroll")
             .meetingScrollEdge()

@@ -5,39 +5,39 @@ final class BulkTransferUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "library", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launchAndWait(fresh: true)
-        XCTAssertTrue(app.buttons["libraryArchiveMenu"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["selectNotesForExport"].waitForExistence(within: 15))
         return app
     }
 
     @MainActor func testExportAllMakesACompletedArchiveAndOffersItForSaving() {
         let app = launch()
-        app.buttons["libraryArchiveMenu"].tap()
-        app.collectionViews.buttons["Export All as ZIP…"].tapWhenSettled()
+        app.buttons["selectNotesForExport"].tap()
+        XCTAssertTrue(app.buttons["selectAllNotes"].waitForExistence(within: 15))
+        app.buttons["selectAllNotes"].tap()
+        app.buttons["exportSelectedNotes"].tap()
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["zipExportCompleted"].waitForExistence(within: 15))
         XCTAssertEqual(app.staticTexts["zipExportCompleted"].label, "Exported 2 to a ZIP archive")
     }
 
-    @MainActor func testSelectedExportIsShownOnlyAfterSelectingANote() {
+    @MainActor func testSelectedExportIsEnabledOnlyAfterSelectingANote() {
         let app = launch()
-        app.buttons["libraryArchiveMenu"].tap()
-        XCTAssertTrue(app.collectionViews.buttons["Export All as ZIP…"].waitForExistence(within: 15))
-        XCTAssertFalse(app.collectionViews.buttons["Export Selected as ZIP…"].exists)
-        app.staticTexts["TODAY"].firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssertTrue(app.collectionViews.buttons["Export All as ZIP…"].waitForNonExistence(within: 15),
-                      "a noninteractive day heading dismisses the menu before selection starts")
         let selection = app.buttons["selectArchiveNote-AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]
         XCTAssertTrue(app.buttons["selectNotesForExport"].tapWhenInteractive(in: app, until: { selection.exists }),
-                      "Edit enters selection mode after the menu is dismissed")
+                      "Select enters selection mode")
+        let exportButton = app.buttons["exportSelectedNotes"]
+        XCTAssertTrue(exportButton.waitForExistence(within: 15))
+        XCTAssertFalse(exportButton.isEnabled)
         selection.tap()
-        app.buttons["libraryArchiveMenu"].tap()
-        app.collectionViews.buttons["Export Selected as ZIP…"].tapWhenSettled()
+        XCTAssertTrue(exportButton.waitForEnabled(within: 15))
+        exportButton.tap()
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["zipExportCompleted"].waitForExistence(within: 15))
         XCTAssertEqual(app.staticTexts["zipExportCompleted"].label, "Exported 1 to a ZIP archive")
     }
+
     @MainActor func testExportAllSkipsALiveRecording() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "recording", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
@@ -46,35 +46,48 @@ final class BulkTransferUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 15))
         app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
-        app.buttons["libraryArchiveMenu"].tap()
-        let export = app.collectionViews.buttons["Export All as ZIP…"]
-        XCTAssertTrue(export.waitForExistence(within: 15))
-        let card = app.buttons["activeRecordingCard"]
-        let previous = card.label
-        XCTAssertTrue(card.wait(until: NSPredicate(format: "label != %@", previous), within: 15),
-                      "The open menu survives an actual capture-clock update")
-        XCTAssertTrue(export.exists)
-        export.tapWhenSettled()
+        app.buttons["selectNotesForExport"].tap()
+        XCTAssertTrue(app.buttons["selectAllNotes"].waitForExistence(within: 15))
+        app.buttons["selectAllNotes"].tap()
+        app.buttons["exportSelectedNotes"].tap()
         XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(within: 15))
         closeShareSheet(app)
         XCTAssertTrue(app.staticTexts["zipExportCompleted"].waitForExistence(within: 15))
         XCTAssertEqual(app.staticTexts["zipExportCompleted"].label, "Exported 2 to a ZIP archive")
     }
 
-    @MainActor func testTrashingTheSelectionRemovesTheSelectedExportAction() {
+    @MainActor func testTrashingTheSelectionDisablesExport() {
         let app = launch()
         app.buttons["selectNotesForExport"].tap()
-        app.buttons["selectArchiveNote-AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "A quieter kind of productivity")).firstMatch
-        row.press(forDuration: 1)
-        app.buttons["Move to Recently Deleted"].tapWhenSettled()
+        let selection = app.buttons["selectArchiveNote-AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]
+        XCTAssertTrue(selection.waitForExistence(within: 15))
+        selection.tap()
+        XCTAssertTrue(app.buttons["exportSelectedNotes"].waitForEnabled(within: 15))
+        app.buttons["deleteSelectedNotes"].tap()
         XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 15))
-        app.buttons["libraryArchiveMenu"].tap()
-        XCTAssertTrue(app.collectionViews.buttons["Export All as ZIP…"].waitForExistence(within: 15))
-        XCTAssertFalse(app.collectionViews.buttons["Export Selected as ZIP…"].exists)
     }
 
-    @MainActor func testOnlyALiveRecordingOffersNoEditOrZIPAction() {
+    @MainActor func testStarredSelectAllDeletesOnlyStarredNotes() {
+        let app = launch()
+        app.buttons["Starred"].tapWhenSettled()
+        app.buttons["selectNotesForExport"].tap()
+        XCTAssertTrue(app.buttons["selectAllNotes"].waitForExistence(within: 15))
+        app.buttons["selectAllNotes"].tap()
+        XCTAssertEqual(app.staticTexts["selectedCountLabel"].label, "1 selected")
+        app.buttons["deleteSelectedNotes"].tap()
+        XCTAssertTrue(app.buttons["Undo"].waitForExistence(within: 15))
+        app.buttons["All"].tapWhenSettled()
+        let unstarred = app.buttons.matching(
+            NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "Thoughts from the morning walk")
+        ).firstMatch
+        let starred = app.buttons.matching(
+            NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", "A quieter kind of productivity")
+        ).firstMatch
+        XCTAssertTrue(unstarred.waitForExistence(within: 15), "Unstarred meeting must survive Starred → Select All → Delete")
+        XCTAssertFalse(starred.exists)
+    }
+
+    @MainActor func testOnlyALiveRecordingOffersNoSelectAction() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--seed", "recording", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launchAndWait(fresh: true)
@@ -82,15 +95,13 @@ final class BulkTransferUITests: XCTestCase {
             let row = app.buttons.matching(NSPredicate(format: "identifier == 'noteRow' AND label BEGINSWITH %@", title)).firstMatch
             XCTAssertTrue(row.waitForExistence(within: 15))
             row.press(forDuration: 1)
-            app.buttons["Move to Recently Deleted"].tapWhenSettled()
+            app.buttons["Delete"].tapWhenSettled()
         }
         XCTAssertTrue(app.staticTexts["heroTitle"].waitForExistence(within: 15))
         app.buttons["recordButton"].tap()
         XCTAssertTrue(app.buttons["Pause recording"].waitForEnabled(within: 15))
         app.buttons["recordingAllMeetings"].tap()
         XCTAssertTrue(app.buttons["activeRecordingCard"].waitForExistence(within: 15))
-        XCTAssertFalse(app.buttons["libraryArchiveMenu"].exists)
         XCTAssertFalse(app.buttons["selectNotesForExport"].exists)
     }
-
 }

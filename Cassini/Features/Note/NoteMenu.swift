@@ -27,34 +27,41 @@ struct NoteMenu: View {
             Button(note.isFavorite ? NoteCopy.removeStar : NoteCopy.star, systemImage: note.isFavorite ? "star.slash" : "star") {
                 perform(.toggleStar)
             }
+            Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
             if note.hasDocument || note.speakers?.isEmpty == false {
                 Button(NoteCopy.speakers, systemImage: "person.2") { perform(.speakers) }
                     .accessibilityIdentifier("speakersButton")
             }
-            if note.hasDocument {
-                if (note.versions ?? []).count > 0 {
-                    Button(NoteCopy.versions, systemImage: "clock.arrow.circlepath") { perform(.versions) }
-                }
+            if note.hasDocument, (note.versions ?? []).count > 0 {
+                Button(NoteCopy.versions, systemImage: "clock.arrow.circlepath") { perform(.versions) }
             }
-            Button(NoteCopy.rename, systemImage: "pencil") { perform(.rename) }
-            if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
-            Divider()
+            if let transcribeRow {
+                transcription(transcribeRow, disabled: finishing)
+            }
             Button(LibraryCopy.export, systemImage: "square.and.arrow.up") {
                 exportPresented = true
                 exportOpen = true
             }
                 .accessibilityIdentifier("exportOpen")
                 .disabled(exportingDocument || finishing || note.isRecording)
-            if let transcribeRow {
-                Divider()
-                transcription(transcribeRow, disabled: finishing)
-            }
+            if note.hasDocument { Button(NoteCopy.documentInfo, systemImage: "info.circle") { perform(.documentInfo) } }
             if !note.isRecording {
                 Divider()
-                Button(TrashCopy.moveToTrash, systemImage: "trash", role: .destructive) { perform(.moveToTrash) }
+                Button(role: .destructive) { perform(.moveToTrash) } label: {
+                    Label(TrashCopy.delete, systemImage: "trash")
+                    Text(TrashCopy.recoverableFor30Days)
+                }
+                .accessibilityIdentifier("Delete")
             }
         } label: {
-            Image(systemName: "ellipsis").frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            if #available(iOS 26.0, *) {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(Color.ink)
+            } else {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(Color.ink)
+                    .frame(minWidth: HitTarget.minimum, minHeight: HitTarget.minimum)
+            }
         }
         .sheet(isPresented: $exportOpen, onDismiss: shareConfirmed) {
             ExportFormatSheet(note: note, jobPending: transcribeRow == .stop || transcribeRow == .removeFromQueue) {

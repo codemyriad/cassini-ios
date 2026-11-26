@@ -24,6 +24,8 @@ enum TrashCopy {
                                      comment: "Confirmation before moving a note whose transcription runs")
     static let keptFor30Days = String(localized: "Kept for 30 days, then deleted.", table: "Trash",
                                       comment: "Confirmation body before moving a note to Recently Deleted")
+    static let recoverableFor30Days = String(localized: "Recoverable for 30 days.", table: "Trash",
+                                             comment: "Menu subtitle under Delete")
     static let voicesUnavailable = String(localized: "Saved voices could not be read, so nothing was deleted. Their files are kept.",
                                           table: "Trash", comment: "Delete now or Empty while the saved voices cannot be read")
 

@@ -16,7 +16,7 @@ struct TrashView: View {
         let items = trash.items
         let dialog = dialogs.dialog(in: items)
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.tight) {
+            VStack(alignment: .leading, spacing: Spacing.row) {
                 if items.isEmpty {
                     TrashEmptyCard()
                 } else {
@@ -36,7 +36,8 @@ struct TrashView: View {
             if !items.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(TrashCopy.empty, role: .destructive) { dialogs.askEmpty(items: items) }
-                        .buttonStyle(.borderedProminent).tint(Color.errorFill).foregroundStyle(Color.onRecord)
+                        .foregroundStyle(Color.toneError)
+                        .tint(Color.toneError)
                 }
             }
         }

@@ -1679,42 +1679,6 @@
         }
       }
     },
-    "Moment at %@": {
-      "comment": "A bookmark without a label of its own, named by its time",
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Momento en %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moment à %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Momento a %@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Momento em %@"
-          }
-        },
-        "pt-PT": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Momento aos %@"
-          }
-        }
-      }
-    },
     "Name this speaker": {
       "extractionState": "manual",
       "localizations": {

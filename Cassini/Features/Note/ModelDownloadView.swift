@@ -83,8 +83,9 @@ private struct ModelDownloadContent: View {
     let plan: ModelDownloadPlan
     @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 30
-    private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var pad: Bool { sizeClass == .regular }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

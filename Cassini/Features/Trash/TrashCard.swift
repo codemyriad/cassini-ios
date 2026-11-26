@@ -42,9 +42,16 @@ struct TrashCard: View {
 
     @ViewBuilder private var buttons: some View {
         Button(action: restore) {
-            Text(TrashCopy.restore).font(.subheadline.weight(.semibold)).padding(.horizontal, 14).frame(minHeight: HitTarget.minimum)
+            Text(TrashCopy.restore)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Color.neutralTint, in: Capsule())
+                .frame(minHeight: HitTarget.minimum)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.ink)
+        .buttonStyle(.plain)
         Button(role: .destructive, action: deleteNow) {
             // Use the app's error role for this custom destructive action.
             Text(TrashCopy.deleteNow).font(.subheadline.weight(.semibold)).foregroundStyle(Color.toneError)

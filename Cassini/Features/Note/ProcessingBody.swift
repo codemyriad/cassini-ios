@@ -29,7 +29,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
             if pinned {
                 topContent
                     .padding(.horizontal, Spacing.gutter).padding(.top, Spacing.gutter).padding(.bottom, Spacing.tight)
-                    .readableWidth()
+                    .meetingReadableWidth()
                 if isProcessing, draftScrolled {
                     Rectangle().fill(Color.line).frame(height: 1)
                         .accessibilityIdentifier("transcribingScrolledDivider")
@@ -42,7 +42,8 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                         if !pinned { topContent }
                         banners()
                         if !isProcessing, !note.bookmarks.isEmpty {
-                            BookmarksSection(note: note, isExpanded: $model.showBookmarks, model: model)
+                            let draftTranscript = model.shownDraft.map { cache.draft($0) } ?? .empty
+                            BookmarksSection(note: note, transcript: draftTranscript, isExpanded: $model.showBookmarks, model: model)
                         }
                         RunningDraft(model: model, cache: cache)
                     }
@@ -54,7 +55,7 @@ struct ProcessingBody<Top: View, Banners: View>: View {
                             Color.canvasClear.frame(height: 1).id(Self.end).accessibilityHidden(true)
                         }
                     }
-                    .readableWidth()
+                    .meetingReadableWidth()
                 }
                 .accessibilityIdentifier("draftScroll")
                 .scrollPosition($position)

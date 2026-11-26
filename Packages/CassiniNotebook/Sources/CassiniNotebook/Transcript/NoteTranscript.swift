@@ -239,6 +239,29 @@ public struct NoteTranscript: Hashable, Sendable {
         return turn.words[word.index].start
     }
 
+    /// Speaker and spoken words at or just after `time`, for a marked-moment row.
+    /// Uses the start-sorted playback index (O(log N)) and attributes inline chips to their own speaker.
+    public func bookmarkPreview(at time: TimeInterval) -> (speaker: SpeakerName?, words: String)? {
+        let ref: WordRef
+        if let active = activeWord(at: time) {
+            ref = active
+        } else if let first = turns.first, !first.words.isEmpty {
+            ref = WordRef(turnID: first.id, index: 0)
+        } else {
+            return nil
+        }
+        guard let turn = turn(ref.turnID), turn.words.indices.contains(ref.index) else { return nil }
+        if let chip = turn.interjections.first(where: { $0.wordRange.contains(ref.index) }) {
+            let end = min(chip.wordRange.upperBound, ref.index + 16)
+            let words = turn.words[ref.index..<end].map(\.text).joined(separator: " ")
+            let speaker: SpeakerName? = chip.name == .unknown ? nil : chip.name
+            return words.isEmpty ? nil : (speaker, words)
+        }
+        let end = min(turn.words.count, ref.index + 16)
+        let words = turn.words[ref.index..<end].map(\.text).joined(separator: " ")
+        let speaker: SpeakerName? = turn.name == .unknown ? nil : turn.name
+        return words.isEmpty ? nil : (speaker, words)
+    }
 
 }
 
