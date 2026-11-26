@@ -1559,4 +1559,75 @@ import CassiniNotebook
         #expect(h.library.note(note1.id)?.speaker("b")?.background == false)
         #expect(h.library.note(note2.id)?.speaker("d")?.match == .confirmed(voice: dana.id, score: 1))
     }
+
+    /// Re-confirming an already-sampled speaker on a single-sample voice (replacement enrollment) followed by a failed
+    /// note write during Undo must keep the voice alive with its newer sample rather than deleting the voice.
+    @Test func failedNoteWriteDuringUndoAfterReplacementEnrollmentPreservesVoiceAndNewerSample() async throws {
+        defer { h.tearDown() }
+        let olderPrint = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [1, 0], speechSeconds: 10)
+        let newerPrint = SpeakerPrint(speakerID: "a", model: VoiceprintModel.sha256, vector: [0.8, 0.6], speechSeconds: 10)
+
+        var note = Note(title: "Replacement Enrollment")
+        note.status = .ready
+        note.speakers = [NoteSpeaker(id: "a", name: "Speaker 1"), NoteSpeaker(id: "b", name: "Speaker 2")]
+        note.transcript = [
+            .init(text: "Hello", start: 0, end: 6, speaker: "Speaker 1", speakerID: "a"),
+            .init(text: "Coffee", start: 7, end: 10, speaker: "Speaker 2", speakerID: "b"),
+        ]
+        try NoteRepository(root: h.root).save(note)
+        await h.start()
+        try await h.voices.store?.savePrints([olderPrint], noteID: note.id)
+
+        // Enrol single-sample voice Alex with olderPrint.
+        try await remember("Alex", speaker: "a", in: note.id, voices: h.voices)
+        let alex = try #require(h.voices.savedVoices.first { $0.name == "Alex" })
+        #expect(alex.samples.count == 1)
+        #expect(alex.samples.first?.print.vector == [1, 0])
+
+        // Append a newer print for the same speaker on the same note, then re-confirm Alex (replacing its sole sample)
+        // alongside marking b as background.
+        try await h.voices.store?.savePrints([olderPrint, newerPrint], noteID: note.id)
+        let snapshot = try await h.voices.performBatch([
+            .init(speakerID: "a", effects: [
+                .relabel(speakerID: "a", name: "Alex"),
+                .rememberVoice(speakerID: "a", voiceID: alex.id, name: "Alex"),
+            ]),
+            .init(speakerID: "b", effects: [.setBackground(speakerID: "b", background: true)]),
+        ], noteID: note.id)
+        await h.library.settle()
+        #expect(h.voices.voice(alex.id)?.samples.count == 1)
+        #expect(h.voices.voice(alex.id)?.samples.first?.print.vector == [0.8, 0.6])
+
+        // Fail note persistence during Undo while VoiceStore remains writable.
+        let noteDir = try #require(h.library.directory(for: note.id))
+        let noteDirPath = noteDir.path
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: noteDirPath) }
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: noteDirPath)
+
+        do throws(VoicesStore.SaveFailure) {
+            try await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+            Issue.record("expected noteNotSaved when note directory is read-only")
+        } catch {
+            guard case .noteNotSaved = error.reason else { Issue.record("\(error.reason)"); return }
+        }
+        await h.library.settle()
+
+        // Compensation must preserve Alex with its newer sample (matching the persisted confirmed link).
+        let compensatedAlex = try #require(h.voices.voice(alex.id))
+        #expect(compensatedAlex.samples.count == 1)
+        #expect(compensatedAlex.samples.first?.print.vector == [0.8, 0.6])
+        #expect(h.library.note(note.id)?.speaker("a")?.match.voiceID == alex.id)
+        #expect(h.library.note(note.id)?.speaker("b")?.background == true)
+
+        // Once writable, retrying Undo restores Alex's older sample and b's foreground state.
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: noteDirPath)
+        try await h.voices.undoSpeakerChanges(snapshot, noteID: note.id)
+        await h.library.settle()
+
+        let restoredAlex = try #require(h.voices.voice(alex.id))
+        #expect(restoredAlex.samples.count == 1)
+        #expect(restoredAlex.samples.first?.print.vector == [1, 0])
+        #expect(h.library.note(note.id)?.speaker("a")?.match == .confirmed(voice: alex.id, score: 1))
+        #expect(h.library.note(note.id)?.speaker("b")?.background == false)
+    }
 }

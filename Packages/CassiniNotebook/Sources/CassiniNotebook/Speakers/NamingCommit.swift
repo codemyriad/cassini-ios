@@ -130,14 +130,22 @@ public struct NamingCommit: Hashable, Sendable {
             if let previousName, previousName != currentName {
                 inverse.append(.undoRename(voiceID: voiceID, previousName: currentName))
             }
-            if let replacedSample {
+            if let removedSample {
+                // `undoUnenrol` replaces any sample sharing `(noteID, speakerID)` in place; only emit a separate
+                // removal for `replacedSample` if it has a distinct `(noteID, speakerID)` key (and before `undoUnenrol`
+                // in `inverse` so reverse replay puts `removedSample` back first and never empties the voice).
+                if let replacedSample,
+                   replacedSample.noteID != removedSample.noteID || replacedSample.print.speakerID != removedSample.print.speakerID {
+                    inverse.append(.undoEnrol(voiceID: voiceID, noteID: replacedSample.noteID,
+                                              speakerID: replacedSample.print.speakerID,
+                                              previousName: nil, replacedSample: nil))
+                }
+                inverse.append(.undoUnenrol(voiceID: voiceID, sample: removedSample,
+                                            fallbackVoice: currentVoice, forgotten: removedVoice))
+            } else if let replacedSample {
                 inverse.append(.undoEnrol(voiceID: voiceID, noteID: replacedSample.noteID,
                                           speakerID: replacedSample.print.speakerID,
                                           previousName: nil, replacedSample: nil))
-            }
-            if let removedSample {
-                inverse.append(.undoUnenrol(voiceID: voiceID, sample: removedSample,
-                                            fallbackVoice: currentVoice, forgotten: removedVoice))
             }
             return inverse
         case .undoUnenrol(let voiceID, let sample, let fallbackVoice, _):
