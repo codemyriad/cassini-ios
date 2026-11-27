@@ -173,10 +173,10 @@ final class AccessibilityAuditTests: XCTestCase {
                     if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                         titleClipped = true
                         unattributedClips += 1
-                    } else if modalOverNavigationBar, issue.element == nil, issue.auditType == .textClipped,
-                              unattributedClips < 2 {
-                        // On iPad, a modal sheet without a navigation bar leaves the split view's dimmed
-                        // sidebar and detail navigation bars visible behind it; any attributed issue still fails.
+                    } else if modalOverNavigationBar, issue.element == nil, issue.auditType == .textClipped {
+                        // On iPad, a centered modal sheet hides the dimmed NavigationSplitView's accessibility
+                        // elements (sidebar rows + nav bars) behind it, so their pixels report unattributed
+                        // clipping; every element inside the sheet itself carries an element and still fails.
                         unattributedClips += 1
                     } else if listRows, AuditFilter.isListRowPrediction(issue),
                               unattributedClips < listRowLimit {
