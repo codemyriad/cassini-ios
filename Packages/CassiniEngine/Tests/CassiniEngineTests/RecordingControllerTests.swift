@@ -421,7 +421,7 @@ import CassiniNotebook
         let h = try RecordingHarness(); defer { h.tearDown() }
         h.isReady = false
         #expect(h.controller.start())
-        try await h.waitFor("the start waits for the app") { h.readyChecks >= 2 }
+        try await h.waitFor("the start waits for the app") { h.readyWaits >= 1 }
         #expect(h.controller.state == .starting)
         #expect(h.capture.starts == 0)
         h.isReady = true

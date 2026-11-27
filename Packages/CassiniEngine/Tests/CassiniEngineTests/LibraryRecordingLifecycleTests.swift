@@ -53,6 +53,8 @@ import CassiniNotebook
         let screen = RecordingScreenModel(controller: h.controller, ports: .init(
             permission: FakeMicrophonePermission(), modelsMissing: { true }, askNotificationsOnce: {}))
         let context = QueueFacts()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
         let model = LibraryScreenModel(ports: .init(
             notes: { library.notes }, loading: { !library.isLoaded }, unavailable: { library.loadFailure != nil },
             processing: { context.processing }, phase: { _ in nil }, install: { nil },
@@ -60,7 +62,7 @@ import CassiniNotebook
             transcribe: { _, _ in .queued(changed: false) }, startOver: { _ in .queued(changed: false) },
             stop: { _ in }, dequeue: { _ in }, update: { id, change in library.update(id, change) },
             trash: { _ in }, speakerModelsReady: { true },
-            setRecordingTitle: { h.controller.setTitle($0) }, clock: h.clock, calendar: Calendar(identifier: .gregorian)))
+            setRecordingTitle: { h.controller.setTitle($0) }, clock: h.clock, calendar: calendar))
         #expect(model.content.sections.isEmpty)
         var effects: [RecordingEffect] = []
         screen.onEffect = { effects.append($0) }

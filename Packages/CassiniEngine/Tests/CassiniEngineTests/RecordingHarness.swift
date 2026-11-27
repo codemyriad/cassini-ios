@@ -20,9 +20,14 @@ import CassiniNotebook
     let store: NoteStore
     let notes: CountingRecordingNotes
     let controller: RecordingController
-    var isReady = true
-    /// How often a start has asked whether the app is ready.
-    private(set) var readyChecks = 0
+    var isReady = true {
+        didSet {
+            if isReady { resumeReadyWaiters() }
+        }
+    }
+    /// How often a start has waited for the app to become ready.
+    private(set) var readyWaits = 0
+    private var readyWaiters: [CheckedContinuation<Void, Never>] = []
 
     static let debounce: Duration = .milliseconds(50)
 
@@ -34,8 +39,16 @@ import CassiniNotebook
         notes = CountingRecordingNotes(store: store)
         weak var harness: RecordingHarness?
         controller = RecordingController(parts: .init(
-            ready: {
-                while harness?.isReady == false { harness?.readyChecks += 1; try? await Task.sleep(for: .milliseconds(5)) }
+            ready: { @MainActor in
+                guard let harness, !harness.isReady else { return }
+                harness.readyWaits += 1
+                await withCheckedContinuation { continuation in
+                    if harness.isReady {
+                        continuation.resume()
+                    } else {
+                        harness.readyWaiters.append(continuation)
+                    }
+                }
             },
             notes: recordingNotes?(notes) ?? notes, capture: capture, storage: storage, audio: audioProcessing ?? audio, settings: settings, handoff: handoff, consent: consent,
             liveActivity: activity, notifier: notifier, clock: clock,
@@ -44,7 +57,15 @@ import CassiniNotebook
         harness = self
     }
 
+    private func resumeReadyWaiters() {
+        let waiters = readyWaiters
+        readyWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
+
     func tearDown() {
+        isReady = true
+        resumeReadyWaiters()
         controller.policy?.cancel()
         controller.titleWrite?.cancel()
         controller.events?.cancel()
