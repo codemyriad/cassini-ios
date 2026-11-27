@@ -174,6 +174,7 @@ struct NameSpeakerSheet: View {
                                     .font(.subheadline.weight(selected ? .semibold : .regular))
                                     .foregroundStyle(item.isBackground ? Color.muted : Color.ink)
                                     .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)

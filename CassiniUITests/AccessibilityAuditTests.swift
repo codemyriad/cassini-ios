@@ -152,6 +152,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func audit(_ app: XCUIApplication, screen: String,
                                   _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
                                   transcript: Bool = false, listRows: Bool = false,
+                                  modalOverNavigationBar: Bool = false,
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
         var titleClipped = false
@@ -169,7 +170,8 @@ final class AccessibilityAuditTests: XCTestCase {
         do {
             for pass in passes {
                 try app.performAccessibilityAudit(for: pass) { issue in
-                    if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
+                    if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped,
+                                                     modalOverNavigationBar: modalOverNavigationBar) {
                         titleClipped = true
                         unattributedClips += 1
                     } else if listRows, AuditFilter.isListRowPrediction(issue),
@@ -486,7 +488,8 @@ final class AccessibilityAuditTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(rowButtons.count, 2)
         XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 15))
         XCTAssertTrue(app.buttons["saveSpeakerName"].exists)
-        audit(app, screen: "nameSpeaker-row-ax5", .textClipped)
+        let modalOverNav = UIDevice.current.userInterfaceIdiom == .pad
+        audit(app, screen: "nameSpeaker-row-ax5", .textClipped, modalOverNavigationBar: modalOverNav)
 
         // Select the second speaker in the top row and toggle Background voice.
         let secondSpeaker = rowButtons.element(boundBy: 1)
@@ -501,7 +504,7 @@ final class AccessibilityAuditTests: XCTestCase {
         let placeholder = app.staticTexts["speakerNameField"]
         XCTAssertTrue(placeholder.waitForExistence(within: 15))
         XCTAssertEqual(secondSpeaker.value as? String, "Background voice")
-        audit(app, screen: "nameSpeaker-background-ax5", .textClipped)
+        audit(app, screen: "nameSpeaker-background-ax5", .textClipped, modalOverNavigationBar: modalOverNav)
     }
 }
 
@@ -523,8 +526,9 @@ enum AuditFilter {
     /// buttons, and the audit reports that without an element. Every text of the app's own views comes with its
     /// element, so only the first such issue, on a screen that shows a navigation bar, passes; a second is the app's.
     @MainActor static func isNavigationTitle(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication,
-                                             alreadySeen: Bool) -> Bool {
-        issue.element == nil && issue.auditType == .textClipped && !alreadySeen && app.navigationBars.firstMatch.exists
+                                             alreadySeen: Bool, modalOverNavigationBar: Bool = false) -> Bool {
+        issue.element == nil && issue.auditType == .textClipped && !alreadySeen
+            && (app.navigationBars.firstMatch.exists || modalOverNavigationBar)
     }
 
     /// "Potentially inaccessible text" with no element, on a screen that draws a transcript. The element detection reads
