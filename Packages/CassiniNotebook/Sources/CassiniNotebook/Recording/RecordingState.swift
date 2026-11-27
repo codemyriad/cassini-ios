@@ -1,6 +1,6 @@
 import Foundation
 
-/// The format a capture writes, for the format chip ("PCM 48 kHz").
+/// The format a capture writes (for example, 48 kHz 16-bit mono PCM).
 public struct CaptureFormat: Codable, Hashable, Sendable {
     public var codec: String
     public var sampleRate: Double
