@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+  "commit": "e709094d283434fa59428544e0065e8deb49967b",
   "sha256": {
     "contract/LIBRARY-RULES.md": "1525db1ac89d2bf4cbe6ca8c1d2bf8d912bed4011b827ab2bda832c4a18465ea",
     "contract/STATUS-BADGES.md": "ea4ff3050d91db4dd1e3297c3f49ce2df7741e980e29be58e824ef113f04c405",

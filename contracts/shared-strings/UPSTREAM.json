@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/codemyriad/cassini-ux",
-  "commit": "60ac93da94ce433412c93d8e96a76c68503dcec3",
+  "commit": "e709094d283434fa59428544e0065e8deb49967b",
   "path": "strings/strings.json",
   "sha256": "8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb",
   "vendored_path": "Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json"
