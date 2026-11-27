@@ -129,6 +129,7 @@ struct NameSpeakerSheet: View {
             .padding(.bottom, 16)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("nameSpeakerScroll")
         .disabled(saving)
         .onChange(of: model.activeSpeakerID) { _, _ in
             syncFieldFromModel()
@@ -173,6 +174,7 @@ struct NameSpeakerSheet: View {
                                     .font(.subheadline.weight(selected ? .semibold : .regular))
                                     .foregroundStyle(item.isBackground ? Color.muted : Color.ink)
                                     .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -188,6 +190,7 @@ struct NameSpeakerSheet: View {
                         .buttonStyle(.plain)
                         .id(item.id)
                         .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityValue(item.isBackground ? SpeakersCopy.backgroundVoice : "")
                         .accessibilityIdentifier("speakerRow-\(item.speakerID)")
                     }
                 }
@@ -288,6 +291,8 @@ struct NameSpeakerSheet: View {
                     Text(SpeakersCopy.backgroundVoiceNamePlaceholder)
                         .font(.body)
                         .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("speakerNameField")
                 } else {
@@ -506,7 +511,6 @@ struct NameSpeakerSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .fixedSize(horizontal: true, vertical: true)
                 .foregroundStyle(Color.ink)
-                .fixedSize(horizontal: true, vertical: false)
                 .padding(.vertical, 8)
                 .frame(minHeight: HitTarget.minimum)
                 .contentShape(Rectangle())
@@ -592,7 +596,6 @@ private struct SheetPillButtonStyle: ButtonStyle {
             .font(.subheadline.weight(.semibold))
             .fixedSize(horizontal: true, vertical: true)
             .foregroundStyle(primary ? Color.onAccent : Color.ink)
-            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, compact ? 14 : 18)
             .padding(.vertical, compact ? 7 : 10)
             .background {

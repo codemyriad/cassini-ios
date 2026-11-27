@@ -88,13 +88,16 @@ struct MeetingProvenanceTests {
     }
 
     @Test func allCatalogLanguagesAndMeetingTimeShapesKeepProvenanceWithoutInventedDates() throws {
+        let now = Date(timeIntervalSince1970: 1_763_113_260) // 2025-11-14 09:41:00 UTC
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
         for language in ["en", "it", "fr", "es", "pt-BR", "pt-PT"] {
             let text = try text(language)
             for origin in [NoteOrigin.imported, .importedDocument] {
-                for time in [MeetingTime.instant(Date()), .local("2026-11-14 09:41"), .unknown] {
+                for time in [MeetingTime.instant(now), .local("2026-11-14 09:41"), .unknown] {
                     var imported = note(origin)
                     imported.meetingTime = time
-                    let subtitle = try #require(NoteSubtitle.of(imported, mode: .reading, now: Date(), calendar: .current))
+                    let subtitle = try #require(NoteSubtitle.of(imported, mode: .reading, now: now, calendar: calendar))
                     let key = try #require(subtitle.provenance.subtitleKey)
                     let formatted = subtitle.importedText(template: text(key), day: "Today", time: "09:41", duration: "2:03")
                     #expect(formatted.contains(text("states.badge.received")))

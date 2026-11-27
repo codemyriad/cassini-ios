@@ -239,7 +239,7 @@ TestFlight still need.
   voices page keeps guided **Add voice** enrollment (`PrivateVoices/Enrollment`, excluded from Library and ZIP exports)
   as an iOS extra; row playback, sample counts and Ready labels are removed. Download consent is a full-screen modal
   with a source-only detail page; standalone downloads retain **Download** and speakers-only jobs retain **Download and
-  identify speakers**. Shared strings are pinned to `cassini-ux` `d9bf213a30179c395657e8d8ecd34fe2b987af1a` across all
+  identify speakers**. Shared strings are pinned to `cassini-ux` `e709094d283434fa59428544e0065e8deb49967b` across all
   six languages ([shared-strings-pin.md](docs/shared-strings-pin.md)). Pending L-68 permission prompts are not adopted.
 - **Engines and thresholds.** D78 starts with bundled Whistle and promotes Parakeet Ultra after its pinned files
   are verified. Parakeet needs a device that reports at least 3.25 GiB of physical RAM (every 4 GB device and no 3 GB

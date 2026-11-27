@@ -156,9 +156,11 @@ import CassiniNotebook
         defer { try? FileManager.default.removeItem(at: folder) }
         let source = folder.appendingPathComponent("audio.m4a")
         try Data(count: 4096).write(to: source)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: base], ofItemAtPath: source.path)
         let checkpoint = state(signature: CheckpointState.signature(of: source))
         try checkpoint.validate(expected(signature: CheckpointState.signature(of: source)))
-        let later = Date().addingTimeInterval(5)
+        let later = base.addingTimeInterval(5)
         try FileManager.default.setAttributes([.modificationDate: later], ofItemAtPath: source.path)
         #expect(throws: CheckpointState.Mismatch.signature) {
             try checkpoint.validate(expected(signature: CheckpointState.signature(of: source)))

@@ -1,8 +1,8 @@
 # Shared string source
 
-The current global shared catalog pin (updated in D-1131 / L-65) is `codemyriad/cassini-ux`
-`d9bf213a30179c395657e8d8ecd34fe2b987af1a`, `strings/strings.json`, SHA-256
-`fedf8cfa51992ded96fafb5d4f15af7e5d1700f877575b51caf0f5da6ad970fa`.
+The current global shared catalog pin (updated in D-1185 / D113) is `codemyriad/cassini-ux`
+`e709094d283434fa59428544e0065e8deb49967b`, `strings/strings.json`, SHA-256
+`8272be2e315ff8cb6435b2eb6fba6568ecb11ee84975ff19fcb9bbaaf715a7fb`.
 `contracts/shared-strings/UPSTREAM.json` is the global source pin and points to the complete, byte-identical catalog in
 `Packages/CassiniNotebook/Tests/CassiniNotebookTests/Resources/status-badges/strings/strings.json`; `contracts/wave5-strings/UPSTREAM.json`
 and the resource bundle pin use the same commit and hash. The generators reject disagreement between them.

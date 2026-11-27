@@ -2,7 +2,7 @@
   "sourceLanguage": "en",
   "strings": {
     "common.cancel": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.cancel.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, common.cancel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -44,7 +44,7 @@
       }
     },
     "common.quote": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.quote; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, common.quote; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -86,7 +86,7 @@
       }
     },
     "common.savedVoices": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.savedVoices.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, common.savedVoices.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -128,7 +128,7 @@
       }
     },
     "common.stop": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.stop.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, common.stop.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -170,7 +170,7 @@
       }
     },
     "common.undo": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, common.undo.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, common.undo.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -212,7 +212,7 @@
       }
     },
     "library.allMeetings": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, library.allMeetings.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, library.allMeetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -254,7 +254,7 @@
       }
     },
     "library.backToAllMeetings": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, library.backToAllMeetings.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, library.backToAllMeetings.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -296,7 +296,7 @@
       }
     },
     "meeting.find.placeholder": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, meeting.find.placeholder.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, meeting.find.placeholder.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -338,7 +338,7 @@
       }
     },
     "phone.row.resume": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, phone.row.resume.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, phone.row.resume.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -380,7 +380,7 @@
       }
     },
     "player.pause": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, player.pause.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, player.pause.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -422,7 +422,7 @@
       }
     },
     "speakers.backgroundVoice": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
       }
     },
     "speakers.backgroundVoice.description": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.description.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.description.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -506,7 +506,7 @@
       }
     },
     "speakers.backgroundVoice.namePlaceholder": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.namePlaceholder.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.namePlaceholder.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -548,7 +548,7 @@
       }
     },
     "speakers.backgroundVoice.toast.single": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.toast.single; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.toast.single; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -590,7 +590,7 @@
       }
     },
     "speakers.dialog.a11y": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.dialog.a11y.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.dialog.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -632,7 +632,7 @@
       }
     },
     "speakers.duplicate.notice": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.notice; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.duplicate.notice; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -674,7 +674,7 @@
       }
     },
     "speakers.duplicate.samePerson": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.samePerson.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.duplicate.samePerson.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -716,7 +716,7 @@
       }
     },
     "speakers.duplicate.someoneElse": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.duplicate.someoneElse.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.duplicate.someoneElse.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -758,7 +758,7 @@
       }
     },
     "speakers.mergeInto": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.mergeInto.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.mergeInto.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -800,7 +800,7 @@
       }
     },
     "speakers.nameLabel": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.nameLabel.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.nameLabel.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -842,7 +842,7 @@
       }
     },
     "speakers.playSample": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.playSample.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.playSample.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -884,7 +884,7 @@
       }
     },
     "speakers.rememberVoice.cardBody.iphone": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.cardBody.iphone; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.rememberVoice.cardBody.iphone; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -926,7 +926,7 @@
       }
     },
     "speakers.rememberVoice.cardBody.iphone.unnamed": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.cardBody.iphone.unnamed.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.rememberVoice.cardBody.iphone.unnamed.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -968,7 +968,7 @@
       }
     },
     "speakers.rememberVoice.modelsNeeded": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.modelsNeeded.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.rememberVoice.modelsNeeded.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1010,7 +1010,7 @@
       }
     },
     "speakers.rememberVoice.title": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.title.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.rememberVoice.title.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1052,7 +1052,7 @@
       }
     },
     "speakers.rememberVoice.tooShort": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.rememberVoice.tooShort.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.rememberVoice.tooShort.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1094,7 +1094,7 @@
       }
     },
     "speakers.saveName": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.saveName.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.saveName.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1136,7 +1136,7 @@
       }
     },
     "speakers.savedVoices.heading": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.savedVoices.heading.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.savedVoices.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1178,7 +1178,7 @@
       }
     },
     "speakers.savedVoices.likely": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.savedVoices.likely.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.savedVoices.likely.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1220,7 +1220,7 @@
       }
     },
     "speakers.talkTime": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.talkTime; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.talkTime; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1262,7 +1262,7 @@
       }
     },
     "transcribing.details.a11y": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.details.a11y.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.details.a11y.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1304,7 +1304,7 @@
       }
     },
     "transcribing.heading": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.heading.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.heading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1346,7 +1346,7 @@
       }
     },
     "transcribing.speakerSuggestion.no": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion.no.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.speakerSuggestion.no.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1388,7 +1388,7 @@
       }
     },
     "transcribing.speakerSuggestion.yes": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion.yes.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.speakerSuggestion.yes.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1430,7 +1430,7 @@
       }
     },
     "transcribing.stat.audioDone": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.audioDone.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stat.audioDone.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1472,7 +1472,7 @@
       }
     },
     "transcribing.stat.batteryAtFinish": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.batteryAtFinish.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stat.batteryAtFinish.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1514,7 +1514,7 @@
       }
     },
     "transcribing.stat.timeLeft": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.timeLeft.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stat.timeLeft.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1556,7 +1556,7 @@
       }
     },
     "transcribing.stat.wordsSoFar": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.wordsSoFar.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stat.wordsSoFar.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1598,7 +1598,7 @@
       }
     },
     "transcribing.step.preparing": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.preparing.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.step.preparing.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1640,7 +1640,7 @@
       }
     },
     "transcribing.step.reading": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.reading.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.step.reading.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1682,7 +1682,7 @@
       }
     },
     "transcribing.step.saving": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.saving.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.step.saving.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1724,7 +1724,7 @@
       }
     },
     "transcribing.step.speakers": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.speakers.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.step.speakers.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1766,7 +1766,7 @@
       }
     },
     "transcribing.step.words": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.step.words.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.step.words.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1808,7 +1808,7 @@
       }
     },
     "transcribing.stopAndKeepProgress": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stopAndKeepProgress.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stopAndKeepProgress.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1850,7 +1850,7 @@
       }
     },
     "transcribing.transcriptSoFar": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.transcriptSoFar.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.transcriptSoFar.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1892,7 +1892,7 @@
       }
     },
     "transcribing.speakerSuggestion": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.speakerSuggestion; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.speakerSuggestion; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1934,7 +1934,7 @@
       }
     },
     "transcribing.stat.audioDoneValue": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.stat.audioDoneValue; named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.stat.audioDoneValue; named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -1976,7 +1976,7 @@
       }
     },
     "speakers.backgroundVoice.hidden.one": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.hidden (one); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.hidden (one); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2018,7 +2018,7 @@
       }
     },
     "speakers.backgroundVoice.hidden.other": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.hidden (other); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.hidden (other); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2060,7 +2060,7 @@
       }
     },
     "speakers.backgroundVoice.toast.count.one": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.toast.count (one); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.toast.count (one); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2102,7 +2102,7 @@
       }
     },
     "speakers.backgroundVoice.toast.count.other": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.toast.count (other); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.toast.count (other); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2144,7 +2144,7 @@
       }
     },
     "transcribing.eta.minutes.one": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.eta.minutes (one); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.eta.minutes (one); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2186,7 +2186,7 @@
       }
     },
     "transcribing.eta.minutes.other": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, transcribing.eta.minutes (other); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, transcribing.eta.minutes (other); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2228,7 +2228,7 @@
       }
     },
     "speakers.backgroundVoice.toast.namedAndBackground.one": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.toast.namedAndBackground (one); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.toast.namedAndBackground (one); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -2270,7 +2270,7 @@
       }
     },
     "speakers.backgroundVoice.toast.namedAndBackground.other": {
-      "comment": "Generated from cassini-ux 60ac93da94ce433412c93d8e96a76c68503dcec3, speakers.backgroundVoice.toast.namedAndBackground (other); named placeholders stay verbatim.",
+      "comment": "Generated from cassini-ux e709094d283434fa59428544e0065e8deb49967b, speakers.backgroundVoice.toast.namedAndBackground (other); named placeholders stay verbatim.",
       "extractionState": "manual",
       "localizations": {
         "en": {

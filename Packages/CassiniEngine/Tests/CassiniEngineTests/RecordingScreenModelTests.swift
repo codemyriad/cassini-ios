@@ -12,8 +12,17 @@ import CassiniNotebook
         let h: RecordingHarness
         let permission: FakeMicrophonePermission
         var missing = false
-        /// While true the speech-model lookup waits.
-        var lookupHeld = false
+        /// While true the speech-model lookup waits on an event-gated continuation.
+        var lookupHeld = false {
+            didSet {
+                if !lookupHeld {
+                    let waiters = lookupWaiters
+                    lookupWaiters.removeAll()
+                    waiters.forEach { $0.resume() }
+                }
+            }
+        }
+        private var lookupWaiters: [CheckedContinuation<Void, Never>] = []
         /// Speech-model lookups that have answered.
         var lookups = 0
         var effects: [RecordingEffect] = []
@@ -27,8 +36,16 @@ import CassiniNotebook
             let center = NoticeCenter(settings: h.settings, notifier: h.notifier) { true }
             var screen: Screen?
             model = RecordingScreenModel(controller: h.controller, ports: .init(
-                permission: permission, modelsMissing: {
-                    while screen?.lookupHeld == true { try? await Task.sleep(for: .milliseconds(5)) }
+                permission: permission, modelsMissing: { @MainActor in
+                    if let screen, screen.lookupHeld {
+                        await withCheckedContinuation { continuation in
+                            if !screen.lookupHeld {
+                                continuation.resume()
+                            } else {
+                                screen.lookupWaiters.append(continuation)
+                            }
+                        }
+                    }
                     defer { screen?.lookups += 1 }
                     return screen?.missing ?? false
                 },
@@ -201,7 +218,7 @@ import CassiniNotebook
 
     // ports: RecordingViewModelTest#finishWithoutConsentOpensModelDownloadOnlyWhenPartsAreMissing
     @Test func finishWithoutConsentOpensModelDownloadOnlyWhenPartsAreMissing() async throws {
-        let s = try Screen(consented: false); defer { s.h.tearDown() }
+        let s = try Screen(consented: false); defer { s.lookupHeld = false; s.h.tearDown() }
         s.missing = true
         let effect = try await finish(s)
         let id = try #require(await s.h.store.all().first?.id)
@@ -210,7 +227,7 @@ import CassiniNotebook
 
     // ports: RecordingViewModelTest#finishWithoutConsentAndNothingMissingOpensTheNote
     @Test func finishWithoutConsentAndNothingMissingOpensTheNote() async throws {
-        let s = try Screen(consented: false); defer { s.h.tearDown() }
+        let s = try Screen(consented: false); defer { s.lookupHeld = false; s.h.tearDown() }
         let effect = try await finish(s)
         let id = try #require(await s.h.store.all().first?.id)
         #expect(effect == .openNote(id, modelDownload: false))
@@ -218,7 +235,7 @@ import CassiniNotebook
 
     // ports: RecordingViewModelTest#finishAfterADeclineOpensTheNoteAudioOnly
     @Test func finishAfterADeclineOpensTheNoteAudioOnly() async throws {
-        let s = try Screen(consented: false); defer { s.h.tearDown() }
+        let s = try Screen(consented: false); defer { s.lookupHeld = false; s.h.tearDown() }
         s.h.settings.recordDeclined()
         s.missing = true
         let effect = try await finish(s)
@@ -227,7 +244,7 @@ import CassiniNotebook
     }
 
     @Test func aSlowModelLookupDoesNotLeadAwayFromANewerRecording() async throws {
-        let s = try Screen(consented: false); defer { s.h.tearDown() }
+        let s = try Screen(consented: false); defer { s.lookupHeld = false; s.h.tearDown() }
         s.missing = true
         s.lookupHeld = true
         await s.model.enter()

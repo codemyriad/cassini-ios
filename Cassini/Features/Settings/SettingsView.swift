@@ -209,19 +209,6 @@ private struct SettingsForm: View {
                 hours: String(localized: "{h} h {mm} min", table: "Export")) ?? ""
     }
 
-    private var speechAnswer: String {
-        if let store = ports.speechModels {
-            switch store.displayRecognizer {
-            case .whistle: return SettingsPhase2Copy.whistle
-            case .parakeet: return SettingsPhase2Copy.parakeet
-            case .appleSpeech: return ModelPart.speech.settingsLabel
-            }
-        }
-        if ports.recognizer == .parakeet { return SettingsPhase2Copy.parakeet }
-        if ports.recognizer == .whistle { return SettingsPhase2Copy.whistle }
-        return ModelPart.speech.settingsLabel
-    }
-
     private var transcription: some View {
         @Bindable var settings = settings
         return Group {

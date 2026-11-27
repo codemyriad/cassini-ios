@@ -152,6 +152,7 @@ final class AccessibilityAuditTests: XCTestCase {
     @MainActor private func audit(_ app: XCUIApplication, screen: String,
                                   _ types: XCUIAccessibilityAuditType = .all.subtracting([.contrast, .dynamicType]),
                                   transcript: Bool = false, listRows: Bool = false,
+                                  modalOverNavigationBar: Bool = false,
                                   file: StaticString = #filePath, line: UInt = #line) {
         var issues: [String] = []
         var titleClipped = false
@@ -171,6 +172,11 @@ final class AccessibilityAuditTests: XCTestCase {
                 try app.performAccessibilityAudit(for: pass) { issue in
                     if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                         titleClipped = true
+                        unattributedClips += 1
+                    } else if modalOverNavigationBar, issue.element == nil, issue.auditType == .textClipped {
+                        // On iPad, a centered modal sheet hides the dimmed NavigationSplitView's accessibility
+                        // elements (sidebar rows + nav bars) behind it, so their pixels report unattributed
+                        // clipping; every element inside the sheet itself carries an element and still fails.
                         unattributedClips += 1
                     } else if listRows, AuditFilter.isListRowPrediction(issue),
                               unattributedClips < listRowLimit {
@@ -425,6 +431,89 @@ final class AccessibilityAuditTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(button.frame.width, 44, label)
             XCTAssertGreaterThanOrEqual(button.frame.height, 44, label)
         }
+    }
+
+    // MARK: 25–26 Nov sheets (D-1163 Set date and time, D-1167 Background voices & speaker row)
+
+    @MainActor func testSetDateTimeSheetPassesAuditAtLargestTextSize() {
+        auditSetDateTimeSheet(Self.largestText)
+    }
+
+    @MainActor func testIPadSetDateTimeSheetPassesAuditAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad sheet layout")
+        auditSetDateTimeSheet(Self.largestText)
+    }
+
+    @MainActor private func auditSetDateTimeSheet(_ extra: [String]) {
+        defer { XCUIApplication().terminate() }
+        let app = launch(["--seed", "library", "--open-fixture", Self.fixture] + extra, fresh: true)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        let more = app.buttons["noteActions"]
+        XCTAssertTrue(more.waitForExistence(within: 15))
+        more.tap()
+        let item = app.buttons["Set date and time"]
+        XCTAssertTrue(item.waitForExistence(within: 15))
+        item.tapWhenSettled()
+        XCTAssertTrue(app.staticTexts["setDateTimeTitle"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["setDateTimeSave"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["setDateTimeCancel"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["setDatePicker"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["setTimePicker"].exists)
+        audit(app, screen: "setDateTime-ax5", .textClipped)
+        app.buttons["setDateTimeCancel"].tap()
+        XCTAssertTrue(poll(within: uiWaitFloor) { !app.staticTexts["setDateTimeTitle"].exists })
+    }
+
+    @MainActor func testNameSpeakerBackgroundVoicesAndRowPassAuditAtLargestTextSize() {
+        auditNameSpeakerBackgroundAndRow(Self.largestText)
+    }
+
+    @MainActor func testIPadNameSpeakerBackgroundVoicesAndRowPassAuditAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad sheet layout")
+        auditNameSpeakerBackgroundAndRow(Self.largestText)
+    }
+
+    @MainActor private func auditNameSpeakerBackgroundAndRow(_ extra: [String]) {
+        defer { XCUIApplication().terminate() }
+        let app = launch(["--seed", "speakers", "--open-fixture", Self.fixture] + extra, fresh: true)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        let noteScroll = app.scrollViews["noteReadingScroll"]
+        let header = app.buttons["speakerHeader-w1"]
+        if !(header.exists && header.isHittable) {
+            XCTAssertTrue(noteScroll.scroll(attempts: 8) { header.exists && header.isHittable },
+                          "Speaker turn header did not become visible at AX5")
+        }
+        header.tap()
+
+        XCTAssertTrue(app.otherElements["nameSpeakerSheet"].waitForExistence(within: 15))
+        let speakerRowScroll = app.scrollViews["speakerRowScroll"]
+        XCTAssertTrue(speakerRowScroll.waitForExistence(within: 15))
+        let rowButtons = speakerRowScroll.buttons
+        XCTAssertGreaterThanOrEqual(rowButtons.count, 2)
+        XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["saveSpeakerName"].exists)
+        let modalOverNav = UIDevice.current.userInterfaceIdiom == .pad
+        audit(app, screen: "nameSpeaker-row-ax5", .textClipped, modalOverNavigationBar: modalOverNav)
+
+        // Select the second speaker in the top row and toggle Background voice.
+        let secondSpeaker = rowButtons.element(boundBy: 1)
+        secondSpeaker.tap()
+        let sheetScroll = app.scrollViews["nameSpeakerScroll"]
+        let bgToggle = app.switches["backgroundVoiceToggle"]
+        if !(bgToggle.exists && bgToggle.isHittable) {
+            XCTAssertTrue(sheetScroll.scroll(attempts: 10) { bgToggle.exists && bgToggle.isHittable },
+                          "Background voice toggle is not visible at AX5")
+        }
+        bgToggle.tap()
+        if !poll(within: 5) { bgToggle.value as? String == "1" } {
+            // On iOS 18, tapping the center of a tall AX5 Toggle row can miss the trailing UISwitch.
+            bgToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(poll(within: 15) { bgToggle.value as? String == "1" },
+                      "Background voice toggle did not turn on at AX5")
+        XCTAssertTrue(poll(within: 15) { secondSpeaker.value as? String == "Background voice" },
+                      "Speaker row pill did not announce Background voice")
+        audit(app, screen: "nameSpeaker-background-ax5", .textClipped, modalOverNavigationBar: modalOverNav)
     }
 }
 
