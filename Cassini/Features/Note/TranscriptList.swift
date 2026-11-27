@@ -90,6 +90,8 @@ private struct BackgroundRunRow: View {
                 Text(SpeakersCopy.backgroundHidden(run.voiceCount))
                     .font(.subheadline)
                     .foregroundStyle(Color.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
                 Image(systemName: expanded ? "chevron.up" : "chevron.down")
                     .font(.caption.weight(.semibold))

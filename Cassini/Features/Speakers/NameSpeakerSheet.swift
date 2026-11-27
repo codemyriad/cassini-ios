@@ -129,6 +129,7 @@ struct NameSpeakerSheet: View {
             .padding(.bottom, 16)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("nameSpeakerScroll")
         .disabled(saving)
         .onChange(of: model.activeSpeakerID) { _, _ in
             syncFieldFromModel()
@@ -188,6 +189,7 @@ struct NameSpeakerSheet: View {
                         .buttonStyle(.plain)
                         .id(item.id)
                         .accessibilityAddTraits(selected ? .isSelected : [])
+                        .accessibilityValue(item.isBackground ? SpeakersCopy.backgroundVoice : "")
                         .accessibilityIdentifier("speakerRow-\(item.speakerID)")
                     }
                 }
@@ -288,6 +290,8 @@ struct NameSpeakerSheet: View {
                     Text(SpeakersCopy.backgroundVoiceNamePlaceholder)
                         .font(.body)
                         .foregroundStyle(Color.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("speakerNameField")
                 } else {

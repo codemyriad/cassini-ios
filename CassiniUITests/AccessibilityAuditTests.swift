@@ -426,6 +426,83 @@ final class AccessibilityAuditTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(button.frame.height, 44, label)
         }
     }
+
+    // MARK: 25–26 Nov sheets (D-1163 Set date and time, D-1167 Background voices & speaker row)
+
+    @MainActor func testSetDateTimeSheetPassesAuditAtLargestTextSize() {
+        auditSetDateTimeSheet(Self.largestText)
+    }
+
+    @MainActor func testIPadSetDateTimeSheetPassesAuditAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad sheet layout")
+        auditSetDateTimeSheet(Self.largestText)
+    }
+
+    @MainActor private func auditSetDateTimeSheet(_ extra: [String]) {
+        defer { XCUIApplication().terminate() }
+        let app = launch(["--seed", "library", "--open-fixture", Self.fixture] + extra, fresh: true)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        let more = app.buttons["noteActions"]
+        XCTAssertTrue(more.waitForExistence(within: 15))
+        more.tap()
+        let item = app.buttons["Set date and time"]
+        XCTAssertTrue(item.waitForExistence(within: 15))
+        item.tapWhenSettled()
+        XCTAssertTrue(app.staticTexts["setDateTimeTitle"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["setDateTimeSave"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["setDateTimeCancel"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["setDatePicker"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["setTimePicker"].exists)
+        audit(app, screen: "setDateTime-ax5", .textClipped)
+        app.buttons["setDateTimeCancel"].tap()
+        XCTAssertTrue(poll(within: uiWaitFloor) { !app.staticTexts["setDateTimeTitle"].exists })
+    }
+
+    @MainActor func testNameSpeakerBackgroundVoicesAndRowPassAuditAtLargestTextSize() {
+        auditNameSpeakerBackgroundAndRow(Self.largestText)
+    }
+
+    @MainActor func testIPadNameSpeakerBackgroundVoicesAndRowPassAuditAtLargestTextSize() throws {
+        try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad sheet layout")
+        auditNameSpeakerBackgroundAndRow(Self.largestText)
+    }
+
+    @MainActor private func auditNameSpeakerBackgroundAndRow(_ extra: [String]) {
+        defer { XCUIApplication().terminate() }
+        let app = launch(["--seed", "speakers", "--open-fixture", Self.fixture] + extra, fresh: true)
+        XCTAssertTrue(app.staticTexts["noteTitle"].waitForExistence(within: 15))
+        let noteScroll = app.scrollViews["noteReadingScroll"]
+        let header = app.buttons["speakerHeader-w1"]
+        if !(header.exists && header.isHittable) {
+            XCTAssertTrue(noteScroll.scroll(attempts: 8) { header.exists && header.isHittable },
+                          "Speaker turn header did not become visible at AX5")
+        }
+        header.tap()
+
+        XCTAssertTrue(app.otherElements["nameSpeakerSheet"].waitForExistence(within: 15))
+        let speakerRowScroll = app.scrollViews["speakerRowScroll"]
+        XCTAssertTrue(speakerRowScroll.waitForExistence(within: 15))
+        let rowButtons = speakerRowScroll.buttons
+        XCTAssertGreaterThanOrEqual(rowButtons.count, 2)
+        XCTAssertTrue(app.textFields["speakerNameField"].waitForExistence(within: 15))
+        XCTAssertTrue(app.buttons["saveSpeakerName"].exists)
+        audit(app, screen: "nameSpeaker-row-ax5", .textClipped)
+
+        // Select the second speaker in the top row and toggle Background voice.
+        let secondSpeaker = rowButtons.element(boundBy: 1)
+        secondSpeaker.tap()
+        let sheetScroll = app.scrollViews["nameSpeakerScroll"]
+        let bgToggle = app.switches["backgroundVoiceToggle"]
+        if !(bgToggle.exists && bgToggle.isHittable) {
+            XCTAssertTrue(sheetScroll.scroll(attempts: 10) { bgToggle.exists && bgToggle.isHittable },
+                          "Background voice toggle is not visible at AX5")
+        }
+        bgToggle.tap()
+        let placeholder = app.staticTexts["speakerNameField"]
+        XCTAssertTrue(placeholder.waitForExistence(within: 15))
+        XCTAssertEqual(secondSpeaker.value as? String, "Background voice")
+        audit(app, screen: "nameSpeaker-background-ax5", .textClipped)
+    }
 }
 
 /// Issues the audit reports that the app cannot or should not change, each for a stated reason.
