@@ -500,12 +500,21 @@ final class AccessibilityAuditTests: XCTestCase {
         secondSpeaker.tap()
         let sheetScroll = app.scrollViews["nameSpeakerScroll"]
         let bgToggle = app.switches["backgroundVoiceToggle"]
-        if !(bgToggle.exists && bgToggle.isHittable) {
-            XCTAssertTrue(sheetScroll.scroll(attempts: 10) { bgToggle.exists && bgToggle.isHittable },
+        let saveButton = app.buttons["saveSpeakerName"]
+        let toggleVisible: @MainActor () -> Bool = {
+            guard bgToggle.exists, bgToggle.isHittable else { return false }
+            return !saveButton.exists || bgToggle.frame.maxY < saveButton.frame.minY
+        }
+        if !toggleVisible() {
+            XCTAssertTrue(sheetScroll.scroll(attempts: 10, until: toggleVisible),
                           "Background voice toggle is not visible at AX5")
         }
-        bgToggle.tap()
         let placeholder = app.staticTexts["speakerNameField"]
+        bgToggle.tapWhenSettled()
+        if !placeholder.waitForExistence(within: 5) {
+            // On iOS 18, tapping the center of a tall AX5 Toggle row can miss the trailing UISwitch.
+            bgToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
         XCTAssertTrue(placeholder.waitForExistence(within: 15))
         XCTAssertEqual(secondSpeaker.value as? String, "Background voice")
         audit(app, screen: "nameSpeaker-background-ax5", .textClipped, modalOverNavigationBar: modalOverNav)
