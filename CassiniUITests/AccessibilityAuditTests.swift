@@ -170,9 +170,13 @@ final class AccessibilityAuditTests: XCTestCase {
         do {
             for pass in passes {
                 try app.performAccessibilityAudit(for: pass) { issue in
-                    if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped,
-                                                     modalOverNavigationBar: modalOverNavigationBar) {
+                    if AuditFilter.isNavigationTitle(issue, in: app, alreadySeen: titleClipped) {
                         titleClipped = true
+                        unattributedClips += 1
+                    } else if modalOverNavigationBar, issue.element == nil, issue.auditType == .textClipped,
+                              unattributedClips < 2 {
+                        // On iPad, a modal sheet without a navigation bar leaves the split view's dimmed
+                        // sidebar and detail navigation bars visible behind it; any attributed issue still fails.
                         unattributedClips += 1
                     } else if listRows, AuditFilter.isListRowPrediction(issue),
                               unattributedClips < listRowLimit {
@@ -526,9 +530,8 @@ enum AuditFilter {
     /// buttons, and the audit reports that without an element. Every text of the app's own views comes with its
     /// element, so only the first such issue, on a screen that shows a navigation bar, passes; a second is the app's.
     @MainActor static func isNavigationTitle(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication,
-                                             alreadySeen: Bool, modalOverNavigationBar: Bool = false) -> Bool {
-        issue.element == nil && issue.auditType == .textClipped && !alreadySeen
-            && (app.navigationBars.firstMatch.exists || modalOverNavigationBar)
+                                             alreadySeen: Bool) -> Bool {
+        issue.element == nil && issue.auditType == .textClipped && !alreadySeen && app.navigationBars.firstMatch.exists
     }
 
     /// "Potentially inaccessible text" with no element, on a screen that draws a transcript. The element detection reads
